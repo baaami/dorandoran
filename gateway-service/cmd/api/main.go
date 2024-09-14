@@ -8,7 +8,7 @@ import (
 	socketio "github.com/googollee/go-socket.io"
 )
 
-const webPort = 8080
+const webPort = 80
 
 type Config struct {
 	ws *socketio.Server

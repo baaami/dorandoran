@@ -1,0 +1,12 @@
+version: '3'
+services:
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: ./gateway-service/gateway-service.dockerfile
+    restart: always
+    ports:
+      - '2719:80'
+    deploy:
+      mode: replicated
+      replicas: 1
