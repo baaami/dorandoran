@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	socketio "github.com/googollee/go-socket.io"
 )
@@ -11,7 +12,8 @@ import (
 const webPort = 80
 
 type Config struct {
-	ws *socketio.Server
+	ws    *socketio.Server
+	users sync.Map
 }
 
 func main() {
@@ -19,8 +21,8 @@ func main() {
 
 	log.Printf("Starting Gateway service on port %d", webPort)
 
-	// 초기화
-	app.InitSocket()
+	// 소켓 서버 등록
+	app.RegisterSocketServer()
 
 	// HTTP 서버 설정
 	srv := &http.Server{

@@ -7,53 +7,43 @@ import (
 	socketio "github.com/googollee/go-socket.io"
 )
 
-func (app *Config) InitSocket() {
+// ChatMessage 구조체 정의
+type ChatMessage struct {
+	SenderID   string `json:"senderID"`
+	ReceiverID string `json:"receiverID"`
+	ChatRoomID string `json:"chatRoomID"`
+	Message    string `json:"message"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+func (app *Config) RegisterSocketServer() {
 	app.ws = socketio.NewServer(nil)
 
 	app.ws.OnConnect("/", func(s socketio.Conn) error {
 		s.SetContext("")
-		fmt.Println("connected to root namespace:", s.ID())
+		fmt.Println("connected to chat id:", s.ID())
+		// 유저 ID와 소켓 연결을 Config의 sync.Map에 저장
+		app.users.Store(s.ID(), s)
 		return nil
 	})
 
-	app.ws.OnConnect("/chat", func(s socketio.Conn) error {
-		s.SetContext("")
-		fmt.Println("connected to chat namespace:", s.ID())
-		return nil
-	})
+	app.ws.OnEvent("/", "message", func(s socketio.Conn, msg ChatMessage) string {
+		log.Printf("Received chat message: %v", msg)
 
-	app.ws.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
-		fmt.Println("notice:", msg)
-		s.Emit("reply", "have "+msg)
-	})
+		// 채팅방의 상대방에게 메시지 전달 (예: chatRoomID로 상대방을 찾는 로직 필요)
+		if receiverConn, ok := app.users.Load(msg.ReceiverID); ok {
+			log.Printf("Send Message %s to %s", msg.Message, msg.ReceiverID)
+			receiverConn.(socketio.Conn).Emit("new_message", msg.Message) // 상대방에게 새 메시지를 전달
+		}
 
-	app.ws.OnEvent("/chat", "message", func(s socketio.Conn, msg string) string {
-		fmt.Println("chat message:", msg)
-		s.Emit("reply", "received "+msg)
-		return "received " + msg
-	})
-
-	app.ws.OnEvent("/", "bye", func(s socketio.Conn) string {
-		last := s.Context().(string)
-		s.Emit("bye", last)
-		s.Close()
-		return last
-	})
-
-	app.ws.OnError("/", func(s socketio.Conn, e error) {
-		fmt.Printf("Error on root namespace for client %s: %v\n", s.ID(), e)
-	})
-
-	app.ws.OnError("/chat", func(s socketio.Conn, e error) {
-		fmt.Printf("Error on chat namespace for client %s: %v\n", s.ID(), e)
+		s.Emit("reply", "Message received and sent to user")
+		return "Message sent to user"
 	})
 
 	app.ws.OnDisconnect("/", func(s socketio.Conn, reason string) {
-		fmt.Printf("Client %s disconnected from root: %s\n", s.ID(), reason)
-	})
-
-	app.ws.OnDisconnect("/chat", func(s socketio.Conn, reason string) {
 		fmt.Printf("Client %s disconnected from chat: %s\n", s.ID(), reason)
+		// 유저 소켓 연결을 Config의 sync.Map에서 제거
+		app.users.Delete(s.ID())
 	})
 
 	go func() {
