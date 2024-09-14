@@ -1,5 +1,4 @@
 gateway-service/gatewayApp
 user-service/userApp
-client/go.mod
-client/go.sum
-client/main.go
+client
+db-data
