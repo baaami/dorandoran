@@ -23,16 +23,14 @@ func (app *Config) routes() http.Handler {
 	mux.Handle("/socket.io/", app.ws)
 
 	// API 명세
-	mux.Post("/", app.usage)
+	mux.Get("/", app.usage)
 
 	// 로그인
 	mux.Post("/auth/google", app.googleLogin)
 
 	// 유저 정보
-	mux.Post("/auth/google", app.googleLogin)
 
 	// 채팅
-	mux.Post("/auth/google", app.googleLogin)
 
 	return mux
 }
