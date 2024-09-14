@@ -1,4 +1,5 @@
 GATEWAY_BINARY=gatewayApp
+USER_BINARY=userApp
 
 ## up: starts all containers in the background without forcing build
 up:
@@ -24,4 +25,10 @@ down:
 build_gateway:
 	@echo "Building gateway binary..."
 	cd gateway-service && go build -o ${GATEWAY_BINARY} ./cmd/api
+	@echo "Done!"
+
+## build_gateway: builds the user binary as a linux executable
+build_user:
+	@echo "Building user binary..."
+	cd user-service && go build -o ${USER_BINARY} ./cmd/api
 	@echo "Done!"

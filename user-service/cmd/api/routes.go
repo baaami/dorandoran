@@ -10,6 +10,7 @@ import (
 func (app *Config) routes() http.Handler {
 	mux := chi.NewRouter()
 
+	// CORS 설정
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -19,20 +20,11 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Socket IO
-	mux.Handle("/socket.io/", app.ws)
-
-	// API 명세
-	mux.Get("/", app.usage)
-
-	// 로그인
-	mux.Handle("/auth", http.HandlerFunc(app.authService))
-
-	// 유저 정보
-	mux.Handle("/user", http.HandlerFunc(app.userService))
-
-	// 채팅
-	mux.Handle("/chat", http.HandlerFunc(app.chatService))
+	// 유저 서비스 관련 라우팅
+	mux.Get("/user/read", app.readUser)
+	mux.Post("/user/insert", app.insertUser)
+	mux.Put("/user/update", app.updateUser)
+	mux.Delete("/user/delete", app.deleteUser)
 
 	return mux
 }

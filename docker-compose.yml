@@ -10,3 +10,39 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: ./user-service/user-service.dockerfile
+    restart: always
+    ports:
+      - '2719:80'
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  mysql:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_DATABASE: users
+      MYSQL_ROOT_PASSWORD: sample
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./db-data/mysql:/var/lib/mysql
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  mongo:
+    image: 'mongo:4.2.16-bionic'
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_DATABASE: logs
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: sample
+    volumes:
+      - ./db-data/mongo/:/data/db
