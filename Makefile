@@ -1,5 +1,6 @@
 GATEWAY_BINARY=gatewayApp
 USER_BINARY=userApp
+CHAT_BINARY=chatApp
 
 ## up: starts all containers in the background without forcing build
 up:
@@ -8,7 +9,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user
+up_build: build_gateway build_user build_chat
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -18,17 +19,23 @@ up_build: build_gateway build_user
 ## down: stop docker compose
 down:
 	@echo "Stopping docker compose..."
-	docker-compose down
+	docker-compose downn
 	@echo "Done!"
 
-## build_gateway: builds the gateway binary as a linux executable
+## build_gateway: builds the gateway biary as a linux executable
 build_gateway:
 	@echo "Building gateway binary..."
 	cd gateway-service && env GOOS=linux CGO_ENABLED=0 go build -o ${GATEWAY_BINARY} ./cmd/api
 	@echo "Done!"
 
-## build_gateway: builds the user binary as a linux executable
+## build_user: builds the user binary as a linux executable
 build_user:
 	@echo "Building user binary..."
 	cd user-service && env GOOS=linux CGO_ENABLED=0 go build -o ${USER_BINARY} ./cmd/api
+	@echo "Done!"
+
+## build_chat: builds the chat binary as a linux executable
+build_chat:
+	@echo "Building chat binary..."
+	cd chat-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_BINARY} ./cmd/api
 	@echo "Done!"

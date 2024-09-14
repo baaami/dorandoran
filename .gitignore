@@ -2,3 +2,4 @@ gateway-service/gatewayApp
 user-service/userApp
 client
 db-data
+chat-service/chatApp

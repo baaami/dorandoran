@@ -20,6 +20,15 @@ services:
       mode: replicated
       replicas: 1
 
+  chat-service:
+    build:
+      context: ./chat-service
+      dockerfile: ./chat-service.dockerfile
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
+
   mysql:
     image: mysql:8
     restart: always
