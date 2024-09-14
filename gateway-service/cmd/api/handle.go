@@ -1,16 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
+	"log"
 	"net/http"
+	"strings"
 )
-
-type UserPayload struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
-}
 
 func (app *Config) usage(w http.ResponseWriter, r *http.Request) {
 	payload := jsonResponse{
@@ -21,72 +16,75 @@ func (app *Config) usage(w http.ResponseWriter, r *http.Request) {
 	_ = app.writeJSON(w, http.StatusOK, payload)
 }
 
-func (app *Config) userService(w http.ResponseWriter, r *http.Request) {
-	// 요청에서 데이터를 읽음 (예: JSON 데이터)
-	var userData map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&userData)
-	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
+func (app *Config) proxyService() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Proxy Request URL: %s", r.URL)
+
+		// 요청 경로에서 첫 번째 경로 요소를 추출
+		firstPath, trimmedPath := extractFirstPath(r.URL.Path)
+
+		// 첫 번째 경로 요소에 따라 targetURL 설정
+		baseURL := "http://" + firstPath + "-service"
+		targetURL := baseURL + trimmedPath
+
+		// 송신할 요청 생성
+		req, err := http.NewRequest(r.Method, targetURL, r.Body)
+		if err != nil {
+			http.Error(w, "Failed to create request", http.StatusInternalServerError)
+			return
+		}
+
+		// 원본 요청의 헤더를 모두 복사
+		for name, values := range r.Header {
+			for _, value := range values {
+				req.Header.Add(name, value)
+			}
+		}
+
+		// HTTP 클라이언트 생성
+		client := &http.Client{}
+
+		// 요청을 송신하고 응답을 받음
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, "Failed to send request", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		// 응답 헤더 설정
+		for name, values := range resp.Header {
+			for _, value := range values {
+				w.Header().Add(name, value)
+			}
+		}
+
+		// 상태 코드 설정
+		w.WriteHeader(resp.StatusCode)
+
+		// 응답 본문을 클라이언트에게 전달
+		_, err = io.Copy(w, resp.Body)
+		if err != nil {
+			http.Error(w, "Failed to copy response body", http.StatusInternalServerError)
+			return
+		}
 	}
-
-	// 데이터를 송신할 URL
-	targetURL := "http://user-service"
-
-	// 데이터를 JSON 형식으로 변환
-	jsonData, err := json.Marshal(userData)
-	if err != nil {
-		http.Error(w, "Error converting data to JSON", http.StatusInternalServerError)
-		return
-	}
-
-	// 송신할 요청 생성
-	req, err := http.NewRequest(r.Method, targetURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		http.Error(w, "Failed to create request", http.StatusInternalServerError)
-		return
-	}
-
-	// 요청에 필요한 헤더 추가
-	req.Header.Set("Content-Type", "application/json")
-
-	// HTTP 클라이언트 생성
-	client := &http.Client{}
-
-	// 요청을 송신하고 응답을 받음
-	resp, err := client.Do(req)
-	if err != nil {
-		http.Error(w, "Failed to send request", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	// 응답 내용 읽기
-	body, err := io.ReadAll(resp.Body) // ioutil.ReadAll 대신 io.ReadAll 사용
-	if err != nil {
-		http.Error(w, "Failed to read response", http.StatusInternalServerError)
-		return
-	}
-
-	// 응답을 클라이언트에게 반환
-	w.WriteHeader(resp.StatusCode)
-	w.Write(body)
 }
 
-func (app *Config) chatService(w http.ResponseWriter, r *http.Request) {
-	payload := jsonResponse{
-		Error:   false,
-		Message: "I will connect chat service here",
+// 첫 번째 경로 요소를 추출하고 나머지 경로를 반환하는 함수
+func extractFirstPath(path string) (string, string) {
+	// 경로를 '/'로 분리
+	parts := strings.SplitN(path, "/", 3)
+
+	// 첫 번째 경로 요소 (예: "user")와 나머지 경로 반환
+	if len(parts) > 1 {
+		firstPath := parts[1] // 첫 번째 경로 요소 (예: "user")
+		if len(parts) > 2 {
+			return firstPath, "/" + parts[2] // 나머지 경로 (예: "/read")
+		}
+		return firstPath, "/" // 경로가 없을 경우 루트 경로 반환
 	}
 
-	_ = app.writeJSON(w, http.StatusOK, payload)
-}
-
-func (app *Config) authService(w http.ResponseWriter, r *http.Request) {
-	payload := jsonResponse{
-		Error:   false,
-		Message: "I will Write Usage Here",
-	}
-
-	_ = app.writeJSON(w, http.StatusOK, payload)
+	// 경로가 비었을 경우 기본값 반환
+	return "", "/"
 }

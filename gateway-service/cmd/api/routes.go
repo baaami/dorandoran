@@ -20,19 +20,19 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	// Socket IO
-	mux.Handle("/socket.io/", app.ws)
+	mux.Handle("/socket.io/*", app.ws)
+
+	// 로그인
+	mux.Handle("/auth/*", http.HandlerFunc(app.proxyService()))
+
+	// 유저 정보
+	mux.Handle("/user/*", http.HandlerFunc(app.proxyService()))
+
+	// 채팅
+	mux.Handle("/chat/*", http.HandlerFunc(app.proxyService()))
 
 	// API 명세
 	mux.Get("/", app.usage)
-
-	// 로그인
-	mux.Handle("/auth", http.HandlerFunc(app.authService))
-
-	// 유저 정보
-	mux.Handle("/user", http.HandlerFunc(app.userService))
-
-	// 채팅
-	mux.Handle("/chat", http.HandlerFunc(app.chatService))
 
 	return mux
 }
