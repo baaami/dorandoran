@@ -3,7 +3,7 @@ services:
   gateway-service:
     build:
       context: ./gateway-service
-      dockerfile: ./gateway-service/gateway-service.dockerfile
+      dockerfile: ./gateway-service.dockerfile
     restart: always
     ports:
       - '2719:80'
@@ -14,10 +14,8 @@ services:
   user-service:
     build:
       context: ./user-service
-      dockerfile: ./user-service/user-service.dockerfile
+      dockerfile: ./user-service.dockerfile
     restart: always
-    ports:
-      - '2719:80'
     deploy:
       mode: replicated
       replicas: 1
