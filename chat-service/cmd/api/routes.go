@@ -25,5 +25,8 @@ func (app *Config) routes() http.Handler {
 	mux.Get("/list", app.getChatRooms)
 	mux.Delete("/delete/{id}", app.deleteChatRoom)
 
+	// 채팅 데이터 추가
+	mux.Post("/msg", app.addChatMsg)
+
 	return mux
 }

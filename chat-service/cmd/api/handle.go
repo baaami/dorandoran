@@ -2,11 +2,23 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/baaami/dorandoran/chat/cmd/data"
 	"github.com/go-chi/chi/v5"
 )
+
+// ChatMessage 구조체 정의
+type ChatMessage struct {
+	RoomID     string    `bson:"room_id"`
+	SenderID   string    `bson:"sender_id"`
+	ReceiverID string    `bson:"receiver_id"`
+	Message    string    `bson:"message"`
+	CreatedAt  time.Time `bson:"created_at"`
+}
 
 // 채팅방 구조체
 type ChatRoom struct {
@@ -70,4 +82,32 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 
 	// 채팅방을 찾지 못한 경우
 	http.Error(w, "Chat room not found", http.StatusNotFound)
+}
+
+// 채팅 메시지를 추가하는 핸들러
+func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
+	var chatMsg ChatMessage
+	err := json.NewDecoder(r.Body).Decode(&chatMsg)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// ChatEntry에 삽입
+	entry := data.ChatEntry{
+		RoomID:     chatMsg.RoomID,
+		SenderID:   chatMsg.SenderID,
+		ReceiverID: chatMsg.ReceiverID,
+		Message:    chatMsg.Message,
+	}
+
+	err = app.Models.ChatEntry.Insert(entry)
+	if err != nil {
+		http.Error(w, "Failed to insert chat message", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Chat message inserted successfully"))
+	log.Printf("Chat message from %s to %s inserted", chatMsg.SenderID, chatMsg.ReceiverID)
 }
