@@ -29,6 +29,15 @@ services:
       mode: replicated
       replicas: 1
 
+  consumer-service:
+    build:
+      context: ./consumer-service
+      dockerfile: ./consumer-service.dockerfile
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
+
   mysql:
     image: mysql:8
     restart: always
@@ -53,3 +62,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: sample
     volumes:
       - ./db-data/mongo/:/data/db
+
+  rabbitmq:
+    image: 'rabbitmq:3.9-alpine'
+    ports:
+      - '5672:5672'
+    deploy:
+      mode: replicated
+      replicas: 1
+    volumes:
+      - ./db-data/rabbitmq/:/var/lib/rabbitmq/

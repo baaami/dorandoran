@@ -1,6 +1,8 @@
 GATEWAY_BINARY=gatewayApp
 USER_BINARY=userApp
 CHAT_BINARY=chatApp
+CONSUMER_BINARY=consumerApp
+SERVICES=gateway-service user-service chat-service consumer-service
 
 ## up: starts all containers in the background without forcing build
 up:
@@ -9,17 +11,26 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user build_chat
+up_build: build_gateway build_user build_chat build_consumer
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
 	docker-compose up --build -d
 	@echo "Docker images built and started!"
 
+## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
+up_service: build_gateway build_user build_chat build_consumer
+	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
+	docker-compose stop ${SERVICES}
+	docker-compose rm -f ${SERVICES}
+	@echo "Building and starting services..."
+	docker-compose up --build -d ${SERVICES}
+	@echo "Services have been rebuilt and started!"
+
 ## down: stop docker compose
 down:
 	@echo "Stopping docker compose..."
-	docker-compose downn
+	docker-compose down
 	@echo "Done!"
 
 ## build_gateway: builds the gateway biary as a linux executable
@@ -38,4 +49,10 @@ build_user:
 build_chat:
 	@echo "Building chat binary..."
 	cd chat-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_BINARY} ./cmd/api
+	@echo "Done!"
+
+## build_consumer: builds the consumer binary as a linux executable
+build_consumer:
+	@echo "Building consumer binary..."
+	cd consumer-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CONSUMER_BINARY} .
 	@echo "Done!"
