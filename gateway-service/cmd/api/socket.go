@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -39,7 +38,14 @@ func (app *Config) RegisterSocketServer() {
 			receiverConn.(socketio.Conn).Emit("new_message", chatMsg.Message) // 상대방에게 새 메시지를 전달
 
 			// push rabbitmq
-			app.pushChatToQueue(chatMsg)
+			emitter, err := event.NewEventEmitter(app.Rabbit)
+			if err != nil {
+				log.Printf("Failed to NewEventEmitter, err: %s", err.Error())
+				return err.Error()
+			}
+
+			// push rabbitmq
+			emitter.PushChatToQueue(event.ChatMessage(chatMsg))
 		}
 
 		s.Emit("reply", "Message received and sent to user")
@@ -61,33 +67,4 @@ func (app *Config) RegisterSocketServer() {
 			log.Fatalf("Socket.IO server error: %v", err)
 		}
 	}()
-}
-
-// pushChatToQueue pushes a message into RabbitMQ
-func (app *Config) pushChatToQueue(chatMsg ChatMessage) error {
-	if app.Rabbit == nil {
-		log.Println("RabbitMQ connection is nil")
-		return fmt.Errorf("RabbitMQ connection is nil")
-	}
-
-	emitter, err := event.NewEventEmitter(app.Rabbit)
-	if err != nil {
-		return err
-	}
-
-	payload := ChatMessage{
-		SenderID:   chatMsg.SenderID,
-		ReceiverID: chatMsg.ReceiverID,
-		RoomID:     chatMsg.RoomID,
-		Message:    chatMsg.Message,
-		CreatedAt:  chatMsg.CreatedAt,
-	}
-
-	j, _ := json.MarshalIndent(&payload, "", "\t")
-	err = emitter.Push(string(j), "chat")
-	if err != nil {
-		log.Printf("Failed to push message to queue: %v", err)
-		return err
-	}
-	return nil
 }
