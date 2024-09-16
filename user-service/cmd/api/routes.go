@@ -21,10 +21,10 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	// 유저 서비스 관련 라우팅
-	mux.Get("/read", app.readUser)
+	mux.Get("/read/{id}", app.readUser)
 	mux.Post("/create", app.insertUser)
-	mux.Put("/update", app.updateUser)
-	mux.Delete("/delete", app.deleteUser)
+	mux.Put("/update/{id}", app.updateUser)
+	mux.Delete("/delete/{id}", app.deleteUser)
 
 	return mux
 }

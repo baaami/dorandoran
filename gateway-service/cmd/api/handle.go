@@ -30,6 +30,7 @@ func (app *Config) proxyService() http.HandlerFunc {
 		// 송신할 요청 생성
 		req, err := http.NewRequest(r.Method, targetURL, r.Body)
 		if err != nil {
+			log.Printf("method: %s, url: %s, body: %v, err: %s", r.Method, targetURL, r.Body, err.Error())
 			http.Error(w, "Failed to create request", http.StatusInternalServerError)
 			return
 		}
