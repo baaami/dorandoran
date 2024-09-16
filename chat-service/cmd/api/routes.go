@@ -21,12 +21,13 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	// 채팅방 관련 라우팅
-	mux.Post("/create", app.createChatRoom)
-	mux.Get("/list", app.getChatRooms)
-	mux.Delete("/delete/{id}", app.deleteChatRoom)
+	mux.Post("/room/create", app.createChatRoom)
+	mux.Get("/room/list", app.getChatRooms)
+	mux.Delete("/room/delete/{id}", app.deleteChatRoom)
 
-	// 채팅 데이터 추가
+	// 채팅 메시지
 	mux.Post("/msg", app.addChatMsg)
+	mux.Get("/list/{id}", app.getChatMsgList)
 
 	return mux
 }

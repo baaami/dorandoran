@@ -111,3 +111,23 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Chat message inserted successfully"))
 	log.Printf("Chat message from %s to %s inserted", chatMsg.SenderID, chatMsg.ReceiverID)
 }
+
+func (app *Config) getChatMsgList(w http.ResponseWriter, r *http.Request) {
+	// URL에서 room ID 가져오기
+	roomID := chi.URLParam(r, "id")
+
+	messages, err := app.Models.ChatEntry.GetByRoomID(roomID)
+	if err != nil {
+		log.Printf("Failed to GetByRoomID, err: %v", err)
+		http.Error(w, "Failed to chatentry", http.StatusInternalServerError)
+		return
+	}
+
+	// 결과를 JSON으로 변환하여 반환
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(messages); err != nil {
+		log.Printf("Failed to encode messages, msg: %v, err: %v", messages, err)
+		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
+		return
+	}
+}
