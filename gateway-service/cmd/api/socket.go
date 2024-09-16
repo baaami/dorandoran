@@ -45,7 +45,7 @@ func (app *Config) RegisterSocketServer() {
 			}
 
 			// push rabbitmq
-			emitter.PushChatToQueue(event.ChatMessage(chatMsg))
+			emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
 		}
 
 		s.Emit("reply", "Message received and sent to user")

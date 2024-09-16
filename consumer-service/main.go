@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// watch the queue and consume events
-	err = consumer.Listen([]string{"chat.#"}) // chat.# 패턴으로 수신
+	err = consumer.Listen([]string{"chat.#", "auth.#"})
 	if err != nil {
 		log.Println(err)
 	}

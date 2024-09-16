@@ -20,6 +20,16 @@ type ChatMessage struct {
 	CreatedAt  time.Time `bson:"created_at"`
 }
 
+// User 구조체 정의
+type User struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Nickname string `json:"nickname"`
+	Gender   int    `json:"gender"`
+	Age      int    `json:"age"`
+	Email    string `json:"email"`
+}
+
 type Consumer struct {
 	conn      *amqp.Connection
 	queueName string
@@ -45,17 +55,19 @@ func (consumer *Consumer) setup() error {
 		return err
 	}
 
+	// Exchange 선언
 	return declareChatExchange(channel)
 }
 
-type Payload struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
+// EventPayload 구조체 정의
+type EventPayload struct {
+	EventType string          `json:"event_type"`
+	Data      json.RawMessage `json:"data"`
 }
 
-// Listen 함수는 RabbitMQ에서 chat 메시지를 수신합니다.
+// Listen 함수는 RabbitMQ에서 메시지를 수신하여 이벤트 처리
 func (consumer *Consumer) Listen(topics []string) error {
-	log.Println("Setting up listener for chat topics...")
+	log.Println("Setting up listener for events...")
 
 	ch, err := consumer.conn.Channel()
 	if err != nil {
@@ -75,7 +87,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 		err = ch.QueueBind(
 			q.Name,
 			s,
-			"chat_topic", // chat_topic exchange로 바인딩
+			"chat_topic", // 이벤트를 수신할 exchange
 			false,
 			nil,
 		)
@@ -99,18 +111,36 @@ func (consumer *Consumer) Listen(topics []string) error {
 		for d := range messages {
 			log.Printf("Message received: %s", d.Body)
 
-			var chatMsg ChatMessage
-			err := json.Unmarshal(d.Body, &chatMsg)
+			var eventPayload EventPayload
+			err := json.Unmarshal(d.Body, &eventPayload)
 			if err != nil {
 				log.Printf("Failed to unmarshal message: %v", err)
 				continue
 			}
 
-			// 채팅 메시지 로그 출력
-			log.Printf("Received chat message from %s to %s in room %s: %s", chatMsg.SenderID, chatMsg.ReceiverID, chatMsg.RoomID, chatMsg.Message)
-			handleChatPayload(chatMsg)
+			// 이벤트 타입에 따라 처리
+			switch eventPayload.EventType {
+			case "chat":
+				var chatMsg ChatMessage
+				err := json.Unmarshal(eventPayload.Data, &chatMsg)
+				if err != nil {
+					log.Printf("Failed to unmarshal chat message: %v", err)
+					continue
+				}
+				handleChatPayload(chatMsg)
 
-			// 이후 MongoDB에 저장하는 로직을 여기에 추가 가능
+			case "user.created":
+				var user User
+				err := json.Unmarshal(eventPayload.Data, &user)
+				if err != nil {
+					log.Printf("Failed to unmarshal user message: %v", err)
+					continue
+				}
+				handleUserPayload(user)
+
+			default:
+				log.Printf("Unknown event type: %s", eventPayload.EventType)
+			}
 		}
 	}()
 
@@ -120,6 +150,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 	return nil
 }
 
+// handleChatPayload는 채팅 메시지를 처리하는 함수
 func handleChatPayload(chatMsg ChatMessage) error {
 	payload := ChatMessage{
 		SenderID:   chatMsg.SenderID,
@@ -135,7 +166,7 @@ func handleChatPayload(chatMsg ChatMessage) error {
 
 	request, err := http.NewRequest("POST", chatServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("Failed to NewRequest(): %v", err)
+		log.Printf("Failed to create request: %v", err)
 		return err
 	}
 
@@ -145,45 +176,28 @@ func handleChatPayload(chatMsg ChatMessage) error {
 
 	response, err := client.Do(request)
 	if err != nil {
-		log.Printf("Failed to Request: %v", err)
+		log.Printf("Failed to send request: %v", err)
 		return err
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusAccepted {
-		log.Printf("Failed to Response: %v", err)
+	if response.StatusCode != http.StatusCreated {
+		log.Printf("Failed to send chat message: %v", err)
 		return err
 	}
 
 	return nil
 }
 
-// TODO: Socket에 맞춰서 payload 형식을 맞춰야함
-func handlePayload(payload Payload) {
-	switch payload.Name {
-	case "log", "event":
-		// log whatever we get
-		err := logEvent(payload)
-		if err != nil {
-			log.Println(err)
-		}
+// handleUserPayload는 유저 생성 이벤트를 처리하는 함수
+func handleUserPayload(user User) error {
+	jsonData, _ := json.MarshalIndent(&user, "", "\t")
 
-	case "auth":
-		// authenticate
-		// you can have as many cases as you want, as long as you write the logic
+	userServiceURL := "http://user-service/user/insert"
 
-	default:
-		break
-	}
-}
-
-func logEvent(entry Payload) error {
-	jsonData, _ := json.MarshalIndent(entry, "", "\t")
-
-	logServiceURL := "http://logger-service/log"
-
-	request, err := http.NewRequest("POST", logServiceURL, bytes.NewBuffer(jsonData))
+	request, err := http.NewRequest("POST", userServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("Failed to create request: %v", err)
 		return err
 	}
 
@@ -193,13 +207,16 @@ func logEvent(entry Payload) error {
 
 	response, err := client.Do(request)
 	if err != nil {
+		log.Printf("Failed to send request: %v", err)
 		return err
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusAccepted {
+	if response.StatusCode != http.StatusCreated {
+		log.Printf("Failed to send user creation event: %v", err)
 		return err
 	}
 
+	log.Println("User creation event successfully sent to user-service")
 	return nil
 }
