@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
 	socketio "github.com/googollee/go-socket.io"
@@ -11,11 +12,11 @@ import (
 
 // ChatMessage 구조체 정의
 type ChatMessage struct {
-	SenderID   string `json:"senderID"`
-	ReceiverID string `json:"receiverID"`
-	ChatRoomID string `json:"chatRoomID"`
-	Message    string `json:"message"`
-	CreatedAt  string `json:"createdAt"`
+	RoomID     string    `bson:"room_id"`
+	SenderID   string    `bson:"sender_id"`
+	ReceiverID string    `bson:"receiver_id"`
+	Message    string    `bson:"message"`
+	CreatedAt  time.Time `bson:"created_at"`
 }
 
 func (app *Config) RegisterSocketServer() {
@@ -77,7 +78,7 @@ func (app *Config) pushChatToQueue(chatMsg ChatMessage) error {
 	payload := ChatMessage{
 		SenderID:   chatMsg.SenderID,
 		ReceiverID: chatMsg.ReceiverID,
-		ChatRoomID: chatMsg.ChatRoomID,
+		RoomID:     chatMsg.RoomID,
 		Message:    chatMsg.Message,
 		CreatedAt:  chatMsg.CreatedAt,
 	}

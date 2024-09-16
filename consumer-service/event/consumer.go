@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // ChatMessage 구조체 정의
 type ChatMessage struct {
-	SenderID   string `json:"senderID"`
-	ReceiverID string `json:"receiverID"`
-	ChatRoomID string `json:"chatRoomID"`
-	Message    string `json:"message"`
-	CreatedAt  string `json:"createdAt"`
+	RoomID     string    `bson:"room_id"`
+	SenderID   string    `bson:"sender_id"`
+	ReceiverID string    `bson:"receiver_id"`
+	Message    string    `bson:"message"`
+	CreatedAt  time.Time `bson:"created_at"`
 }
 
 type Consumer struct {
@@ -106,7 +107,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 			}
 
 			// 채팅 메시지 로그 출력
-			log.Printf("Received chat message from %s to %s in room %s: %s", chatMsg.SenderID, chatMsg.ReceiverID, chatMsg.ChatRoomID, chatMsg.Message)
+			log.Printf("Received chat message from %s to %s in room %s: %s", chatMsg.SenderID, chatMsg.ReceiverID, chatMsg.RoomID, chatMsg.Message)
 			handleChatPayload(chatMsg)
 
 			// 이후 MongoDB에 저장하는 로직을 여기에 추가 가능
@@ -123,7 +124,7 @@ func handleChatPayload(chatMsg ChatMessage) error {
 	payload := ChatMessage{
 		SenderID:   chatMsg.SenderID,
 		ReceiverID: chatMsg.ReceiverID,
-		ChatRoomID: chatMsg.ChatRoomID,
+		RoomID:     chatMsg.RoomID,
 		Message:    chatMsg.Message,
 		CreatedAt:  chatMsg.CreatedAt,
 	}
