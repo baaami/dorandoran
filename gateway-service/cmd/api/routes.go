@@ -22,6 +22,9 @@ func (app *Config) routes() http.Handler {
 	// Socket IO
 	mux.Handle("/socket.io/*", app.ws)
 
+	// 매칭
+	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))
+
 	// 로그인
 	mux.Handle("/auth/*", http.HandlerFunc(app.proxyService()))
 
