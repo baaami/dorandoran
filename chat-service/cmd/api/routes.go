@@ -20,12 +20,15 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 
-	// 채팅방 관련 라우팅
+	// 채팅방
+	mux.Get("/room/list/{user_id}", app.getChatRoomsByUserID)
+	mux.Get("/room/{id}", app.getChatRoomByID)
+
 	mux.Post("/room/create", app.createChatRoom)
-	mux.Get("/room/list", app.getChatRooms)
+
 	mux.Delete("/room/delete/{id}", app.deleteChatRoom)
 
-	// 채팅 메시지
+	// 채팅
 	mux.Post("/msg", app.addChatMsg)
 	mux.Get("/list/{id}", app.getChatMsgList)
 

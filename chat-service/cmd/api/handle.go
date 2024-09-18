@@ -5,103 +5,115 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/baaami/dorandoran/chat/cmd/data"
 	"github.com/go-chi/chi/v5"
 )
 
-// ChatMessage 구조체 정의
-type ChatMessage struct {
-	RoomID     string    `bson:"room_id"`
-	SenderID   string    `bson:"sender_id"`
-	ReceiverID string    `bson:"receiver_id"`
-	Message    string    `bson:"message"`
-	CreatedAt  time.Time `bson:"created_at"`
-}
-
-// 채팅방 구조체
-type ChatRoom struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-// 채팅방 목록 (메모리 상에서 관리)
-var chatRooms = []ChatRoom{}
-var nextID = 1
-
-// 채팅방 생성 API
+// 채팅방 생성
 func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
-	var newChatRoom ChatRoom
+	var room data.ChatRoom
 
-	// 요청에서 채팅방 정보를 읽음
-	err := json.NewDecoder(r.Body).Decode(&newChatRoom)
+	// 요청 바디에서 데이터 읽기
+	err := json.NewDecoder(r.Body).Decode(&room)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	// ID 자동 증가
-	newChatRoom.ID = nextID
-	nextID++
-
-	// 채팅방을 목록에 추가
-	chatRooms = append(chatRooms, newChatRoom)
-
-	// 생성된 채팅방 정보를 반환
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(newChatRoom)
-}
-
-// 채팅방 목록 불러오기 API
-func (app *Config) getChatRooms(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(chatRooms)
-}
-
-// 채팅방 삭제 API
-func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
-	// URL 경로에서 채팅방 ID를 가져옴
-	idParam := chi.URLParam(r, "id")
-	id, err := strconv.Atoi(idParam)
+	// MongoDB에 새로운 채팅방 삽입
+	err = app.Models.ChatRoom.InsertRoom(&room)
 	if err != nil {
-		http.Error(w, "Invalid chat room ID", http.StatusBadRequest)
+		http.Error(w, "Failed to create chat room", http.StatusInternalServerError)
 		return
 	}
 
-	// 채팅방을 찾고 삭제
-	for i, room := range chatRooms {
-		if room.ID == id {
-			chatRooms = append(chatRooms[:i], chatRooms[i+1:]...)
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"message": "Chat room deleted"}`))
-			return
-		}
-	}
-
-	// 채팅방을 찾지 못한 경우
-	http.Error(w, "Chat room not found", http.StatusNotFound)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(room)
 }
 
-// 채팅 메시지를 추가하는 핸들러
+// 특정 유저의 채팅방 목록 조회
+func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) {
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// MongoDB에서 특정 유저가 참여한 채팅방 목록 조회
+	rooms, err := app.Models.ChatRoom.GetRoomsByUserID(userID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve chat rooms", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(rooms)
+}
+
+// Room ID로 채팅방 조회
+func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
+	roomIDStr := chi.URLParam(r, "id")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		http.Error(w, "Invalid room ID", http.StatusBadRequest)
+		return
+	}
+
+	// MongoDB에서 Room ID로 채팅방 조회
+	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
+	if err != nil {
+		http.Error(w, "Failed to find chat room", http.StatusInternalServerError)
+		return
+	}
+	if room == nil {
+		http.Error(w, "Chat room not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(room)
+}
+
+// 특정 Room ID로 채팅방 삭제
+func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
+	roomIDStr := chi.URLParam(r, "id")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil {
+		http.Error(w, "Invalid room ID", http.StatusBadRequest)
+		return
+	}
+
+	// MongoDB에서 Room ID로 채팅방 삭제
+	err = app.Models.ChatRoom.DeleteRoom(roomID)
+	if err != nil {
+		http.Error(w, "Failed to delete chat room", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Chat room deleted"})
+}
+
+// 채팅 메시지 추가
 func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
-	var chatMsg ChatMessage
+	var chatMsg data.Chat
 	err := json.NewDecoder(r.Body).Decode(&chatMsg)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	// ChatEntry에 삽입
-	entry := data.ChatEntry{
+	// Chat에 삽입
+	entry := data.Chat{
 		RoomID:     chatMsg.RoomID,
 		SenderID:   chatMsg.SenderID,
 		ReceiverID: chatMsg.ReceiverID,
 		Message:    chatMsg.Message,
 	}
 
-	err = app.Models.ChatEntry.Insert(entry)
+	err = app.Models.Chat.Insert(entry)
 	if err != nil {
 		http.Error(w, "Failed to insert chat message", http.StatusInternalServerError)
 		return
@@ -112,14 +124,15 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Chat message from %s to %s inserted", chatMsg.SenderID, chatMsg.ReceiverID)
 }
 
+// 특정 방의 채팅 메시지 리스트 획득
 func (app *Config) getChatMsgList(w http.ResponseWriter, r *http.Request) {
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")
 
-	messages, err := app.Models.ChatEntry.GetByRoomID(roomID)
+	messages, err := app.Models.Chat.GetByRoomID(roomID)
 	if err != nil {
 		log.Printf("Failed to GetByRoomID, err: %v", err)
-		http.Error(w, "Failed to chatentry", http.StatusInternalServerError)
+		http.Error(w, "Failed to Chat", http.StatusInternalServerError)
 		return
 	}
 
