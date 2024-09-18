@@ -113,6 +113,7 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 		return err
 	}
 	room.ID = lastRoom.ID + 1
+	room.LastConfirmID = -1
 	room.CreatedAt = time.Now()
 	room.ModifiedAt = time.Now()
 	room.ConfirmAt = time.Now()

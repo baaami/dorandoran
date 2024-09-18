@@ -1,6 +1,9 @@
 gateway-service/gatewayApp
 user-service/userApp
+auth-service/authApp
+consumer-service/consumerApp
+chat-service/chatApp
 client
 db-data
-chat-service/chatApp
-consumer-service/consumerApp
+index.html
+.DS_Store

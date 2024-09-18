@@ -52,7 +52,7 @@ func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(rooms)
 }
 
-// Room ID로 채팅방 조회
+// Room ID로 채팅방 상세 정보 조회
 func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	roomIDStr := chi.URLParam(r, "id")
 	roomID, err := strconv.Atoi(roomIDStr)

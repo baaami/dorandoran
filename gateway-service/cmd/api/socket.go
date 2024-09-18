@@ -35,7 +35,7 @@ func (app *Config) RegisterSocketServer() {
 		// 채팅방의 상대방에게 메시지 전달 (예: chatRoomID로 상대방을 찾는 로직 필요)
 		if receiverConn, ok := app.users.Load(chatMsg.ReceiverID); ok {
 			log.Printf("Send Message %s to %s", chatMsg.Message, chatMsg.ReceiverID)
-			receiverConn.(socketio.Conn).Emit("new_message", chatMsg.Message) // 상대방에게 새 메시지를 전달
+			receiverConn.(socketio.Conn).Emit("message", chatMsg.Message) // 상대방에게 새 메시지를 전달
 
 			// push rabbitmq
 			emitter, err := event.NewEventEmitter(app.Rabbit)
