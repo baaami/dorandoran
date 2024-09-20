@@ -38,6 +38,30 @@ services:
       mode: replicated
       replicas: 1
 
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: ./auth-service.dockerfile
+    restart: always
+    environment:
+      KAKAO_REDIRECT_URI: http://localhost:5500/index.html # Redirect URI
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  match-service:
+    build:
+      context: ./match-service
+      dockerfile: ./match-service.dockerfile
+    restart: always
+    environment:
+      REDIS_HOST: redis # Redis 서비스 이름
+      REDIS_PORT: 6379 # Redis 기본 포트
+      REDIS_PASSWORD: admin # Redis 비밀번호
+    deploy:
+      mode: replicated
+      replicas: 1
+
   mysql:
     image: mysql:8
     restart: always
@@ -72,3 +96,14 @@ services:
       replicas: 1
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
+
+  redis:
+    image: redis:alpine
+    restart: always
+    environment:
+      REDIS_PASSWORD: admin # Redis 비밀번호 설정
+    ports:
+      - '6379:6379'
+    command: ['redis-server', '--requirepass', 'admin'] # Redis 비밀번호 설정 명령어
+    volumes:
+      - ./db-data/redis:/data # Redis 데이터 저장소 마운트
