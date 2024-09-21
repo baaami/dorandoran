@@ -1,11 +1,16 @@
-package main
+// gateway-service/pkg/socket/socket.go
+package socket
 
 import (
 	"encoding/json"
 	"log"
+	"sync"
+
 	"net/http"
 
 	"github.com/baaami/dorandoran/broker/event"
+	"github.com/gorilla/websocket"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // 메시지 타입 정의
@@ -15,14 +20,26 @@ const (
 	MessageTypeRegister = "register" // 유저 등록 메시지
 )
 
-type RegisterMessage struct {
-	UserID string `json:"user_id"`
+type Config struct {
+	Clients map[string]*websocket.Conn
+	Mu      sync.Mutex
+	Rabbit  *amqp.Connection
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 // WebSocket 메시지 구조체 정의
 type WebSocketMessage struct {
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload"`
+}
+
+type RegisterMessage struct {
+	UserID string `json:"user_id"`
 }
 
 // 채팅 메시지 구조체 정의
@@ -34,7 +51,7 @@ type ChatMessage struct {
 }
 
 // WebSocket 연결 처리
-func (app *Config) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
@@ -51,9 +68,9 @@ func (app *Config) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Error reading message: %v", err)
 			// 유저가 연결 해제되면 해당 유저를 메모리에서 제거
 			if userID != "" {
-				app.mu.Lock()
-				delete(app.clients, userID)
-				app.mu.Unlock()
+				app.Mu.Lock()
+				delete(app.Clients, userID)
+				app.Mu.Unlock()
 			}
 			return
 		}
@@ -75,9 +92,9 @@ func (app *Config) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			userID = regiMsg.UserID
 
-			app.mu.Lock()
-			app.clients[userID] = conn
-			app.mu.Unlock()
+			app.Mu.Lock()
+			app.Clients[userID] = conn
+			app.Mu.Unlock()
 			log.Printf("User %s registered", userID)
 
 		case MessageTypeChat:
@@ -89,28 +106,27 @@ func (app *Config) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			log.Printf("chatMsg %v", chatMsg)
-			app.handleChatMessage(chatMsg)
+			app.HandleChatMessage(chatMsg)
 		}
 	}
 }
 
 // 채팅 메시지 처리
-func (app *Config) handleChatMessage(chatMsg ChatMessage) {
+func (app *Config) HandleChatMessage(chatMsg ChatMessage) {
 	log.Printf("Received chat message from %s: %s", chatMsg.SenderID, chatMsg.Message)
 
-	// 수신자에게 메시지 전달
-	app.mu.Lock()
-	if receiverConn, ok := app.clients[chatMsg.ReceiverID]; ok {
+	app.Mu.Lock()
+	if receiverConn, ok := app.Clients[chatMsg.ReceiverID]; ok {
 		log.Printf("Sending message to %s", chatMsg.ReceiverID)
 		receiverConn.WriteJSON(chatMsg)
 
-		// 메시지를 RabbitMQ에 푸시
-		emitter, err := event.NewEventEmitter(app.Rabbit)
+		// RabbitMQ 메시지 전송
+		emitter, err := event.NewEventEmitter(app.Rabbit) // 여기에 맞게 구현 필요
 		if err == nil {
 			emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
 		}
 	} else {
 		log.Printf("Receiver %s not connected", chatMsg.ReceiverID)
 	}
-	app.mu.Unlock()
+	app.Mu.Unlock()
 }
