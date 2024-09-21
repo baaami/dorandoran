@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/baaami/dorandoran/broker/event"
+	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -20,8 +21,9 @@ const (
 )
 
 type Config struct {
-	Clients sync.Map
-	Rabbit  *amqp.Connection
+	Clients     sync.Map
+	Rabbit      *amqp.Connection
+	RedisClient *redis.RedisClient
 }
 
 var upgrader = websocket.Upgrader{
@@ -36,6 +38,10 @@ type WebSocketMessage struct {
 }
 
 type RegisterMessage struct {
+	UserID string `json:"user_id"`
+}
+
+type MatchMessage struct {
 	UserID string `json:"user_id"`
 }
 
@@ -93,6 +99,14 @@ func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			log.Printf("chatMsg %v", chatMsg)
 			app.HandleChatMessage(chatMsg)
+
+		case MessageTypeMatch:
+			var matchMsg MatchMessage
+			if err := json.Unmarshal(wsMsg.Payload, &matchMsg); err != nil {
+				log.Printf("Failed to unmarshal match message: %v", err)
+				continue
+			}
+			app.HandleMatchRequest(matchMsg, conn)
 		}
 	}
 }
@@ -111,5 +125,53 @@ func (app *Config) HandleChatMessage(chatMsg ChatMessage) {
 		}
 	} else {
 		log.Printf("Receiver %s not connected", chatMsg.ReceiverID)
+	}
+}
+
+// HandleMatchRequest 매칭 요청 처리
+func (app *Config) HandleMatchRequest(matchMsg MatchMessage, conn *websocket.Conn) {
+	// Redis 대기열에 유저 추가
+	err := app.RedisClient.AddUserToQueue(matchMsg.UserID)
+	if err != nil {
+		log.Printf("Failed to add user to Redis queue: %v", err)
+		return
+	}
+	log.Printf("User %s added to match queue", matchMsg.UserID)
+
+	waitingClients, err := app.RedisClient.GetAllUsersInQueue()
+	if err != nil {
+		log.Printf("Failed to get users from Redis queue: %v", err)
+		return
+	}
+
+	log.Printf("Waiting Clients %v", waitingClients)
+
+	// 매칭을 위해 두 명의 유저를 대기열에서 가져옴
+	user1, user2, err := app.RedisClient.PopUsersFromQueue()
+	if err != nil {
+		log.Printf("Failed to pop users from queue: %v", err)
+		return
+	}
+
+	if user1 != "" && user2 != "" {
+		// 매칭 성공
+		roomID := user1 + "-" + user2
+		matchResponse := map[string]string{
+			"user1_id": user1,
+			"user2_id": user2,
+			"room_id":  roomID,
+		}
+
+		// 유저1에게 매칭 정보 전달
+		if conn1, ok := app.Clients.Load(user1); ok {
+			conn1.(*websocket.Conn).WriteJSON(matchResponse)
+		}
+
+		// 유저2에게 매칭 정보 전달
+		if conn2, ok := app.Clients.Load(user2); ok {
+			conn2.(*websocket.Conn).WriteJSON(matchResponse)
+		}
+
+		log.Printf("Match made between %s and %s in room %s", user1, user2, roomID)
 	}
 }

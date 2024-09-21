@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/baaami/dorandoran/broker/pkg/socket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -19,6 +20,9 @@ type Config struct {
 }
 
 func main() {
+	// Redis 클라이언트 생성
+	redisClient := redis.NewRedisClient()
+
 	// RabbitMQ 연결
 	rabbitConn, err := connect()
 	if err != nil {
@@ -34,8 +38,9 @@ func main() {
 	// WebSocket 서버 설정
 	// WebSocket 설정
 	wsConfig := &socket.Config{
-		Clients: sync.Map{},
-		Rabbit:  rabbitConn,
+		Clients:     sync.Map{},
+		Rabbit:      rabbitConn,
+		RedisClient: redisClient,
 	}
 
 	log.Printf("Starting Gateway service on port %d", webPort)
