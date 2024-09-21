@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/cors"
 )
 
-func (app *Config) routes(wsConfig socket.Config) http.Handler {
+func (app *Config) routes(wsConfig *socket.Config) http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(cors.Handler(cors.Options{

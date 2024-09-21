@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/baaami/dorandoran/broker/pkg/socket"
-	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -33,9 +32,9 @@ func main() {
 	}
 
 	// WebSocket 서버 설정
-	wsConfig := socket.Config{
-		Clients: make(map[string]*websocket.Conn),
-		Mu:      sync.Mutex{},
+	// WebSocket 설정
+	wsConfig := &socket.Config{
+		Clients: sync.Map{},
 		Rabbit:  rabbitConn,
 	}
 
