@@ -4,7 +4,8 @@ CHAT_BINARY=chatApp
 CONSUMER_BINARY=consumerApp
 AUTH_BINARY=authApp
 MATCH_BINARY=matchApp
-SERVICES=gateway-service user-service chat-service consumer-service auth-service match-service
+REALTIME_BINARY=realtimeApp
+SERVICES=gateway-service user-service chat-service consumer-service auth-service match-service realtime-service
 
 ## up: starts all containers in the background without forcing build
 up:
@@ -13,7 +14,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user build_chat build_consumer build_auth build_match
+up_build: build_gateway build_user build_chat build_consumer build_auth build_match build_realtime
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -21,7 +22,7 @@ up_build: build_gateway build_user build_chat build_consumer build_auth build_ma
 	@echo "Docker images built and started!"
 
 ## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
-up_service: build_gateway build_user build_chat build_consumer build_auth build_match
+up_service: build_gateway build_user build_chat build_consumer build_auth build_match build_realtime
 	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
 	docker-compose stop ${SERVICES}
 	docker-compose rm -f ${SERVICES}
@@ -71,3 +72,8 @@ build_consumer:
 	cd consumer-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CONSUMER_BINARY} .
 	@echo "Done!"
 
+## build_realtime: builds the consumer binary as a linux executable
+build_realtime:
+	@echo "Building realtime binary..."
+	cd realtime-service && env GOOS=linux CGO_ENABLED=0 go build -o ${REALTIME_BINARY} ./cmd
+	@echo "Done!"

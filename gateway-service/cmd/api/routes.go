@@ -19,9 +19,6 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Socket IO
-	mux.Handle("/socket.io/*", app.ws)
-
 	// 매칭
 	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))
 
