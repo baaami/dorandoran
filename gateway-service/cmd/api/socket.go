@@ -1,70 +1,116 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"log"
-	"time"
+	"net/http"
 
 	"github.com/baaami/dorandoran/broker/event"
-	socketio "github.com/googollee/go-socket.io"
 )
 
-// ChatMessage 구조체 정의
-type ChatMessage struct {
-	RoomID     string    `bson:"room_id"`
-	SenderID   string    `bson:"sender_id"`
-	ReceiverID string    `bson:"receiver_id"`
-	Message    string    `bson:"message"`
-	CreatedAt  time.Time `bson:"created_at"`
+// 메시지 타입 정의
+const (
+	MessageTypeChat     = "chat"
+	MessageTypeMatch    = "match"
+	MessageTypeRegister = "register" // 유저 등록 메시지
+)
+
+type RegisterMessage struct {
+	UserID string `json:"user_id"`
 }
 
-func (app *Config) RegisterSocketServer() {
-	app.ws = socketio.NewServer(nil)
+// WebSocket 메시지 구조체 정의
+type WebSocketMessage struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}
 
-	app.ws.OnConnect("/", func(s socketio.Conn) error {
-		s.SetContext("")
-		fmt.Println("connected to chat id:", s.ID())
-		// 유저 ID와 소켓 연결을 Config의 sync.Map에 저장
-		app.users.Store(s.ID(), s)
-		return nil
-	})
+// 채팅 메시지 구조체 정의
+type ChatMessage struct {
+	RoomID     string `json:"room_id"`
+	SenderID   string `json:"sender_id"`
+	ReceiverID string `json:"receiver_id"`
+	Message    string `json:"message"`
+}
 
-	app.ws.OnEvent("/", "message", func(s socketio.Conn, chatMsg ChatMessage) string {
-		log.Printf("Received chat message: %v", chatMsg)
+// WebSocket 연결 처리
+func (app *Config) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade error: %v", err)
+		return
+	}
+	defer conn.Close()
 
-		// 채팅방의 상대방에게 메시지 전달 (예: chatRoomID로 상대방을 찾는 로직 필요)
-		if receiverConn, ok := app.users.Load(chatMsg.ReceiverID); ok {
-			log.Printf("Send Message %s to %s", chatMsg.Message, chatMsg.ReceiverID)
-			receiverConn.(socketio.Conn).Emit("message", chatMsg.Message) // 상대방에게 새 메시지를 전달
+	var regiMsg RegisterMessage
+	var userID string // 접속한 유저의 ID
 
-			// push rabbitmq
-			emitter, err := event.NewEventEmitter(app.Rabbit)
-			if err != nil {
-				log.Printf("Failed to NewEventEmitter, err: %s", err.Error())
-				return err.Error()
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("Error reading message: %v", err)
+			// 유저가 연결 해제되면 해당 유저를 메모리에서 제거
+			if userID != "" {
+				app.mu.Lock()
+				delete(app.clients, userID)
+				app.mu.Unlock()
+			}
+			return
+		}
+
+		// WebSocket 메시지 처리
+		var wsMsg WebSocketMessage
+		if err := json.Unmarshal(msg, &wsMsg); err != nil {
+			log.Printf("Failed to unmarshal message: %v", err)
+			continue
+		}
+
+		switch wsMsg.Type {
+		case MessageTypeRegister:
+			// 유저 등록 처리
+			if err := json.Unmarshal(wsMsg.Payload, &regiMsg); err != nil {
+				log.Printf("Failed to unmarshal register message: %v", err)
+				continue
 			}
 
-			// push rabbitmq
+			userID = regiMsg.UserID
+
+			app.mu.Lock()
+			app.clients[userID] = conn
+			app.mu.Unlock()
+			log.Printf("User %s registered", userID)
+
+		case MessageTypeChat:
+			// 채팅 메시지 처리
+			var chatMsg ChatMessage
+			if err := json.Unmarshal(wsMsg.Payload, &chatMsg); err != nil {
+				log.Printf("Failed to unmarshal chat message: %v", err)
+				continue
+			}
+
+			log.Printf("chatMsg %v", chatMsg)
+			app.handleChatMessage(chatMsg)
+		}
+	}
+}
+
+// 채팅 메시지 처리
+func (app *Config) handleChatMessage(chatMsg ChatMessage) {
+	log.Printf("Received chat message from %s: %s", chatMsg.SenderID, chatMsg.Message)
+
+	// 수신자에게 메시지 전달
+	app.mu.Lock()
+	if receiverConn, ok := app.clients[chatMsg.ReceiverID]; ok {
+		log.Printf("Sending message to %s", chatMsg.ReceiverID)
+		receiverConn.WriteJSON(chatMsg)
+
+		// 메시지를 RabbitMQ에 푸시
+		emitter, err := event.NewEventEmitter(app.Rabbit)
+		if err == nil {
 			emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
 		}
-
-		s.Emit("reply", "Message received and sent to user")
-		return "Message sent to user"
-	})
-
-	app.ws.OnDisconnect("/", func(s socketio.Conn, reason string) {
-		fmt.Printf("Client %s disconnected from chat: %s\n", s.ID(), reason)
-		// 유저 소켓 연결을 Config의 sync.Map에서 제거
-		app.users.Delete(s.ID())
-	})
-
-	app.ws.OnError("/", func(s socketio.Conn, e error) {
-		log.Printf("Error on client %s: %v", s.ID(), e)
-	})
-
-	go func() {
-		if err := app.ws.Serve(); err != nil {
-			log.Fatalf("Socket.IO server error: %v", err)
-		}
-	}()
+	} else {
+		log.Printf("Receiver %s not connected", chatMsg.ReceiverID)
+	}
+	app.mu.Unlock()
 }

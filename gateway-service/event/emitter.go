@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -15,11 +14,10 @@ type EventPayload struct {
 }
 
 type ChatMessage struct {
-	RoomID     string    `bson:"room_id"`
-	SenderID   string    `bson:"sender_id"`
-	ReceiverID string    `bson:"receiver_id"`
-	Message    string    `bson:"message"`
-	CreatedAt  time.Time `bson:"created_at"`
+	RoomID     string `bson:"room_id"`
+	SenderID   string `bson:"sender_id"`
+	ReceiverID string `bson:"receiver_id"`
+	Message    string `bson:"message"`
 }
 
 type Emitter struct {
@@ -75,7 +73,6 @@ func NewEventEmitter(conn *amqp.Connection) (Emitter, error) {
 
 	return emitter, nil
 }
-
 func (e *Emitter) PushChatMessageToQueue(chatMsg ChatMessage) error {
 	if e.connection == nil {
 		log.Println("RabbitMQ connection is nil")
@@ -95,20 +92,49 @@ func (e *Emitter) PushChatMessageToQueue(chatMsg ChatMessage) error {
 		Data:      chatData,
 	}
 
-	// JSON으로 변환
+	// EventPayload를 JSON으로 변환 (문자열로 변환하지 않음)
 	eventJSON, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("Failed to marshal event payload: %v", err)
 		return err
 	}
 
-	// 메시지 발행
-	err = e.Push(string(eventJSON), "chat")
+	// 메시지 발행 (eventJSON을 문자열이 아닌 바이트 슬라이스로 전송)
+	err = e.PushBytes(eventJSON, "chat")
 	if err != nil {
 		log.Printf("Failed to push message to queue: %v", err)
 		return err
 	}
 
 	log.Printf("Chat message successfully pushed to RabbitMQ")
+	return nil
+}
+
+// PushBytes 함수는 바이트 슬라이스 데이터를 RabbitMQ로 전송
+func (e *Emitter) PushBytes(event []byte, severity string) error {
+	channel, err := e.connection.Channel()
+	if err != nil {
+		return err
+	}
+	defer channel.Close()
+
+	log.Println("Pushing to channel")
+
+	// 메시지 전송
+	err = channel.Publish(
+		"chat_topic", // 교환기 이름
+		severity,     // 라우팅 키
+		false,        // mandatory
+		false,        // immediate
+		amqp.Publishing{
+			ContentType: "application/json", // 콘텐츠 타입 설정
+			Body:        event,              // 바이트 슬라이스 데이터를 메시지로 전송
+		},
+	)
+	if err != nil {
+		log.Printf("Publish failed, err: %s", err.Error())
+		return err
+	}
+
 	return nil
 }

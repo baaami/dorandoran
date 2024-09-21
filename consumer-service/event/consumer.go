@@ -6,18 +6,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // ChatMessage 구조체 정의
 type ChatMessage struct {
-	RoomID     string    `bson:"room_id"`
-	SenderID   string    `bson:"sender_id"`
-	ReceiverID string    `bson:"receiver_id"`
-	Message    string    `bson:"message"`
-	CreatedAt  time.Time `bson:"created_at"`
+	RoomID     string `bson:"room_id"`
+	SenderID   string `bson:"sender_id"`
+	ReceiverID string `bson:"receiver_id"`
+	Message    string `bson:"message"`
 }
 
 // User 구조체 정의
@@ -114,28 +112,30 @@ func (consumer *Consumer) Listen(topics []string) error {
 			var eventPayload EventPayload
 			err := json.Unmarshal(d.Body, &eventPayload)
 			if err != nil {
-				log.Printf("Failed to unmarshal message: %v", err)
+				log.Printf("Failed to unmarshal event payload: %v", err)
 				continue
 			}
 
-			// 이벤트 타입에 따라 처리
+			log.Printf("Event Type: %s", eventPayload.EventType)
+
 			switch eventPayload.EventType {
 			case "chat":
 				var chatMsg ChatMessage
-				err := json.Unmarshal(eventPayload.Data, &chatMsg)
-				if err != nil {
+				// eventPayload.Data는 json.RawMessage이므로 다시 언마샬링
+				if err := json.Unmarshal(eventPayload.Data, &chatMsg); err != nil {
 					log.Printf("Failed to unmarshal chat message: %v", err)
 					continue
 				}
+				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
 				handleChatPayload(chatMsg)
 
 			case "user.created":
 				var user User
-				err := json.Unmarshal(eventPayload.Data, &user)
-				if err != nil {
+				if err := json.Unmarshal(eventPayload.Data, &user); err != nil {
 					log.Printf("Failed to unmarshal user message: %v", err)
 					continue
 				}
+				log.Printf("User Created Message Unmarshaled: %+v", user)
 				handleUserPayload(user)
 
 			default:
@@ -152,15 +152,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 
 // handleChatPayload는 채팅 메시지를 처리하는 함수
 func handleChatPayload(chatMsg ChatMessage) error {
-	payload := ChatMessage{
-		SenderID:   chatMsg.SenderID,
-		ReceiverID: chatMsg.ReceiverID,
-		RoomID:     chatMsg.RoomID,
-		Message:    chatMsg.Message,
-		CreatedAt:  chatMsg.CreatedAt,
-	}
-
-	jsonData, _ := json.MarshalIndent(&payload, "", "\t")
+	jsonData, _ := json.MarshalIndent(&chatMsg, "", "\t")
 
 	chatServiceURL := "http://chat-service/msg"
 

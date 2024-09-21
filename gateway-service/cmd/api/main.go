@@ -3,27 +3,32 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
-	socketio "github.com/googollee/go-socket.io"
+	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const webPort = 80
 
 type Config struct {
-	ws     *socketio.Server
-	users  sync.Map
-	Rabbit *amqp.Connection
+	clients map[string]*websocket.Conn // 유저 ID와 WebSocket 연결을 매핑
+	mu      sync.Mutex                 // 동시성 제어
+	Rabbit  *amqp.Connection
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 func main() {
-	// try to connect to rabbitmq
-	rabbitConn, err := connect()
+	// RabbitMQ 연결
+	rabbitConn, err := connectRabbitMQ()
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
@@ -31,13 +36,12 @@ func main() {
 	defer rabbitConn.Close()
 
 	app := Config{
-		Rabbit: rabbitConn,
+		clients: make(map[string]*websocket.Conn),
+		Rabbit:  rabbitConn,
 	}
 
+	// 웹 서버 시작
 	log.Printf("Starting Gateway service on port %d", webPort)
-
-	// 소켓 서버 등록
-	app.RegisterSocketServer()
 
 	// HTTP 서버 설정
 	srv := &http.Server{
@@ -53,33 +57,22 @@ func main() {
 	}
 }
 
-func connect() (*amqp.Connection, error) {
-	var counts int64
+func connectRabbitMQ() (*amqp.Connection, error) {
 	var backOff = 1 * time.Second
 	var connection *amqp.Connection
-
-	// don't continue until rabbit is ready
-	for {
+	for attempts := 0; attempts < 5; attempts++ {
 		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
-		if err != nil {
-			fmt.Println("RabbitMQ not yet ready...")
-			counts++
-		} else {
+		if err == nil {
 			log.Println("Connected to RabbitMQ!")
 			connection = c
 			break
 		}
-
-		if counts > 5 {
-			fmt.Println(err)
-			return nil, err
-		}
-
-		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
-		log.Println("backing off...")
 		time.Sleep(backOff)
-		continue
+		backOff *= 2
 	}
 
+	if connection == nil {
+		return nil, fmt.Errorf("failed to connect to RabbitMQ")
+	}
 	return connection, nil
 }
