@@ -10,6 +10,13 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+type ChatMessage struct {
+	RoomID     string `bson:"room_id"`
+	SenderID   string `bson:"sender_id"`
+	ReceiverID string `bson:"receiver_id"`
+	Message    string `bson:"message"`
+}
+
 // 채팅방 생성
 func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 	var room data.ChatRoom
@@ -98,12 +105,14 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 
 // 채팅 메시지 추가
 func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
-	var chatMsg data.Chat
+	var chatMsg ChatMessage
 	err := json.NewDecoder(r.Body).Decode(&chatMsg)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("ADD chatMsg: %v", chatMsg)
 
 	// Chat에 삽입
 	entry := data.Chat{

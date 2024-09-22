@@ -1,28 +1,27 @@
+// gateway-service/cmd/api/main.go
 package main
 
 import (
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"sync"
-	"time"
 
-	socketio "github.com/googollee/go-socket.io"
+	"github.com/baaami/dorandoran/broker/pkg/redis"
+	"github.com/baaami/dorandoran/broker/pkg/socket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const webPort = 80
 
 type Config struct {
-	ws     *socketio.Server
-	users  sync.Map
 	Rabbit *amqp.Connection
 }
 
 func main() {
-	// try to connect to rabbitmq
+
+	// RabbitMQ 연결
 	rabbitConn, err := connect()
 	if err != nil {
 		log.Println(err)
@@ -30,23 +29,33 @@ func main() {
 	}
 	defer rabbitConn.Close()
 
+	// Redis 연결
+	redisClient, err := redis.NewRedisClient()
+	if err != nil {
+		log.Fatalf("Failed to initialize Redis client: %v", err)
+	}
+
 	app := Config{
 		Rabbit: rabbitConn,
 	}
 
-	log.Printf("Starting Gateway service on port %d", webPort)
-
-	// 소켓 서버 등록
-	app.RegisterSocketServer()
-
-	// HTTP 서버 설정
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", webPort),
-		Handler: app.routes(),
+	// WebSocket 서버 설정
+	// WebSocket 설정
+	wsConfig := &socket.Config{
+		Clients:     sync.Map{},
+		Rabbit:      rabbitConn,
+		RedisClient: redisClient,
 	}
 
-	// 서버 시작
-	log.Printf("Starting Gateway Server on port %d", webPort)
+	// Redis 대기열 모니터링 고루틴 실행
+	go wsConfig.MonitorQueue()
+
+	log.Printf("Starting Gateway service on port %d", webPort)
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", webPort),
+		Handler: app.routes(wsConfig),
+	}
+
 	err = srv.ListenAndServe()
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
@@ -54,32 +63,5 @@ func main() {
 }
 
 func connect() (*amqp.Connection, error) {
-	var counts int64
-	var backOff = 1 * time.Second
-	var connection *amqp.Connection
-
-	// don't continue until rabbit is ready
-	for {
-		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
-		if err != nil {
-			fmt.Println("RabbitMQ not yet ready...")
-			counts++
-		} else {
-			log.Println("Connected to RabbitMQ!")
-			connection = c
-			break
-		}
-
-		if counts > 5 {
-			fmt.Println(err)
-			return nil, err
-		}
-
-		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
-		log.Println("backing off...")
-		time.Sleep(backOff)
-		continue
-	}
-
-	return connection, nil
+	return amqp.Dial("amqp://guest:guest@rabbitmq")
 }

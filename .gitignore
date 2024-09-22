@@ -1,10 +1,10 @@
 gateway-service/gatewayApp
+consumer-service/consumerApp
 user-service/userApp
 auth-service/authApp
-consumer-service/consumerApp
 chat-service/chatApp
-client
 db-data
 index.html
 .DS_Store
 match-service/matchApp
+realtime-service/realtimeApp

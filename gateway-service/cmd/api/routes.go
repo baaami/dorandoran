@@ -3,11 +3,12 @@ package main
 import (
 	"net/http"
 
+	"github.com/baaami/dorandoran/broker/pkg/socket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
 
-func (app *Config) routes() http.Handler {
+func (app *Config) routes(wsConfig *socket.Config) http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(cors.Handler(cors.Options{
@@ -19,8 +20,7 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Socket IO
-	mux.Handle("/socket.io/*", app.ws)
+	mux.HandleFunc("/ws", wsConfig.HandleWebSocket)
 
 	// 매칭
 	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))
