@@ -21,7 +21,7 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	// 카카오 로그인 API 라우팅
-	mux.Post("/kakao", app.kakaoLogin)
+	mux.Post("/kakao", app.KakaoLoginHandler)
 
 	return mux
 }

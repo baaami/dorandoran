@@ -1,163 +1,88 @@
 package main
 
 import (
-	"bytes"
+	// Redis 패키지 import
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
+	"io/ioutil"
 	"net/http"
-	"os"
-	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-const kakaoTokenURL = "https://kauth.kakao.com/oauth/token"
-const kakaoUserInfoURL = "https://kapi.kakao.com/v2/user/me"
+// Redis 클라이언트 생성
 
-type KakaoUserInfo struct {
-	ID          int64          `json:"id"`
-	ConnectedAt string         `json:"connected_at"`
-	Properties  UserProperties `json:"properties"`
-	Account     KakaoAccount   `json:"kakao_account"`
-}
+const KAKAO_API_USER_INFO_URL = "https://kapi.kakao.com/v2/user/me"
 
-type UserProperties struct {
-	Nickname       string `json:"nickname"`
-	ProfileImage   string `json:"profile_image"`
-	ThumbnailImage string `json:"thumbnail_image"`
-}
-
-type KakaoAccount struct {
-	Email    string `json:"email"`
-	AgeRange string `json:"age_range"`
-	Gender   string `json:"gender"`
-}
-
-// KakaoLoginRequest: 카카오 로그인 요청 구조체
-type KakaoLoginRequest struct {
-	Code string `json:"code"`
-}
-
-// KakaoTokenResponse: 카카오에서 발급된 토큰을 저장하는 구조체
-type KakaoTokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
-}
-
-// 카카오 로그인 API
-func (app *Config) kakaoLogin(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[Auth] Request Receive, %v", r.Method)
-
-	var req KakaoLoginRequest
-
-	// 요청 바디에서 코드 읽기
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.Code == "" {
-		log.Printf("Failed to NewDecoder, err: %v", err.Error())
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
+// 클라이언트로부터 받은 access token을 검증하는 함수
+func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
+	var requestData struct {
+		AccessToken string `json:"accessToken"`
 	}
 
-	log.Printf("req.Code: %v", req.Code)
-
-	// 카카오에 access token 요청
-	tokenResp, err := requestKakaoAccessToken(req.Code)
+	// 클라이언트로부터 받은 access token 파싱
+	err := json.NewDecoder(r.Body).Decode(&requestData)
 	if err != nil {
-		log.Printf("Failed to requestKakaoAccessToken, err: %v", err.Error())
-		http.Error(w, "Failed to request Kakao access token", http.StatusInternalServerError)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("tokenResp.AccessToken: %v", tokenResp.AccessToken)
+	// 카카오 API 호출을 통해 access token 검증
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", KAKAO_API_USER_INFO_URL, nil)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", requestData.AccessToken))
 
-	// 토큰을 사용해 카카오 사용자 정보 요청
-	userInfo, err := requestKakaoUserInfo(tokenResp.AccessToken)
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		http.Error(w, "Invalid Kakao token", http.StatusUnauthorized)
+		return
+	}
+
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	var kakaoResponse map[string]interface{}
+	json.Unmarshal(body, &kakaoResponse)
+
+	// 사용자 정보에서 카카오 사용자 ID 추출
+	kakaoUserID := fmt.Sprintf("%v", kakaoResponse["id"])
+
+	// 기존 세션이 존재하는지 확인
+	sessionID, err := app.RedisClient.GetSessionByUserID(kakaoUserID)
 	if err != nil {
-		log.Printf("Failed to requestKakaoUserInfo, err: %v", err.Error())
-		http.Error(w, "Failed to retrieve Kakao user info", http.StatusInternalServerError)
-		return
+		// 세션이 존재하지 않으면 새로 생성
+		sessionID = app.CreateSession(kakaoUserID)
 	}
 
-	// TODO: RabbitMQ 통해 유저 생성 이벤트 발생
+	cookie := &http.Cookie{
+		Name:     "session_id",
+		Value:    sessionID,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+	}
+	http.SetCookie(w, cookie)
 
-	// 사용자 정보를 응답으로 반환
-	w.Header().Set("Content-Type", "application/json")
+	// 클라이언트에게 로그인 성공 응답
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(userInfo) // 구조체를 JSON으로 응답
+	w.Write([]byte("Login successful, session ID issued"))
 }
 
-// 카카오 Access Token 요청
-func requestKakaoAccessToken(code string) (*KakaoTokenResponse, error) {
-	client := &http.Client{}
+// 세션 생성 함수 (Redis에 세션 저장)
+func (app *Config) CreateSession(kakaoUserID string) string {
+	// 고유한 세션 ID 생성 (UUID 사용)
+	sessionID := uuid.New().String()
 
-	// 카카오 토큰 요청 파라미터 설정
-	data := fmt.Sprintf("grant_type=authorization_code&client_id=%s&redirect_uri=%s&code=%s",
-		os.Getenv("KAKAO_APP_KEY"),      // Kakao Client ID
-		os.Getenv("KAKAO_REDIRECT_URI"), // Redirect URI
-		code)
+	// 세션 만료 시간 설정 (예: 24시간)
+	expiresAt := time.Hour * 24
 
-	req, err := http.NewRequest("POST", kakaoTokenURL, strings.NewReader(data))
+	// Redis에 세션 저장
+	err := app.RedisClient.SetSession(sessionID, kakaoUserID, expiresAt)
 	if err != nil {
-		return nil, err
+		fmt.Printf("Failed to store session in Redis: %v", err)
 	}
 
-	// Content-Type 설정
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	// 요청 실행
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// 응답 데이터 처리
-	var tokenResp KakaoTokenResponse
-	err = json.NewDecoder(resp.Body).Decode(&tokenResp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &tokenResp, nil
-}
-
-// 카카오 사용자 정보 요청
-func requestKakaoUserInfo(accessToken string) ([]byte, error) {
-	client := &http.Client{}
-
-	// 카카오 사용자 정보 요청
-	req, err := http.NewRequest("GET", kakaoUserInfoURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// Authorization 헤더에 Bearer 토큰 추가
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	// 요청 실행
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// 응답 데이터 읽기
-	userInfo, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// JSON 데이터를 읽을 수 있는 형태로 변환하여 출력
-	var prettyJSON bytes.Buffer
-	err = json.Indent(&prettyJSON, userInfo, "", "  ")
-	if err != nil {
-		log.Printf("Failed to format user info JSON: %v", err)
-		return nil, err
-	}
-
-	// 로그에 JSON 응답 출력
-	log.Printf("Kakao User Info: %s", prettyJSON.String())
-
-	return userInfo, nil
+	// 생성된 세션 ID 반환
+	return sessionID
 }
