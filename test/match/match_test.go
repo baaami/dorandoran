@@ -21,9 +21,11 @@ type MatchMessage struct {
 
 // MatchResponse 구조체 정의
 type MatchResponse struct {
-	User1ID string `json:"user1_id"`
-	User2ID string `json:"user2_id"`
-	RoomID  string `json:"room_id"`
+	RoomID string `json:"room_id"`
+}
+
+type UnRegisterMessage struct {
+	UserID string `json:"user_id"`
 }
 
 // WebSocket 서버와 연결하는 함수
@@ -103,12 +105,6 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	if matchResp1.RoomID != matchResp2.RoomID {
 		t.Errorf("RoomID mismatch between user1 and user2. user1: %s, user2: %s", matchResp1.RoomID, matchResp2.RoomID)
 	}
-	if matchResp1.User1ID != "user1" && matchResp1.User2ID != "user2" {
-		t.Errorf("Incorrect user match response for user1")
-	}
-	if matchResp2.User1ID != "user1" && matchResp2.User2ID != "user2" {
-		t.Errorf("Incorrect user match response for user2")
-	}
 
-	log.Printf("Test Passed: Match successful between %s and %s in room %s", matchResp1.User1ID, matchResp1.User2ID, matchResp1.RoomID)
+	log.Printf("Test Passed: Match successful in room %s", matchResp1.RoomID)
 }
