@@ -1,12 +1,11 @@
-// socket.go
 package socket
 
 import (
 	"encoding/json"
 	"log"
-	"sync"
-
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
@@ -52,6 +51,7 @@ type ChatMessage struct {
 	Message    string `json:"message"`
 }
 
+// WebSocket 연결 처리
 func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -90,6 +90,9 @@ func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			app.Clients.Store(userID, conn)
 			log.Printf("User %s registered", userID)
 
+			// 유저를 대기열에 추가하고 매칭을 시도
+			go app.RedisClient.AddUserToQueue(userID)
+
 		case MessageTypeChat:
 			var chatMsg ChatMessage
 			if err := json.Unmarshal(wsMsg.Payload, &chatMsg); err != nil {
@@ -99,18 +102,45 @@ func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 			log.Printf("chatMsg %v", chatMsg)
 			app.HandleChatMessage(chatMsg)
-
-		case MessageTypeMatch:
-			var matchMsg MatchMessage
-			if err := json.Unmarshal(wsMsg.Payload, &matchMsg); err != nil {
-				log.Printf("Failed to unmarshal match message: %v", err)
-				continue
-			}
-			app.HandleMatchRequest(matchMsg, conn)
 		}
 	}
 }
 
+// Redis 대기열을 계속 확인하고 매칭 시도
+func (app *Config) MonitorQueue() {
+	for {
+		user1, user2, err := app.RedisClient.PopUsersFromQueue()
+		if err != nil {
+			log.Printf("Error in matching: %v", err)
+			continue
+		}
+
+		if user1 != "" && user2 != "" {
+			roomID := user1 + "-" + user2
+			log.Printf("Matched %s with %s in room %s", user1, user2, roomID)
+			app.notifyUsers(user1, user2, roomID)
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func (app *Config) notifyUsers(user1, user2, roomID string) {
+	matchMsg := MatchMessage{
+		UserID: roomID,
+	}
+
+	for _, userID := range []string{user1, user2} {
+		if conn, ok := app.Clients.Load(userID); ok {
+			conn.(*websocket.Conn).WriteJSON(matchMsg)
+			log.Printf("Notified %s about match in room %s", userID, roomID)
+		} else {
+			log.Printf("User %s not connected", userID)
+		}
+	}
+}
+
+// 채팅 메시지 처리
 func (app *Config) HandleChatMessage(chatMsg ChatMessage) {
 	log.Printf("Received chat message from %s: %s", chatMsg.SenderID, chatMsg.Message)
 
@@ -125,53 +155,5 @@ func (app *Config) HandleChatMessage(chatMsg ChatMessage) {
 		}
 	} else {
 		log.Printf("Receiver %s not connected", chatMsg.ReceiverID)
-	}
-}
-
-// HandleMatchRequest 매칭 요청 처리
-func (app *Config) HandleMatchRequest(matchMsg MatchMessage, conn *websocket.Conn) {
-	// Redis 대기열에 유저 추가
-	err := app.RedisClient.AddUserToQueue(matchMsg.UserID)
-	if err != nil {
-		log.Printf("Failed to add user to Redis queue: %v", err)
-		return
-	}
-	log.Printf("User %s added to match queue", matchMsg.UserID)
-
-	waitingClients, err := app.RedisClient.GetAllUsersInQueue()
-	if err != nil {
-		log.Printf("Failed to get users from Redis queue: %v", err)
-		return
-	}
-
-	log.Printf("Waiting Clients %v", waitingClients)
-
-	// 매칭을 위해 두 명의 유저를 대기열에서 가져옴
-	user1, user2, err := app.RedisClient.PopUsersFromQueue()
-	if err != nil {
-		log.Printf("Failed to pop users from queue: %v", err)
-		return
-	}
-
-	if user1 != "" && user2 != "" {
-		// 매칭 성공
-		roomID := user1 + "-" + user2
-		matchResponse := map[string]string{
-			"user1_id": user1,
-			"user2_id": user2,
-			"room_id":  roomID,
-		}
-
-		// 유저1에게 매칭 정보 전달
-		if conn1, ok := app.Clients.Load(user1); ok {
-			conn1.(*websocket.Conn).WriteJSON(matchResponse)
-		}
-
-		// 유저2에게 매칭 정보 전달
-		if conn2, ok := app.Clients.Load(user2); ok {
-			conn2.(*websocket.Conn).WriteJSON(matchResponse)
-		}
-
-		log.Printf("Match made between %s and %s in room %s", user1, user2, roomID)
 	}
 }

@@ -20,8 +20,6 @@ type Config struct {
 }
 
 func main() {
-	// Redis 클라이언트 생성
-	redisClient := redis.NewRedisClient()
 
 	// RabbitMQ 연결
 	rabbitConn, err := connect()
@@ -30,6 +28,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer rabbitConn.Close()
+
+	// Redis 연결
+	redisClient, err := redis.NewRedisClient()
+	if err != nil {
+		log.Fatalf("Failed to initialize Redis client: %v", err)
+	}
 
 	app := Config{
 		Rabbit: rabbitConn,
@@ -42,6 +46,9 @@ func main() {
 		Rabbit:      rabbitConn,
 		RedisClient: redisClient,
 	}
+
+	// Redis 대기열 모니터링 고루틴 실행
+	go wsConfig.MonitorQueue()
 
 	log.Printf("Starting Gateway service on port %d", webPort)
 	srv := &http.Server{

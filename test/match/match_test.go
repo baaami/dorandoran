@@ -78,10 +78,16 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) MatchResponse {
 func TestMatchWebSocketAPI(t *testing.T) {
 	// 유저1과 유저2 WebSocket 연결 생성
 	conn1 := connectToWebSocket(t, "user1")
-	defer conn1.Close()
+	defer func() {
+		conn1.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		conn1.Close()
+	}()
 
 	conn2 := connectToWebSocket(t, "user2")
-	defer conn2.Close()
+	defer func() {
+		conn2.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		conn2.Close()
+	}()
 
 	// 유저1과 유저2 매칭 요청 전송
 	sendMatchRequest(t, conn1, "user1")
