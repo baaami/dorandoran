@@ -51,26 +51,27 @@ func (r *RedisClient) AddUserToQueue(userID string) error {
 	return nil
 }
 
-// PopUsersFromQueue: 대기열에서 두 명의 유저를 가져옴
-func (r *RedisClient) PopUsersFromQueue() (string, string, error) {
-	user1, err := r.Client.RPop(ctx, "waiting_queue").Result()
-	if err == redis.Nil {
-		return "", "", nil
-	} else if err != nil {
-		log.Printf("Error popping user from queue: %v", err)
-		return "", "", err
+func (r *RedisClient) PopNUsersFromQueue(n int) ([]string, error) {
+	var users []string
+	for i := 0; i < n; i++ {
+		user, err := r.Client.RPop(ctx, "waiting_queue").Result()
+		if err == redis.Nil {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
 	}
+	return users, nil
+}
 
-	user2, err := r.Client.RPop(ctx, "waiting_queue").Result()
+// GetSession: Redis에서 세션 조회
+func (r *RedisClient) GetSession(sessionID string) (string, error) {
+	userID, err := r.Client.Get(ctx, sessionID).Result()
 	if err == redis.Nil {
-		// 유저가 하나만 있을 때 다시 큐에 넣기
-		r.Client.LPush(ctx, "waiting_queue", user1)
-		log.Printf("Only one user in queue. Re-adding %s", user1)
-		return "", "", nil
+		return "", fmt.Errorf("session not found")
 	} else if err != nil {
-		log.Printf("Error popping second user from queue: %v", err)
-		return "", "", err
+		return "", err
 	}
-
-	return user1, user2, nil
+	return userID, nil
 }

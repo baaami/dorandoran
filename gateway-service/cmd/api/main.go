@@ -20,7 +20,6 @@ type Config struct {
 }
 
 func main() {
-
 	// RabbitMQ 연결
 	rabbitConn, err := connect()
 	if err != nil {

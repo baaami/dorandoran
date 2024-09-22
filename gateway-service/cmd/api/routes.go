@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/baaami/dorandoran/broker/pkg/middleware"
 	"github.com/baaami/dorandoran/broker/pkg/socket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -19,6 +20,9 @@ func (app *Config) routes(wsConfig *socket.Config) http.Handler {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	// 세션 검증 미들웨어 추가
+	mux.Use(middleware.SessionMiddleware(wsConfig.RedisClient))
 
 	mux.HandleFunc("/ws", wsConfig.HandleWebSocket)
 
