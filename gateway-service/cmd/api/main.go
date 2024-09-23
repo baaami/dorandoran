@@ -38,7 +38,6 @@ func main() {
 		Rabbit: rabbitConn,
 	}
 
-	// WebSocket 서버 설정
 	// WebSocket 설정
 	wsConfig := &socket.Config{
 		Clients:     sync.Map{},
