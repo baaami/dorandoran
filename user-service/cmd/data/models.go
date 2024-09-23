@@ -10,7 +10,7 @@ import (
 
 type User struct {
 	ID       int    `json:"id"`
-	SnsType  string `json:"sns_type"`
+	SnsType  int    `json:"sns_type"`
 	SnsID    string `json:"sns_id"`
 	Name     string `json:"name"`
 	Nickname string `json:"nickname"`
@@ -63,9 +63,9 @@ func (s *UserService) InitDB() error {
 }
 
 // 유저 생성 (삽입)
-func (s *UserService) InsertUser(name, nickname string, gender, age int, email string) (int64, error) {
-	query := "INSERT INTO users (name, nickname, gender, age, email) VALUES (?, ?, ?, ?, ?)"
-	result, err := s.DB.Exec(query, name, nickname, gender, age, email)
+func (s *UserService) InsertUser(name, nickname, snsID string, gender, age, snsType int, email string) (int64, error) {
+	query := "INSERT INTO users (name, nickname, sns_id, gender, age, sns_type, email) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	result, err := s.DB.Exec(query, name, snsID, nickname, gender, age, snsType, email)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert user: %v", err)
 	}

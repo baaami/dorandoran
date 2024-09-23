@@ -21,7 +21,7 @@ type ChatMessage struct {
 // User 구조체 정의
 type User struct {
 	ID       int    `json:"id"`
-	SnsType  string `json:"sns_type"`
+	SnsType  int    `json:"sns_type"`
 	SnsID    string `json:"sns_id"`
 	Name     string `json:"name"`
 	Nickname string `json:"nickname"`

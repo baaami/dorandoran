@@ -11,7 +11,7 @@ import (
 
 type User struct {
 	ID       int    `json:"id"`
-	SnsType  string `json:"sns_type"`
+	SnsType  int    `json:"sns_type"`
 	SnsID    string `json:"sns_id"`
 	Name     string `json:"name"`
 	Nickname string `json:"nickname"`
@@ -60,7 +60,7 @@ func (app *Config) insertUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// DB에 유저 삽입
-	insertedID, err := app.Models.InsertUser(newUser.Name, newUser.Nickname, newUser.Gender, newUser.Age, newUser.Email)
+	insertedID, err := app.Models.InsertUser(newUser.Name, newUser.Nickname, newUser.SnsID, newUser.Gender, newUser.Age, newUser.SnsType, newUser.Email)
 	if err != nil {
 		http.Error(w, "Failed to insert user", http.StatusInternalServerError)
 		return
