@@ -11,6 +11,8 @@ import (
 
 type User struct {
 	ID       int    `json:"id"`
+	SnsType  string `json:"sns_type"`
+	SnsID    string `json:"sns_id"`
 	Name     string `json:"name"`
 	Nickname string `json:"nickname"`
 	Gender   int    `json:"gender"`
