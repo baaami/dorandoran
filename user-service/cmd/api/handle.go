@@ -48,16 +48,56 @@ func (app *Config) readUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
+// 유저 정보 조회
+func (app *Config) checkUserExistence(w http.ResponseWriter, r *http.Request) {
+	// 쿼리 파라미터에서 sns_type과 sns_id를 가져옴
+	snsType := r.URL.Query().Get("sns_type")
+	snsID := r.URL.Query().Get("sns_id")
+
+	// sns_type이나 sns_id가 없는 경우 오류 반환
+	if snsType == "" || snsID == "" {
+		http.Error(w, "Missing sns_type or sns_id", http.StatusBadRequest)
+		return
+	}
+
+	nSnsType, _ := strconv.Atoi(snsType)
+
+	// DB에서 사용자 조회
+	user, err := app.Models.GetUserBySNS(nSnsType, snsID)
+	if err != nil {
+		http.Error(w, "Error fetching user", http.StatusInternalServerError)
+		return
+	}
+
+	// 유저가 존재하지 않는 경우
+	if user == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// 유저가 존재하는 경우, StatusOK와 함께 유저 정보 반환
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(user)
+}
+
 // 유저 정보 삽입
-func (app *Config) insertUser(w http.ResponseWriter, r *http.Request) {
+func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 	var newUser User
 
-	// 요청에서 유저 데이터를 읽음
+	// 요청에서 sns_type과 sns_id만 읽음
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
+
+	// 나머지 필드들을 기본값으로 초기화
+	newUser.Name = ""     // 빈 문자열로 초기화
+	newUser.Nickname = "" // 빈 문자열로 초기화
+	newUser.Gender = 0    // 0으로 초기화
+	newUser.Age = 0       // 0으로 초기화
+	newUser.Email = ""    // 빈 문자열로 초기화
 
 	// DB에 유저 삽입
 	insertedID, err := app.Models.InsertUser(newUser.Name, newUser.Nickname, newUser.SnsID, newUser.Gender, newUser.Age, newUser.SnsType, newUser.Email)
@@ -66,9 +106,6 @@ func (app *Config) insertUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Insert User: %v", newUser)
-
-	// 삽입된 유저 정보 반환
 	newUser.ID = int(insertedID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

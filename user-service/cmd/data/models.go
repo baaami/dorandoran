@@ -43,8 +43,8 @@ func (s *UserService) InitDB() error {
 	tableCreationQuery := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INT AUTO_INCREMENT PRIMARY KEY,
-    sns_type VARCHAR(50),
-    sns_id VARCHAR(255),
+		sns_type VARCHAR(50),
+		sns_id VARCHAR(255),
 		name VARCHAR(100),
 		nickname VARCHAR(100),
 		gender INT,
@@ -65,7 +65,7 @@ func (s *UserService) InitDB() error {
 // 유저 생성 (삽입)
 func (s *UserService) InsertUser(name, nickname, snsID string, gender, age, snsType int, email string) (int64, error) {
 	query := "INSERT INTO users (name, nickname, sns_id, gender, age, sns_type, email) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	result, err := s.DB.Exec(query, name, snsID, nickname, gender, age, snsType, email)
+	result, err := s.DB.Exec(query, name, nickname, snsID, gender, age, snsType, email)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert user: %v", err)
 	}
@@ -89,6 +89,22 @@ func (s *UserService) GetUserByID(id int) (*User, error) {
 			return nil, nil // 유저가 없을 경우 nil 반환
 		}
 		return nil, fmt.Errorf("failed to retrieve user: %v", err)
+	}
+	return &user, nil
+}
+
+// 유저 조회 (sns_type과 sns_id를 기반으로 조회)
+func (s *UserService) GetUserBySNS(snsType int, snsID string) (*User, error) {
+	query := "SELECT id, sns_type, sns_id, name, nickname, gender, age, email FROM users WHERE sns_type = ? AND sns_id = ?"
+	row := s.DB.QueryRow(query, snsType, snsID)
+
+	var user User
+	err := row.Scan(&user.ID, &user.SnsType, &user.SnsID, &user.Name, &user.Nickname, &user.Gender, &user.Age, &user.Email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // 유저가 없을 경우 nil 반환
+		}
+		return nil, fmt.Errorf("failed to retrieve user by sns_type and sns_id: %v", err)
 	}
 	return &user, nil
 }

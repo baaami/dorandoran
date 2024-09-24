@@ -22,7 +22,8 @@ func (app *Config) routes() http.Handler {
 
 	// 유저 서비스 관련 라우팅
 	mux.Get("/read/{id}", app.readUser)
-	mux.Post("/create", app.insertUser)
+	mux.Get("/exist", app.checkUserExistence)
+	mux.Post("/register", app.registerUser)
 	mux.Put("/update/{id}", app.updateUser)
 	mux.Delete("/delete/{id}", app.deleteUser)
 
