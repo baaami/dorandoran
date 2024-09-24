@@ -9,6 +9,7 @@ import (
 
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
+	"github.com/baaami/dorandoran/common"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -62,7 +63,7 @@ type ChatMessage struct {
 }
 
 // WebSocket 연결 처리
-func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
@@ -74,6 +75,69 @@ func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	// // URL에서 유저 ID 가져오기
+	// userIDStr := r.Header.Get("X-User-ID")
+	// userID, err := strconv.Atoi(userIDStr)
+	// if err != nil {
+	// 	log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+	// 	http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+				log.Printf("Unexpected WebSocket close error: %v", err)
+			} else {
+				log.Println("WebSocket connection closed by client")
+			}
+			return
+		}
+
+		var wsMsg WebSocketMessage
+		if err := json.Unmarshal(msg, &wsMsg); err != nil {
+			log.Printf("Failed to unmarshal message: %v", err)
+			continue
+		}
+
+		switch wsMsg.Type {
+		case MessageTypeRegister:
+			app.handleRegisterMessage(conn, wsMsg.Payload)
+		case MessageTypeUnRegister:
+			app.handleUnRegisterMessage(conn, wsMsg.Payload)
+		case MessageTypeChat:
+			app.handleChatMessage(wsMsg.Payload)
+		case MessageTypeMatch:
+			app.handleMatchMessage(wsMsg.Payload)
+		}
+	}
+}
+
+// WebSocket 연결 처리
+func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
+		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			log.Printf("Unexpected WebSocket close error: %v", err)
+		} else {
+			log.Println("WebSocket connection closed by client")
+		}
+		return
+	}
+	defer conn.Close()
+
+	// // URL에서 유저 ID 가져오기
+	// userIDStr := r.Header.Get("X-User-ID")
+	// userID, err := strconv.Atoi(userIDStr)
+	// if err != nil {
+	// 	log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+	// 	http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -108,7 +172,7 @@ func (app *Config) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 // Register 메시지 처리
 func (app *Config) handleRegisterMessage(conn *websocket.Conn, payload json.RawMessage) {
-	var regiMsg RegisterMessage
+	var regiMsg common.RegisterMessage
 	if err := json.Unmarshal(payload, &regiMsg); err != nil {
 		log.Printf("Failed to unmarshal register message: %v", err)
 		return

@@ -15,9 +15,7 @@ import (
 
 const webPort = 80
 
-type Config struct {
-	Rabbit *amqp.Connection
-}
+type Config struct{}
 
 func main() {
 	// RabbitMQ 연결
@@ -34,9 +32,7 @@ func main() {
 		log.Fatalf("Failed to initialize Redis client: %v", err)
 	}
 
-	app := Config{
-		Rabbit: rabbitConn,
-	}
+	app := Config{}
 
 	// WebSocket 설정
 	wsConfig := &socket.Config{
