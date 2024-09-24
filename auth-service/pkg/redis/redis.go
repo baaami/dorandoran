@@ -75,12 +75,17 @@ func (r *RedisClient) DeleteSession(sessionID string) error {
 
 // GetSessionByUserID: 사용자 ID로 세션 ID 조회
 func (r *RedisClient) GetSessionByUserID(userID string) (string, error) {
-	sessionID, err := r.Client.Get(ctx, userID).Result()
+	// Redis Hash에서 userID에 해당하는 sessionID를 조회
+	sessionID, err := r.Client.HGet(ctx, "user_sessions", userID).Result()
 	if err == redis.Nil {
-		return "", fmt.Errorf("no session found for user")
+		// 해당 userID가 없는 경우 처리
+		return "", fmt.Errorf("no session found for userID: %s", userID)
 	} else if err != nil {
-		return "", err
+		// Redis 오류 처리
+		return "", fmt.Errorf("failed to get session by userID: %v", err)
 	}
+
+	// 세션 ID 반환
 	return sessionID, nil
 }
 
@@ -96,6 +101,12 @@ func (r *RedisClient) CreateSession(userID string) string {
 	err := r.SetSession(sessionID, userID, expiresAt)
 	if err != nil {
 		log.Printf("Failed to store session in Redis: %v", err)
+	}
+
+	// 사용자 ID로 세션 ID를 조회할 수 있게 추가로 저장 (Hash 사용)
+	err = r.Client.HSet(ctx, "user_sessions", userID, sessionID).Err()
+	if err != nil {
+		log.Printf("Failed to store user session mapping in Redis: %v", err)
 	}
 
 	// 생성된 세션 ID 반환
