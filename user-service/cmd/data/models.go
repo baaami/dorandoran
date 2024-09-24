@@ -43,7 +43,7 @@ func (s *UserService) InitDB() error {
 	tableCreationQuery := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INT AUTO_INCREMENT PRIMARY KEY,
-		sns_type VARCHAR(50),
+		sns_type INT,
 		sns_id VARCHAR(255),
 		name VARCHAR(100),
 		nickname VARCHAR(100),
