@@ -27,6 +27,11 @@ func (app *Config) proxyService() http.HandlerFunc {
 		baseURL := "http://" + firstPath + "-service"
 		targetURL := baseURL + trimmedPath
 
+		// 쿼리 스트링이 존재하면 targetURL에 추가
+		if r.URL.RawQuery != "" {
+			targetURL = targetURL + "?" + r.URL.RawQuery
+		}
+
 		// 송신할 요청 생성
 		req, err := http.NewRequest(r.Method, targetURL, r.Body)
 		if err != nil {

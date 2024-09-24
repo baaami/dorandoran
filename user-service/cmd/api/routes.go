@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -20,6 +21,8 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 
+	mux.Use(LogRequestURL)
+
 	// 유저 서비스 관련 라우팅
 	mux.Get("/read/{id}", app.readUser)
 	mux.Get("/exist", app.checkUserExistence)
@@ -28,4 +31,15 @@ func (app *Config) routes() http.Handler {
 	mux.Delete("/delete/{id}", app.deleteUser)
 
 	return mux
+}
+
+// LogRequestURL 미들웨어는 요청의 URL 경로를 출력하는 미들웨어입니다.
+func LogRequestURL(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// URL 경로 출력
+		log.Printf("User Router: %s %s", r.Method, r.URL.Path)
+
+		// 다음 핸들러로 요청 전달
+		next.ServeHTTP(w, r)
+	})
 }

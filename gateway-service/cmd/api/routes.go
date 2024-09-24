@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/baaami/dorandoran/broker/pkg/middleware"
@@ -21,6 +22,7 @@ func (app *Config) routes(wsConfig *socket.Config) http.Handler {
 		MaxAge:           300,
 	}))
 
+	mux.Use(LogRequestURL)
 	// 세션 검증 미들웨어 추가
 	mux.Use(middleware.SessionMiddleware(wsConfig.RedisClient))
 
@@ -43,4 +45,15 @@ func (app *Config) routes(wsConfig *socket.Config) http.Handler {
 	mux.Get("/", app.usage)
 
 	return mux
+}
+
+// LogRequestURL 미들웨어는 요청의 URL 경로를 출력하는 미들웨어입니다.
+func LogRequestURL(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// URL 경로 출력
+		log.Printf("API Gateway: %s %s", r.Method, r.URL.Path)
+
+		// 다음 핸들러로 요청 전달
+		next.ServeHTTP(w, r)
+	})
 }

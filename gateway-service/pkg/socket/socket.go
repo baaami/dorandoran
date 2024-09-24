@@ -9,7 +9,6 @@ import (
 
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
-	"github.com/baaami/dorandoran/common"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -172,7 +171,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 
 // Register 메시지 처리
 func (app *Config) handleRegisterMessage(conn *websocket.Conn, payload json.RawMessage) {
-	var regiMsg common.RegisterMessage
+	var regiMsg RegisterMessage
 	if err := json.Unmarshal(payload, &regiMsg); err != nil {
 		log.Printf("Failed to unmarshal register message: %v", err)
 		return

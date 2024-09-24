@@ -95,7 +95,7 @@ func (r *RedisClient) CreateSession(userID string) string {
 	// Redis에 세션 저장
 	err := r.SetSession(sessionID, userID, expiresAt)
 	if err != nil {
-		fmt.Printf("Failed to store session in Redis: %v", err)
+		log.Printf("Failed to store session in Redis: %v", err)
 	}
 
 	// 생성된 세션 ID 반환
