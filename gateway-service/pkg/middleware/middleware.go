@@ -28,16 +28,16 @@ func SessionMiddleware(redisClient *redis.RedisClient) func(http.Handler) http.H
 			log.Printf("sessionID: %s", sessionID)
 
 			// Redis에서 세션 ID로 사용자 정보 조회
-			snsID, err := redisClient.GetSession(sessionID)
+			userID, err := redisClient.GetSession(sessionID)
 			if err != nil {
 				http.Error(w, "Unauthorized: Invalid session ID", http.StatusUnauthorized)
 				return
 			}
 
-			log.Printf("User[%s]'s Request!!!", snsID)
+			log.Printf("User[%s]'s Request!!!", userID)
 
 			// 사용자 ID를 요청의 헤더에 추가
-			r.Header.Set("X-User-ID", snsID)
+			r.Header.Set("X-User-ID", userID)
 
 			// 다음 핸들러로 요청을 전달
 			next.ServeHTTP(w, r)

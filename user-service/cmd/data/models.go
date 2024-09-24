@@ -110,9 +110,9 @@ func (s *UserService) GetUserBySNS(snsType int, snsID string) (*User, error) {
 }
 
 // 유저 업데이트
-func (s *UserService) UpdateUser(id int, name, nickname string, gender, age int, email string) error {
-	query := "UPDATE users SET name = ?, nickname = ?, gender = ?, age = ?, email = ? WHERE id = ?"
-	_, err := s.DB.Exec(query, name, nickname, gender, age, email, id)
+func (s *UserService) UpdateUser(id int, name, nickname string, gender, age int) error {
+	query := "UPDATE users SET name = ?, nickname = ?, gender = ?, age = ? WHERE id = ?"
+	_, err := s.DB.Exec(query, name, nickname, gender, age, id)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %v", err)
 	}

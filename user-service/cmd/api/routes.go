@@ -24,7 +24,7 @@ func (app *Config) routes() http.Handler {
 	mux.Get("/read/{id}", app.readUser)
 	mux.Get("/exist", app.checkUserExistence)
 	mux.Post("/register", app.registerUser)
-	mux.Put("/update/{id}", app.updateUser)
+	mux.Put("/update", app.updateUser)
 	mux.Delete("/delete/{id}", app.deleteUser)
 
 	return mux

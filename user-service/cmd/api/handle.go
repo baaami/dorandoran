@@ -115,10 +115,11 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 // 유저 정보 업데이트
 func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 	// URL에서 유저 ID 가져오기
-	userIDStr := chi.URLParam(r, "id")
+	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
 		return
 	}
 
@@ -127,6 +128,7 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 	// 요청에서 유저 데이터를 읽음
 	err = json.NewDecoder(r.Body).Decode(&updatedUser)
 	if err != nil {
+		log.Printf("Body: %v, err: %s", updatedUser, err.Error())
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
@@ -134,8 +136,9 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 	updatedUser.ID = userID
 
 	// DB에서 유저 정보 업데이트
-	err = app.Models.UpdateUser(updatedUser.ID, updatedUser.Name, updatedUser.Nickname, updatedUser.Gender, updatedUser.Age, updatedUser.Email)
+	err = app.Models.UpdateUser(updatedUser.ID, updatedUser.Name, updatedUser.Nickname, updatedUser.Gender, updatedUser.Age)
 	if err != nil {
+		log.Printf("Failed to update user, user: %v, err: %s", updatedUser, err.Error())
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
 		return
 	}
