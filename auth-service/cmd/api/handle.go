@@ -49,7 +49,7 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
-	existUser, err := GetExistUserByUserSrv(types.KAKAO, kakaoUserID)
+	loginUser, err := GetExistUserByUserSrv(types.KAKAO, kakaoUserID)
 	if err != nil {
 		log.Printf("Error occurred while checking user existence: %v\n", err)
 		return
@@ -57,9 +57,9 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var sessionID string
 
-	if (existUser == data.User{}) {
+	if (loginUser == data.User{}) {
 		// 유저가 존재하지 않는 경우 -> 회원가입 진행
-		newUserID, err := RegisterNewUser(app, kakaoUserID)
+		loginUser, err := RegisterNewUser(app, kakaoUserID)
 		if err != nil {
 			log.Printf("Failed to register new user")
 			http.Error(w, "Failed to register new user", http.StatusInternalServerError)
@@ -67,24 +67,26 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 생성된 user ID로 세션 생성
-		sessionID = app.RedisClient.CreateSession(strconv.Itoa(newUserID))
+		sessionID = app.RedisClient.CreateSession(strconv.Itoa(loginUser.ID))
 
 	} else {
 		// 유저가 존재하는 경우 -> 세션 존재 여부 확인
-		sessionID, err = app.RedisClient.GetSessionByUserID(strconv.Itoa(existUser.ID))
+		sessionID, err = app.RedisClient.GetSessionByUserID(strconv.Itoa(loginUser.ID))
 		if err == nil && sessionID != "" {
 			// 기존 세션이 존재하는 경우 -> 그대로 사용
 			log.Printf("session already exist, ID: %s", sessionID)
 		} else {
 			// 기존 세션이 존재하지 않는 경우 -> 새 세션 생성
-			sessionID = app.RedisClient.CreateSession(strconv.Itoa(existUser.ID))
+			sessionID = app.RedisClient.CreateSession(strconv.Itoa(loginUser.ID))
 		}
 	}
 
 	SetSessionCookie(&w, sessionID)
 
-	// 클라이언트에게 로그인 성공 응답
+	// 클라이언트에게 로그인 성
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(loginUser)
 	w.Write([]byte("Login successful, session ID issued"))
 }
 
@@ -152,7 +154,7 @@ func GetExistUserByUserSrv(snsType int, snsID string) (data.User, error) {
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 새로운 사용자 생성
-func RegisterNewUser(app *Config, kakaoUserID string) (int, error) {
+func RegisterNewUser(app *Config, kakaoUserID string) (data.User, error) {
 	newUser := data.User{
 		SnsType: types.KAKAO, // Kakao SNS 유형
 		SnsID:   kakaoUserID, // Kakao 사용자 ID
@@ -162,32 +164,32 @@ func RegisterNewUser(app *Config, kakaoUserID string) (int, error) {
 	client := &http.Client{}
 	reqBody, err := json.Marshal(newUser)
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal new user data: %v", err)
+		return data.User{}, fmt.Errorf("failed to marshal new user data: %v", err)
 	}
 
 	req, err := http.NewRequest("POST", "http://user-service/register", bytes.NewBuffer(reqBody))
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %v", err)
+		return data.User{}, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send request to user-service: %v", err)
+		return data.User{}, fmt.Errorf("failed to send request to user-service: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return 0, fmt.Errorf("failed to create user, status code: %d", resp.StatusCode)
+		return data.User{}, fmt.Errorf("failed to create user, status code: %d", resp.StatusCode)
 	}
 
 	var createdUser data.User
 	err = json.NewDecoder(resp.Body).Decode(&createdUser)
 	if err != nil {
-		return 0, fmt.Errorf("failed to decode response: %v", err)
+		return data.User{}, fmt.Errorf("failed to decode response: %v", err)
 	}
 
-	return createdUser.ID, nil
+	return createdUser, nil
 }
 
 func SetSessionCookie(w *http.ResponseWriter, sessionID string) {
