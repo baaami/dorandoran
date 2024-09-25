@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/baaami/dorandoran/auth/pkg/data"
@@ -35,13 +36,21 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	var kakaoUserID string
 
-	if requestData.AccessToken == "masterkey" {
-		kakaoUserID = "1"
+	if strings.HasPrefix(requestData.AccessToken, "masterkey-") {
+		// 구분자 뒤의 숫자를 추출하여 KakaoUserID로 사용
+		parts := strings.Split(requestData.AccessToken, "-")
+		if len(parts) == 2 {
+			kakaoUserID = parts[1]
+		} else {
+			http.Error(w, "Invalid masterkey format", http.StatusBadRequest)
+			return
+		}
 	} else {
 		// [Network] 카카오 API 호출을 통해 access token 검증
 		kakaoResponse, err := GetKaKaoUserInfoByAccessToken(requestData.AccessToken)
 		if err != nil {
 			http.Error(w, "Invalid Kakao token", http.StatusUnauthorized)
+			return
 		}
 
 		// 사용자 정보에서 카카오 사용자 ID 추출

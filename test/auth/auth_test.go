@@ -17,7 +17,7 @@ const API_GATEWAY_URL = "http://localhost:2719"
 func loginAndGetSessionID() (string, error) {
 	// 로그인 요청 데이터 설정 (필요한 데이터로 수정)
 	loginData := map[string]string{
-		"accessToken": "masterkey",
+		"accessToken": "masterkey-1",
 	}
 	reqBody, _ := json.Marshal(loginData)
 
@@ -39,9 +39,31 @@ func loginAndGetSessionID() (string, error) {
 }
 
 // 테스트 요청을 쿠키와 함께 보내는 함수
-func sendRequestWithSession(t *testing.T, sessionID string) {
+func GetUserExist(t *testing.T, sessionID string) {
 	// 테스트 요청 생성
 	req, err := http.NewRequest(http.MethodGet, API_GATEWAY_URL+"/user/exist?sns_type=0&sns_id=1", nil)
+	assert.NoError(t, err)
+
+	// 세션 ID 쿠키 설정
+	req.AddCookie(&http.Cookie{
+		Name:  "session_id",
+		Value: sessionID,
+	})
+
+	// 클라이언트로 요청 보내기
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// 응답 상태 코드 확인
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// 테스트 요청을 쿠키와 함께 보내는 함수
+func DeleteUser(t *testing.T, sessionID string) {
+	// 테스트 요청 생성
+	req, err := http.NewRequest(http.MethodDelete, API_GATEWAY_URL+"/user/delete", nil)
 	assert.NoError(t, err)
 
 	// 세션 ID 쿠키 설정
@@ -71,5 +93,8 @@ func TestWithLoginSession(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 2. 발급받은 세션 ID로 요청 보내기
-	sendRequestWithSession(t, sessionID)
+	GetUserExist(t, sessionID)
+
+	// 3. User 삭제하기
+	DeleteUser(t, sessionID)
 }
