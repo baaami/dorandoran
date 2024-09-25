@@ -28,7 +28,7 @@ func SessionMiddleware(redisClient *redis.RedisClient) func(http.Handler) http.H
 			log.Printf("sessionID: %s", sessionID)
 
 			// Redis에서 세션 ID로 사용자 정보 조회
-			userID, err := redisClient.GetSession(sessionID)
+			userID, err := redisClient.GetUserBySessionID(sessionID)
 			if err != nil {
 				http.Error(w, "Unauthorized: Invalid session ID", http.StatusUnauthorized)
 				return

@@ -73,8 +73,8 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		// 유저가 존재하는 경우 -> 세션 존재 여부 확인
 		sessionID, err = app.RedisClient.GetSessionByUserID(strconv.Itoa(existUser.ID))
 		if err == nil && sessionID != "" {
-			// 기존 세션이 존재하는 경우 -> 그대로 사
-			log.Printf("err nil, sessionid no")
+			// 기존 세션이 존재하는 경우 -> 그대로 사용
+			log.Printf("session already exist, ID: %s", sessionID)
 		} else {
 			// 기존 세션이 존재하지 않는 경우 -> 새 세션 생성
 			sessionID = app.RedisClient.CreateSession(strconv.Itoa(existUser.ID))

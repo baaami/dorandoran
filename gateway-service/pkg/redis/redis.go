@@ -66,11 +66,13 @@ func (r *RedisClient) PopNUsersFromQueue(n int) ([]string, error) {
 }
 
 // GetSession: Redis에서 세션 조회
-func (r *RedisClient) GetSession(sessionID string) (string, error) {
+func (r *RedisClient) GetUserBySessionID(sessionID string) (string, error) {
 	snsID, err := r.Client.Get(ctx, sessionID).Result()
 	if err == redis.Nil {
+		log.Printf("sessionID is not exist in DB")
 		return "", fmt.Errorf("session not found")
 	} else if err != nil {
+		log.Printf("Get Session Error, %s", err.Error())
 		return "", err
 	}
 	return snsID, nil
