@@ -5,8 +5,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type User struct {
@@ -23,13 +21,13 @@ type User struct {
 // 유저 정보 조회
 func (app *Config) readUser(w http.ResponseWriter, r *http.Request) {
 	// URL에서 유저 ID 가져오기
-	userIDStr := chi.URLParam(r, "id")
+	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
 		return
 	}
-
 	// DB에서 유저 정보 조회
 	user, err := app.Models.GetUserByID(userID)
 	if err != nil {
@@ -154,10 +152,11 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 // 유저 정보 삭제
 func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
 	// URL에서 유저 ID 가져오기
-	userIDStr := chi.URLParam(r, "id")
+	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
 		return
 	}
 
@@ -173,5 +172,4 @@ func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
 	// 성공 메시지 반환
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
 }

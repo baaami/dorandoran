@@ -24,11 +24,11 @@ func (app *Config) routes() http.Handler {
 	mux.Use(LogRequestURL)
 
 	// 유저 서비스 관련 라우팅
-	mux.Get("/read/{id}", app.readUser)
+	mux.Get("/read", app.readUser)
 	mux.Get("/exist", app.checkUserExistence)
 	mux.Post("/register", app.registerUser)
 	mux.Put("/update", app.updateUser)
-	mux.Delete("/delete/{id}", app.deleteUser)
+	mux.Delete("/delete", app.deleteUser)
 
 	return mux
 }
