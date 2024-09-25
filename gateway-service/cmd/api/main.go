@@ -36,9 +36,10 @@ func main() {
 
 	// WebSocket 설정
 	wsConfig := &socket.Config{
-		Clients:     sync.Map{},
-		Rabbit:      rabbitConn,
-		RedisClient: redisClient,
+		ChatClients:  sync.Map{},
+		MatchClients: sync.Map{},
+		Rabbit:       rabbitConn,
+		RedisClient:  redisClient,
 	}
 
 	// Redis 대기열 모니터링 고루틴 실행
