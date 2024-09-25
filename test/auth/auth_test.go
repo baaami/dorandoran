@@ -58,6 +58,11 @@ func GetUserExist(t *testing.T, sessionID string) {
 
 	// 응답 상태 코드 확인
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// 응답 본문 확인 (필요 시 추가)
+	body, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	t.Logf("Response: %s", string(body))
 }
 
 // 테스트 요청을 쿠키와 함께 보내는 함수
@@ -80,11 +85,6 @@ func DeleteUser(t *testing.T, sessionID string) {
 
 	// 응답 상태 코드 확인
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// 응답 본문 확인 (필요 시 추가)
-	body, err := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	t.Logf("Response: %s", string(body))
 }
 
 func TestWithLoginSession(t *testing.T) {
