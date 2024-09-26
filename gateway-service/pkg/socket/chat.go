@@ -18,22 +18,14 @@ const (
 	MessageTypeUnRegister = "unregister"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
-type MatchMessage struct {
-	UserID string `json:"user_id"`
-}
-
-type MatchResponse struct {
-	RoomID string `json:"room_id"`
-}
-
 // WebSocket 연결 처리
 func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
@@ -57,7 +49,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.RegisterChatClient(conn, userID)
+	app.RegisterChatClient(conn, strconv.Itoa(userID))
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -69,7 +61,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 				log.Println("WebSocket connection closed by client")
 			}
 
-			app.UnRegisterChatClient(userID)
+			app.UnRegisterChatClient(strconv.Itoa(userID))
 			return
 		}
 
@@ -90,34 +82,51 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 func (app *Config) handleChatMessage(payload json.RawMessage) {
 	var chatMsg common.ChatMessage
 	if err := json.Unmarshal(payload, &chatMsg); err != nil {
-		log.Printf("Failed to unmarshal chat message: %v", err)
+		log.Printf("[ERROR] Failed to unmarshal chat message: %v", err)
 		return
 	}
 
-	log.Printf("Received chat message from %s: %s", chatMsg.SenderID, chatMsg.Message)
+	log.Printf("[INFO] Received chat message from SenderID: %s, RoomID: %s, Message: %s", chatMsg.SenderID, chatMsg.RoomID, chatMsg.Message)
 
+	// 수신자가 존재하는지 확인
 	if receiverConn, ok := app.ChatClients.Load(chatMsg.ReceiverID); ok {
 		conn := receiverConn.(*websocket.Conn)
-		log.Printf("Sending message to %s", chatMsg.ReceiverID)
-		conn.WriteJSON(chatMsg)
+		log.Printf("[INFO] Sending message to ReceiverID: %s", chatMsg.ReceiverID)
+
+		// chatMsg 객체 자체를 WriteJSON으로 전송
+		if err := conn.WriteJSON(chatMsg); err != nil {
+			log.Printf("[ERROR] Failed to send message to ReceiverID %s: %v", chatMsg.ReceiverID, err)
+		}
 
 		emitter, err := event.NewEventEmitter(app.Rabbit)
 		if err == nil {
+			log.Printf("[INFO] Pushing chat message to RabbitMQ for ReceiverID: %s", chatMsg.ReceiverID)
 			emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
+		} else {
+			log.Printf("[ERROR] Failed to create event emitter: %v", err)
 		}
 	} else {
-		log.Printf("Receiver %s not connected", chatMsg.ReceiverID)
+		// 수신자가 존재하지 않는 경우
+		log.Printf("[WARNING] ReceiverID %s not connected", chatMsg.ReceiverID)
+
+		// // sync.Map에 저장된 모든 클라이언트를 출력
+		// log.Println("[DEBUG] Dumping all sync.Map clients as Receiver is not connected")
+		// app.ChatClients.Range(func(key, value interface{}) bool {
+		// 	clientID := key.(string) // client ID (ReceiverID)
+		// 	log.Printf("[CLIENTS] Connected ClientID: %s", clientID)
+		// 	return true
+		// })
 	}
 }
 
 // Register 메시지 처리
-func (app *Config) RegisterChatClient(conn *websocket.Conn, userID int) {
+func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
 	app.ChatClients.Store(userID, conn)
-	log.Printf("User %d register chat server", userID)
+	log.Printf("User %s register chat server", userID)
 }
 
 // UnRegister 메시지 처리
-func (app *Config) UnRegisterChatClient(userID int) {
+func (app *Config) UnRegisterChatClient(userID string) {
 	app.ChatClients.Delete(userID)
-	log.Printf("User %d unregister chat server", userID)
+	log.Printf("User %s unregister chat server", userID)
 }

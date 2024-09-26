@@ -12,8 +12,22 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type MatchMessage struct {
+	UserID string `json:"user_id"`
+}
+
+type MatchResponse struct {
+	RoomID string `json:"room_id"`
+}
+
 // WebSocket 연결 처리
 func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
