@@ -1,156 +1,144 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
-	"os"
-	"strings"
+	"net/http"
+	"strconv"
+	"testing"
+	"time"
 
+	common "github.com/baaami/dorandoran/common/chat"
+	data "github.com/baaami/dorandoran/common/user"
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
 )
 
-type RegisterMessage struct {
-	UserID string `json:"user_id"`
-}
+const (
+	API_GATEWAY_URL = "http://localhost:2719"
+	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
+	RoomID          = "1" // 임의의 RoomID
+)
 
-type ChatMessage struct {
-	RoomID     string `json:"room_id"`
-	SenderID   string `json:"sender_id"`
-	ReceiverID string `json:"receiver_id"`
-	Message    string `json:"message"`
-}
+// 로그인 API를 호출하여 세션 ID와 유저 ID를 발급받는 함수
+func loginAndGetSessionIDAndUserID(accessToken string) (string, string, error) {
+	// 로그인 요청 데이터 설정 (필요한 데이터로 수정)
+	loginData := map[string]string{
+		"accessToken": accessToken,
+	}
+	reqBody, _ := json.Marshal(loginData)
 
-type WebSocketMessage struct {
-	Type    string          `json:"type"`
-	Payload json.RawMessage `json:"payload"`
-}
-
-func main() {
-	// WebSocket 서버에 연결
-	conn, _, err := websocket.DefaultDialer.Dial("ws://localhost:2719/ws", nil)
+	// 로그인 API 호출
+	resp, err := http.Post(API_GATEWAY_URL+"/auth/kakao", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
-		log.Fatalf("Failed to connect to WebSocket server: %v", err)
+		return "", "", err
 	}
-	defer conn.Close()
+	defer resp.Body.Close()
 
-	fmt.Println("Connected to WebSocket server!")
-
-	// 콘솔에서 사용자 입력 처리
-	reader := bufio.NewReader(os.Stdin)
-
-	// 유저 ID 입력받기
-	fmt.Print("Enter your User ID: ")
-	userID, _ := reader.ReadString('\n')
-	userID = strings.TrimSpace(userID) // 공백 제거
-
-	regiMsg := RegisterMessage{
-		UserID: userID,
-	}
-
-	// 유저 ID를 서버에 등록하는 메시지 전송
-	userIDBytes, err := json.Marshal(regiMsg) // 유저 ID를 JSON으로 변환
-	if err != nil {
-		log.Fatalf("Failed to marshal user ID: %v", err)
-	}
-
-	// 유저 ID를 서버에 등록하는 메시지 전송
-	registerMsg := WebSocketMessage{
-		Type:    "register",
-		Payload: userIDBytes,
-	}
-
-	registerMsgBytes, err := json.Marshal(registerMsg)
-	if err != nil {
-		log.Fatalf("Failed to marshal register message: %v", err)
-	}
-
-	// 서버에 유저 등록
-	err = conn.WriteMessage(websocket.TextMessage, registerMsgBytes)
-	if err != nil {
-		log.Fatalf("Failed to send register message: %v", err)
-	}
-	fmt.Printf("User %s registered with server\n", userID)
-
-	// 채팅방 정보 입력받기
-	fmt.Print("Enter Chat Room ID: ")
-	roomID, _ := reader.ReadString('\n')
-	roomID = strings.TrimSpace(roomID)
-
-	fmt.Print("Enter Receiver User ID: ")
-	receiverID, _ := reader.ReadString('\n')
-	receiverID = strings.TrimSpace(receiverID)
-
-	// 채팅 메시지 수신 처리 (고루틴으로 실행)
-	go func() {
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Printf("Error reading message: %v", err)
-				return
-			}
-
-			// 수신된 메시지를 출력
-			var chatMsg ChatMessage
-			if err := json.Unmarshal(msg, &chatMsg); err != nil {
-				log.Printf("Failed to unmarshal received message: %v", err)
-				continue
-			}
-
-			// 수신된 메시지 출력
-			fmt.Printf("\nNew message from %s: %s\n", chatMsg.SenderID, chatMsg.Message)
+	// 세션 ID와 유저 ID 가져오기
+	userID := ""
+	sessionID := ""
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "session_id" {
+			sessionID = cookie.Value
 		}
-	}()
+	}
 
-	fmt.Println("You can now start chatting. Type 'quit' to exit.")
+	var user data.User
+	err = json.NewDecoder(resp.Body).Decode(&user)
+	if err != nil {
+		return "", "", err
+	}
 
-	// 메시지 입력 및 전송
+	userID = strconv.Itoa(user.ID)
+
+	return sessionID, userID, nil
+}
+
+// WebSocket을 통한 메시지 송수신 테스트
+func TestChatBetweenTwoClients(t *testing.T) {
+	// 1. 로그인 후 두 명의 클라이언트 세션 ID 및 유저 ID 발급
+	sessionID1, userID1, err := loginAndGetSessionIDAndUserID("masterkey-2")
+	assert.NoError(t, err)
+	sessionID2, userID2, err := loginAndGetSessionIDAndUserID("masterkey-3")
+	assert.NoError(t, err)
+
+	// 2. 두 클라이언트가 WebSocket으로 접속
+	conn1, err := connectWebSocket(t, sessionID1, userID1)
+	assert.NoError(t, err)
+	defer conn1.Close()
+
+	conn2, err := connectWebSocket(t, sessionID2, userID2)
+	assert.NoError(t, err)
+	defer conn2.Close()
+
+	// 3. 각 클라이언트에서 수신 메시지 대기하는 goroutine 실행
+	go receiveChatMessages(t, conn1, userID1)
+	go receiveChatMessages(t, conn2, userID2)
+
+	// 4. 10번 대화를 주고받기
+	for i := 0; i < 10; i++ {
+		sendChatMessage(t, conn1, userID1, userID2, "Message from User1")
+		time.Sleep(1 * time.Second) // 타임아웃을 두어 메시지 순차 송수신
+
+		sendChatMessage(t, conn2, userID2, userID1, "Message from User2")
+		time.Sleep(1 * time.Second)
+	}
+}
+
+// WebSocket 서버에 접속하는 함수
+func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket.Conn, error) {
+	header := http.Header{}
+	header.Add("Cookie", "session_id="+sessionID)
+	header.Add("X-User-ID", userID)
+
+	conn, _, err := websocket.DefaultDialer.Dial(WS_CHAT_URL, header)
+	if err != nil {
+		t.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	return conn, nil
+}
+
+// WebSocket으로 메시지를 보내는 함수
+func sendChatMessage(t *testing.T, conn *websocket.Conn, senderID string, receiverID string, message string) {
+	chatMessage := common.ChatMessage{
+		RoomID:     RoomID,
+		SenderID:   senderID,
+		ReceiverID: receiverID,
+		Message:    message,
+	}
+
+	log.Printf("sender, receiver: [%s, %s]", senderID, receiverID)
+
+	wsMessage := common.WebSocketMessage{
+		Type:    "chat",
+		Payload: toJSONRawMessage(chatMessage),
+	}
+
+	err := conn.WriteJSON(wsMessage)
+	assert.NoError(t, err, "Failed to send message")
+}
+
+// WebSocket에서 수신된 메시지를 처리하는 goroutine 함수
+func receiveChatMessages(t *testing.T, conn *websocket.Conn, userID string) {
 	for {
-		fmt.Print("Enter message: ")
-		msgText, _ := reader.ReadString('\n')
-		msgText = strings.TrimSpace(msgText)
-
-		if msgText == "quit" {
-			fmt.Println("Disconnecting...")
-			break
-		}
-
-		// 채팅 메시지 생성
-		chatMsg := ChatMessage{
-			SenderID:   userID,
-			ReceiverID: receiverID,
-			RoomID:     roomID,
-			Message:    msgText,
-		}
-
-		// ChatMessage를 JSON으로 변환하여 Payload로 설정
-		chatMsgBytes, err := json.Marshal(chatMsg)
+		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Failed to marshal chat message: %v", err)
-			continue
+			log.Printf("User %s disconnected: %v", userID, err)
+			return
 		}
 
-		// WebSocketMessage 생성
-		wsMsg := WebSocketMessage{
-			Type:    "chat",
-			Payload: chatMsgBytes,
-		}
+		var chatMsg common.ChatMessage
+		err = json.Unmarshal(msg, &chatMsg)
+		assert.NoError(t, err)
 
-		// 메시지를 JSON으로 인코딩
-		wsMsgBytes, err := json.Marshal(wsMsg)
-		if err != nil {
-			log.Printf("Failed to marshal chat message: %v", err)
-			continue
-		}
-
-		// WebSocket 서버로 메시지 전송
-		err = conn.WriteMessage(websocket.TextMessage, wsMsgBytes)
-		if err != nil {
-			log.Printf("Failed to send message: %v", err)
-			break
-		}
+		log.Printf("User %s received message from %s: %s", chatMsg.ReceiverID, chatMsg.SenderID, chatMsg.Message)
 	}
+}
 
-	fmt.Println("Client exiting.")
+// JSON을 RawMessage로 변환하는 유틸리티 함수
+func toJSONRawMessage(v interface{}) json.RawMessage {
+	data, _ := json.Marshal(v)
+	return json.RawMessage(data)
 }

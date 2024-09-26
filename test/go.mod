@@ -3,6 +3,7 @@ module github.com/baaami/dorandoran/test
 go 1.22.5
 
 require (
+	github.com/baaami/dorandoran/common v0.0.0-20240925142333-0e049f5b8e80
 	github.com/gorilla/websocket v1.5.3
 	github.com/stretchr/testify v1.9.0
 )
