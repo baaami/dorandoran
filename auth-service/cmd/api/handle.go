@@ -103,7 +103,7 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, error) {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", KAKAO_API_USER_INFO_URL, nil)
-	req.Header.Set("Authorization", fmt.Sprintf("BearerO %s", accessToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != 200 {
@@ -116,6 +116,15 @@ func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 
 	var kakaoResponse map[string]interface{}
 	json.Unmarshal(body, &kakaoResponse)
+
+	// kakaoResponse 로그
+	log.Printf("Kakao response: %v", kakaoResponse)
+
+	// kakaoResponse에 id key가 있는지 확인
+	if _, ok := kakaoResponse["id"]; !ok {
+		log.Printf("Kakao response does not contain 'id' field")
+		return nil, fmt.Errorf("kakao response does not contain 'id' field")
+	}
 
 	return kakaoResponse, nil
 }
