@@ -20,6 +20,14 @@ type UnRegisterMessage struct {
 	UserID string `json:"user_id"`
 }
 
+type JoinRoomMessage struct {
+	RoomID string `json:"room_id"`
+}
+
+type LeaveRoomMessage struct {
+	RoomID string `json:"room_id"`
+}
+
 type MatchMessage struct {
 	UserID string `json:"user_id"`
 }
