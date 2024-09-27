@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	common "github.com/baaami/dorandoran/common/chat"
-	data "github.com/baaami/dorandoran/common/user"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,6 +20,17 @@ const (
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
 	RoomID          = "1" // 임의의 RoomID
 )
+
+type User struct {
+	ID       int    `json:"id"`
+	SnsType  int    `json:"sns_type"`
+	SnsID    int64  `json:"sns_id"`
+	Name     string `json:"name"`
+	Nickname string `json:"nickname"`
+	Gender   int    `json:"gender"`
+	Age      int    `json:"age"`
+	Email    string `json:"email"`
+}
 
 // 로그인 API를 호출하여 세션 ID와 유저 ID를 발급받는 함수
 func loginAndGetSessionIDAndUserID(accessToken string) (string, string, error) {
@@ -45,12 +56,22 @@ func loginAndGetSessionIDAndUserID(accessToken string) (string, string, error) {
 		}
 	}
 
-	var user data.User
+	// 유저 ID 추출
+	var user User
 	err = json.NewDecoder(resp.Body).Decode(&user)
 	if err != nil {
+		log.Printf("Error decoding user data: %v", err)
 		return "", "", err
 	}
 
+	if user.ID == 0 {
+		log.Printf("User ID is 0, failed to retrieve user data: %v", user)
+		return "", "", fmt.Errorf("failed to retrieve user ID from response")
+	}
+
+	log.Printf("User logged in successfully: %v", user)
+
+	// 유저 ID를 문자열로 변환
 	userID = strconv.Itoa(user.ID)
 
 	return sessionID, userID, nil

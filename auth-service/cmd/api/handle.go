@@ -34,13 +34,13 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var kakaoUserID string
+	var snsID int64
 
 	if strings.HasPrefix(requestData.AccessToken, "masterkey-") {
-		// 구분자 뒤의 숫자를 추출하여 KakaoUserID로 사용
+		// 구분자 뒤의 숫자를 추출하여 snsID 사용
 		parts := strings.Split(requestData.AccessToken, "-")
 		if len(parts) == 2 {
-			kakaoUserID = parts[1]
+			snsID, _ = strconv.ParseInt(parts[1], 10, 64)
 		} else {
 			http.Error(w, "Invalid masterkey format", http.StatusBadRequest)
 			return
@@ -54,11 +54,17 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 사용자 정보에서 카카오 사용자 ID 추출
-		kakaoUserID = fmt.Sprintf("%v", kakaoResponse["id"])
+		snsID, err = strconv.ParseInt(fmt.Sprintf("%v", kakaoResponse["id"]), 10, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid Kakao Id: %s", kakaoResponse["id"]), http.StatusUnauthorized)
+			return
+		}
 	}
 
+	log.Printf("snsID 1: %d", snsID)
+
 	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
-	loginUser, err := GetExistUserByUserSrv(types.KAKAO, kakaoUserID)
+	loginUser, err := GetExistUserByUserSrv(types.KAKAO, snsID)
 	if err != nil {
 		log.Printf("Error occurred while checking user existence: %v\n", err)
 		return
@@ -68,7 +74,7 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	if (loginUser == data.User{}) {
 		// 유저가 존재하지 않는 경우 -> 회원가입 진행
-		loginUser, err := RegisterNewUser(app, kakaoUserID)
+		loginUser, err = RegisterNewUser(app, snsID)
 		if err != nil {
 			log.Printf("Failed to register new user")
 			http.Error(w, "Failed to register new user", http.StatusInternalServerError)
@@ -89,6 +95,8 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 			sessionID = app.RedisClient.CreateSession(strconv.Itoa(loginUser.ID))
 		}
 	}
+
+	log.Printf("Finally Login User: %v", loginUser)
 
 	SetSessionCookie(&w, sessionID)
 
@@ -130,13 +138,13 @@ func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
-func GetExistUserByUserSrv(snsType int, snsID string) (data.User, error) {
+func GetExistUserByUserSrv(snsType int, snsID int64) (data.User, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
 
 	// 요청 URL 생성
-	url := fmt.Sprintf("http://user-service/exist?sns_type=%d&sns_id=%s", snsType, snsID)
+	url := fmt.Sprintf("http://user-service/exist?sns_type=%d&sns_id=%d", snsType, snsID)
 
 	// GET 요청 생성
 	req, err := http.NewRequest("GET", url, nil)
@@ -172,10 +180,10 @@ func GetExistUserByUserSrv(snsType int, snsID string) (data.User, error) {
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 새로운 사용자 생성
-func RegisterNewUser(app *Config, kakaoUserID string) (data.User, error) {
+func RegisterNewUser(app *Config, snsID int64) (data.User, error) {
 	newUser := data.User{
 		SnsType: types.KAKAO, // Kakao SNS 유형
-		SnsID:   kakaoUserID, // Kakao 사용자 ID
+		SnsID:   snsID,       // Kakao 사용자 ID
 	}
 
 	// user-service로 POST 요청 보내기
@@ -206,6 +214,8 @@ func RegisterNewUser(app *Config, kakaoUserID string) (data.User, error) {
 	if err != nil {
 		return data.User{}, fmt.Errorf("failed to decode response: %v", err)
 	}
+
+	log.Printf("Registered User: %v", createdUser)
 
 	return createdUser, nil
 }

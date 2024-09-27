@@ -1,19 +1,18 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/baaami/dorandoran/user/cmd/data"
 )
 
 const webPort = 80
-
-var db *sql.DB
 
 type Config struct {
 	Models *data.UserService
@@ -24,22 +23,10 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
-	db = mysqlClient
-
-	// MySQL 연결 해제 시 사용되는 컨텍스트 생성
-	_, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	// MySQL 연결 해제
-	defer func() {
-		if err = db.Close(); err != nil {
-			panic(err)
-		}
-	}()
 
 	// Config 구조체 초기화
 	app := Config{
-		Models: &data.UserService{DB: db},
+		Models: &data.UserService{DB: mysqlClient},
 	}
 
 	// DB 초기화 (데이터베이스 및 테이블 생성)
@@ -63,20 +50,13 @@ func main() {
 }
 
 // MySQL에 연결하는 함수
-func connectToMySQL() (*sql.DB, error) {
-	// MySQL 데이터 소스 네임 (DSN) 설정
+func connectToMySQL() (*gorm.DB, error) {
 	dsn := "root:sample@tcp(mysql:3306)/users?parseTime=true"
-
-	// MySQL에 연결
-	db, err := sql.Open("mysql", dsn)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info), // 로깅 설정
+	})
 	if err != nil {
 		log.Println("Error connecting to MySQL:", err)
-		return nil, err
-	}
-
-	// MySQL 연결 확인
-	if err := db.Ping(); err != nil {
-		log.Println("Error pinging MySQL:", err)
 		return nil, err
 	}
 

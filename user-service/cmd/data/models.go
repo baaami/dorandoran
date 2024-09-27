@@ -1,130 +1,103 @@
 package data
 
 import (
-	"database/sql"
-	"fmt"
 	"log"
 
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/gorm"
 )
 
 type User struct {
-	ID       int    `json:"id"`
-	SnsType  int    `json:"sns_type"`
-	SnsID    string `json:"sns_id"`
-	Name     string `json:"name"`
-	Nickname string `json:"nickname"`
-	Gender   int    `json:"gender"`
-	Age      int    `json:"age"`
-	Email    string `json:"email"`
+	ID       int    `gorm:"primaryKey;autoIncrement"`
+	SnsType  int    `gorm:"index"`
+	SnsID    int64  `gorm:"index"`
+	Name     string `gorm:"size:100"`
+	Nickname string `gorm:"size:100"`
+	Gender   int
+	Age      int
+	Email    string `gorm:"size:100"`
 }
 
-// MySQL 클라이언트 설정
+// GORM 클라이언트 설정
 type UserService struct {
-	DB *sql.DB
+	DB *gorm.DB
 }
 
-// MySQL 데이터베이스 연결 함수
+// MySQL 데이터베이스 및 테이블 초기화 함수
 func (s *UserService) InitDB() error {
-	// 데이터베이스 생성 쿼리 실행
-	_, err := s.DB.Exec("CREATE DATABASE IF NOT EXISTS users")
+	// 데이터베이스 자동 마이그레이션 (테이블 생성)
+	err := s.DB.AutoMigrate(&User{})
 	if err != nil {
-		return fmt.Errorf("failed to create database: %v", err)
+		return err
 	}
-	log.Println("Database `users` created or already exists.")
-
-	// `users` 데이터베이스 사용
-	_, err = s.DB.Exec("USE users")
-	if err != nil {
-		return fmt.Errorf("failed to switch to database `users`: %v", err)
-	}
-
-	// `users` 테이블 생성 쿼리
-	tableCreationQuery := `
-	CREATE TABLE IF NOT EXISTS users (
-		id INT AUTO_INCREMENT PRIMARY KEY,
-		sns_type INT,
-		sns_id VARCHAR(255),
-		name VARCHAR(100),
-		nickname VARCHAR(100),
-		gender INT,
-		age INT,
-		email VARCHAR(100)
-	);`
-
-	// 테이블 생성 쿼리 실행
-	_, err = s.DB.Exec(tableCreationQuery)
-	if err != nil {
-		return fmt.Errorf("failed to create table: %v", err)
-	}
-	log.Println("Table `users` created or already exists.")
-
+	log.Println("Table `users` migrated or already exists.")
 	return nil
 }
 
 // 유저 생성 (삽입)
-func (s *UserService) InsertUser(name, nickname, snsID string, gender, age, snsType int, email string) (int64, error) {
-	query := "INSERT INTO users (name, nickname, sns_id, gender, age, sns_type, email) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	result, err := s.DB.Exec(query, name, nickname, snsID, gender, age, snsType, email)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert user: %v", err)
+func (s *UserService) InsertUser(name, nickname string, snsID int64, gender, age, snsType int, email string) (int64, error) {
+	user := User{
+		Name:     name,
+		Nickname: nickname,
+		SnsID:    snsID,
+		Gender:   gender,
+		Age:      age,
+		SnsType:  snsType,
+		Email:    email,
+	}
+	if err := s.DB.Create(&user).Error; err != nil {
+		return 0, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to retrieve last insert id: %v", err)
-	}
-	return id, nil
+	log.Printf("[DB] isnert user: %v", user)
+	return int64(user.ID), nil
 }
 
 // 유저 조회
 func (s *UserService) GetUserByID(id int) (*User, error) {
-	query := "SELECT id, name, nickname, gender, age, email FROM users WHERE id = ?"
-	row := s.DB.QueryRow(query, id)
-
 	var user User
-	err := row.Scan(&user.ID, &user.Name, &user.Nickname, &user.Gender, &user.Age, &user.Email)
+	err := s.DB.First(&user, id).Error
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // 유저가 없을 경우 nil 반환
-		}
-		return nil, fmt.Errorf("failed to retrieve user: %v", err)
+		return nil, err
 	}
 	return &user, nil
 }
 
 // 유저 조회 (sns_type과 sns_id를 기반으로 조회)
-func (s *UserService) GetUserBySNS(snsType int, snsID string) (*User, error) {
-	query := "SELECT id, sns_type, sns_id, name, nickname, gender, age, email FROM users WHERE sns_type = ? AND sns_id = ?"
-	row := s.DB.QueryRow(query, snsType, snsID)
-
+func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 	var user User
-	err := row.Scan(&user.ID, &user.SnsType, &user.SnsID, &user.Name, &user.Nickname, &user.Gender, &user.Age, &user.Email)
+	err := s.DB.Where("sns_type = ? AND sns_id = ?", snsType, snsID).First(&user).Error
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // 유저가 없을 경우 nil 반환
+		// record not found인 경우 user와 error 모두 nil 반환
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to retrieve user by sns_type and sns_id: %v", err)
+		// 다른 에러가 있는 경우 에러 반환
+		return nil, err
 	}
 	return &user, nil
 }
 
 // 유저 업데이트
 func (s *UserService) UpdateUser(id int, name, nickname string, gender, age int) error {
-	query := "UPDATE users SET name = ?, nickname = ?, gender = ?, age = ? WHERE id = ?"
-	_, err := s.DB.Exec(query, name, nickname, gender, age, id)
-	if err != nil {
-		return fmt.Errorf("failed to update user: %v", err)
+	user := User{
+		ID: id,
+	}
+	updateFields := map[string]interface{}{
+		"name":     name,
+		"nickname": nickname,
+		"gender":   gender,
+		"age":      age,
+	}
+	if err := s.DB.Model(&user).Updates(updateFields).Error; err != nil {
+		return err
 	}
 	return nil
 }
 
 // 유저 삭제
 func (s *UserService) DeleteUser(id int) error {
-	query := "DELETE FROM users WHERE id = ?"
-	_, err := s.DB.Exec(query, id)
-	if err != nil {
-		return fmt.Errorf("failed to delete user: %v", err)
+	if err := s.DB.Delete(&User{}, id).Error; err != nil {
+		return err
 	}
 	return nil
 }

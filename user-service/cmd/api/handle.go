@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,7 +11,7 @@ import (
 type User struct {
 	ID       int    `json:"id"`
 	SnsType  int    `json:"sns_type"`
-	SnsID    string `json:"sns_id"`
+	SnsID    int64  `json:"sns_id"`
 	Name     string `json:"name"`
 	Nickname string `json:"nickname"`
 	Gender   int    `json:"gender"`
@@ -54,21 +55,38 @@ func (app *Config) checkUserExistence(w http.ResponseWriter, r *http.Request) {
 
 	// sns_type이나 sns_id가 없는 경우 오류 반환
 	if snsType == "" || snsID == "" {
+		log.Printf("Missing parameters: sns_type=%s, sns_id=%s", snsType, snsID)
 		http.Error(w, "Missing sns_type or sns_id", http.StatusBadRequest)
 		return
 	}
 
-	nSnsType, _ := strconv.Atoi(snsType)
+	// sns_type을 정수로 변환
+	nSnsType, err := strconv.Atoi(snsType)
+	if err != nil {
+		log.Printf("Invalid sns_type parameter: %s, error: %v", snsType, err)
+		http.Error(w, fmt.Sprintf("Bad Parameter sns_type: %s", snsType), http.StatusBadRequest)
+		return
+	}
+
+	// sns_id를 정수로 변환
+	nSnsID, err := strconv.ParseInt(snsID, 10, 64)
+	if err != nil {
+		log.Printf("Invalid sns_id parameter: %s, error: %v", snsID, err)
+		http.Error(w, fmt.Sprintf("Bad Parameter sns_id: %s", snsID), http.StatusBadRequest)
+		return
+	}
 
 	// DB에서 사용자 조회
-	user, err := app.Models.GetUserBySNS(nSnsType, snsID)
+	user, err := app.Models.GetUserBySNS(nSnsType, nSnsID)
 	if err != nil {
+		log.Printf("Error fetching user for sns_type=%d, sns_id=%d, error: %v", nSnsType, nSnsID, err)
 		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
 	}
 
 	// 유저가 존재하지 않는 경우
 	if user == nil {
+		log.Printf("User not found for sns_type=%d, sns_id=%d", nSnsType, nSnsID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -76,7 +94,10 @@ func (app *Config) checkUserExistence(w http.ResponseWriter, r *http.Request) {
 	// 유저가 존재하는 경우, StatusOK와 함께 유저 정보 반환
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(user)
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		log.Printf("Error encoding user data: %v", err)
+		http.Error(w, "Error encoding user data", http.StatusInternalServerError)
+	}
 }
 
 // 유저 정보 삽입
@@ -96,6 +117,10 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 	newUser.Gender = 0    // 0으로 초기화
 	newUser.Age = 0       // 0으로 초기화
 	newUser.Email = ""    // 빈 문자열로 초기화
+
+	// 유저 정보 로그 출력
+	log.Printf("Registering user with the following details: sns_type=%d, sns_id=%d, name=%s, nickname=%s, gender=%d, age=%d, email=%s",
+		newUser.SnsType, newUser.SnsID, newUser.Name, newUser.Nickname, newUser.Gender, newUser.Age, newUser.Email)
 
 	// DB에 유저 삽입
 	insertedID, err := app.Models.InsertUser(newUser.Name, newUser.Nickname, newUser.SnsID, newUser.Gender, newUser.Age, newUser.SnsType, newUser.Email)
