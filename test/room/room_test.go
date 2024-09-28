@@ -199,6 +199,9 @@ func TestChatAmongFiveClients(t *testing.T) {
 		go receiveChatMessages(t, conns[i], userIDs[i], &receiveWg)
 	}
 
+	// 수신 메시지 대기
+	time.Sleep(2 * time.Second)
+
 	// 5. 각 참가자들이 채팅 메시지 1개씩 송신
 	for i := 0; i < participantCount; i++ {
 		message := fmt.Sprintf("Hello from User %s", userIDs[i])

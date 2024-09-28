@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/baaami/dorandoran/broker/pkg/redis"
+	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -17,9 +18,14 @@ const (
 	MessageTypeLeave      = "leave"
 )
 
+type Client struct {
+	Conn *websocket.Conn
+	Send chan interface{}
+}
+
 type Config struct {
-	Rooms        sync.Map //
-	ChatClients  sync.Map
+	Rooms        sync.Map // key: roomID, value: *sync.Map (key: userID, value: *Client)
+	ChatClients  sync.Map // key: userID, value: *Client
 	MatchClients sync.Map
 	Rabbit       *amqp.Connection
 	RedisClient  *redis.RedisClient

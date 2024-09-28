@@ -3,9 +3,10 @@ package socket
 import (
 	"log"
 	"sync"
+	"time"
 
+	"github.com/baaami/dorandoran/broker/event"
 	common "github.com/baaami/dorandoran/common/chat"
-	"github.com/gorilla/websocket"
 )
 
 // Room에 있는 모든 사용자에게 브로드캐스트
@@ -13,55 +14,58 @@ func (app *Config) BroadcastToRoom(chatMsg common.ChatMessage) {
 	roomID := chatMsg.RoomID
 	if room, ok := app.Rooms.Load(roomID); ok {
 		roomMap := room.(*sync.Map)
-		roomMap.Range(func(userID, conn interface{}) bool {
-			// conn이 nil인지 확인
-			if conn == nil {
-				log.Printf("[ERROR] Connection for user %v in room %s is nil", userID, roomID)
-				// nil 연결을 room map에서 제거
+		roomMap.Range(func(userID, clientInterface interface{}) bool {
+			if clientInterface == nil {
+				log.Printf("[ERROR] Client for user %v in room %s is nil", userID, roomID)
 				roomMap.Delete(userID)
 				return true
 			}
 
-			wsConn, ok := conn.(*websocket.Conn)
-			if !ok {
-				log.Printf("[ERROR] Invalid connection type for user %v in room %s", userID, roomID)
-				// 잘못된 연결을 room map에서 제거
+			client, ok := clientInterface.(*Client)
+			if !ok || client == nil {
+				log.Printf("[ERROR] Invalid client for user %v in room %s", userID, roomID)
 				roomMap.Delete(userID)
 				return true
 			}
 
-			// 연결이 닫혀있는지 확인
-			if wsConn == nil || wsConn.CloseHandler() == nil {
-				log.Printf("[INFO] Connection for user %v in room %s is closed", userID, roomID)
-				// 닫힌 연결을 room map에서 제거
+			// 메시지를 Send 채널에 보냅니다.
+			select {
+			case client.Send <- chatMsg:
+				// 메시지 전송 성공
+			case <-time.After(time.Second * 1):
+				log.Printf("[ERROR] Sending message to user %v in room %s timed out", userID, roomID)
+				// Optionally remove client or handle the timeout
 				roomMap.Delete(userID)
-				return true
-			}
-
-			// 메시지 전송 시도
-			if err := wsConn.WriteJSON(chatMsg); err != nil {
-				log.Printf("[ERROR] Failed to send message to user %v in room %s: %v", userID, roomID, err)
-
-				// 에러가 연결 종료와 관련된 경우
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-					log.Printf("[INFO] Removing closed connection for user %v in room %s", userID, roomID)
-					// 닫힌 연결을 room map에서 제거
-					roomMap.Delete(userID)
-				} else {
-					log.Printf("[INFO] Connection error for user %v in room %s: %v", userID, roomID, err)
-				}
 			}
 			return true
 		})
 	} else {
 		log.Printf("[WARNING] Room %s not found", roomID)
 	}
+
+	emitter, err := event.NewEventEmitter(app.Rabbit)
+	if err == nil {
+		log.Printf("[INFO] Pushing chat message to RabbitMQ for ReceiverID: %s", chatMsg.RoomID)
+		// TODO: 재시도 로직이나 대체 방안을 고려
+		emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
+	} else {
+		log.Printf("[ERROR] Failed to create event emitter: %v", err)
+	}
 }
 
 // Room에 사용자 추가하기
-func (app *Config) JoinRoom(roomID string, userID string, conn *websocket.Conn) {
+func (app *Config) JoinRoom(roomID string, userID string) {
 	room, _ := app.Rooms.LoadOrStore(roomID, &sync.Map{}) // 각 roomID에 대해 새로운 sync.Map 생성
-	room.(*sync.Map).Store(userID, conn)                  // roomID에 해당하는 사용자 저장
+
+	// 클라이언트 가져오기
+	clientInterface, ok := app.ChatClients.Load(userID)
+	if !ok {
+		log.Printf("[ERROR] Client not found for user %s", userID)
+		return
+	}
+	client := clientInterface.(*Client)
+
+	room.(*sync.Map).Store(userID, client) // roomID에 해당하는 클라이언트 저장
 	log.Printf("User %s joined room %s", userID, roomID)
 }
 

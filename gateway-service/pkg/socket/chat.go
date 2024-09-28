@@ -39,13 +39,13 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 연결 성공
-	defer conn.Close()
-
 	// URL에서 유저 ID 가져오기
 	userID := r.Header.Get("X-User-ID")
-
 	app.RegisterChatClient(conn, userID)
+	defer func() {
+		app.UnRegisterChatClient(userID)
+		conn.Close()
+	}()
 
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -73,7 +73,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		case MessageTypeBroadCast:
 			app.handleBroadCastMessage(wsMsg.Payload)
 		case MessageTypeJoin:
-			app.handleJoinMessage(wsMsg.Payload, userID, conn)
+			app.handleJoinMessage(wsMsg.Payload, userID)
 		case MessageTypeLeave:
 			app.handleLeaveMessage(wsMsg.Payload, userID)
 		}
@@ -91,14 +91,12 @@ func (app *Config) handleChatMessage(payload json.RawMessage) {
 	log.Printf("[INFO] Received chat message from SenderID: %s, RoomID: %s, Message: %s", chatMsg.SenderID, chatMsg.RoomID, chatMsg.Message)
 
 	// 수신자가 존재하는지 확인
-	if receiverConn, ok := app.ChatClients.Load(chatMsg.ReceiverID); ok {
-		conn := receiverConn.(*websocket.Conn)
+	if receiverClient, ok := app.ChatClients.Load(chatMsg.ReceiverID); ok {
+		client := receiverClient.(*Client)
 		log.Printf("[INFO] Sending message to ReceiverID: %s", chatMsg.ReceiverID)
 
-		// chatMsg 객체 자체를 WriteJSON으로 전송
-		if err := conn.WriteJSON(chatMsg); err != nil {
-			log.Printf("[ERROR] Failed to send message to ReceiverID %s: %v", chatMsg.ReceiverID, err)
-		}
+		// 메시지를 Send 채널에 보냅니다.
+		client.Send <- chatMsg
 
 		emitter, err := event.NewEventEmitter(app.Rabbit)
 		if err == nil {
@@ -126,14 +124,14 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage) {
 }
 
 // Join 메시지 처리
-func (app *Config) handleJoinMessage(payload json.RawMessage, userID string, conn *websocket.Conn) {
+func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
 	var joinMsg JoinRoomMessage
 	if err := json.Unmarshal(payload, &joinMsg); err != nil {
 		log.Printf("[ERROR] Failed to unmarshal join message: %v", err)
 		return
 	}
 
-	app.JoinRoom(joinMsg.RoomID, userID, conn)
+	app.JoinRoom(joinMsg.RoomID, userID)
 }
 
 // Leave 메시지 처리
@@ -149,13 +147,46 @@ func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 
 // Register
 func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
-	app.ChatClients.Store(userID, conn)
+	client := &Client{
+		Conn: conn,
+		Send: make(chan interface{}, 256),
+	}
+
+	// 쓰기 고루틴 시작
+	go client.writePump()
+
+	app.ChatClients.Store(userID, client)
 	log.Printf("User %s register chat server", userID)
 }
 
 // UnRegister
 func (app *Config) UnRegisterChatClient(userID string) {
-	// TODO: Room에서도 LeaveRoom을 해야되지 않나??
-	app.ChatClients.Delete(userID)
-	log.Printf("User %s unregister chat server", userID)
+	if clientInterface, ok := app.ChatClients.Load(userID); ok {
+		client := clientInterface.(*Client)
+		close(client.Send) // Send 채널 닫기
+		app.ChatClients.Delete(userID)
+		log.Printf("User %s unregistered chat server", userID)
+	}
+}
+
+func (c *Client) writePump() {
+	defer func() {
+		c.Conn.Close()
+		log.Printf("[INFO] writePump for user %v exited", c.Conn.RemoteAddr())
+	}()
+
+	for {
+		message, ok := <-c.Send
+		if !ok {
+			// 채널이 닫힌 경우 연결을 닫습니다.
+			c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+			return
+		}
+
+		// 메시지를 전송합니다.
+		if err := c.Conn.WriteJSON(message); err != nil {
+			log.Printf("[ERROR] Failed to write message: %v", err)
+			return
+		}
+	}
 }

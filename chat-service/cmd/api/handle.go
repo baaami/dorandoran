@@ -130,7 +130,7 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Chat message inserted successfully"))
-	log.Printf("Chat message from %s to %s inserted", chatMsg.SenderID, chatMsg.ReceiverID)
+	log.Printf("Chat message from %s in room[%s]", chatMsg.SenderID, chatMsg.RoomID)
 }
 
 // 특정 방의 채팅 메시지 리스트 획득
