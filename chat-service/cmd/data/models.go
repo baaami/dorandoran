@@ -34,13 +34,12 @@ type Chat struct {
 }
 
 type ChatRoom struct {
-	ID            int       `bson:"id" json:"id"`
-	UserAID       int       `bson:"user_a_id" json:"user_a_id"`
-	UserBID       int       `bson:"user_b_id" json:"user_b_id"`
-	LastConfirmID int       `bson:"last_confirm_id" json:"last_confirm_id"`
-	CreatedAt     time.Time `bson:"created_at" json:"created_at"`
-	ModifiedAt    time.Time `bson:"modified_at" json:"modified_at"`
-	ConfirmAt     time.Time `bson:"confirm_at" json:"confirm_at"`
+	ID         string    `bson:"id" json:"id"` // UUID 사용
+	Users      []string  `bson:"users" json:"users"`
+	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
+	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
+	// 추가적으로 각 사용자의 마지막 확인 메시지 ID를 추적하기 위한 필드를 고려할 수 있음
+	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
 // 채팅 메시지 삽입
@@ -100,23 +99,13 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// rooms 컬렉션 선택
 	collection := client.Database("chat_db").Collection("rooms")
 
-	// Auto-increment id 계산
-	opts := options.FindOne().SetSort(bson.D{{"id", -1}})
-	var lastRoom ChatRoom
-	err := collection.FindOne(ctx, bson.D{}, opts).Decode(&lastRoom)
-	if err != nil && err != mongo.ErrNoDocuments {
-		return err
-	}
-	room.ID = lastRoom.ID + 1
-	room.LastConfirmID = -1
 	room.CreatedAt = time.Now()
 	room.ModifiedAt = time.Now()
-	room.ConfirmAt = time.Now()
+	room.UserLastRead = make(map[string]time.Time) // 각 사용자의 마지막 읽은 메시지 ID를 저장하기 위한 맵 (필요 시)
 
-	_, err = collection.InsertOne(ctx, room)
+	_, err := collection.InsertOne(ctx, room)
 	if err != nil {
 		log.Println("Error inserting new room:", err)
 		return err
@@ -126,7 +115,7 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 }
 
 // 채팅방 삭제
-func (c *ChatRoom) DeleteRoom(roomID int) error {
+func (c *ChatRoom) DeleteRoom(roomID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -141,18 +130,17 @@ func (c *ChatRoom) DeleteRoom(roomID int) error {
 }
 
 // Room ID로 채팅방 조회
-func (c *ChatRoom) GetRoomByID(roomID int) (*ChatRoom, error) {
+func (c *ChatRoom) GetRoomByID(roomID string) (*ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("rooms")
 
-	// MongoDB에서 해당 Room ID로 채팅방을 조회
 	var room ChatRoom
 	err := collection.FindOne(ctx, bson.M{"id": roomID}).Decode(&room)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, nil // 해당 Room ID에 해당하는 방이 없을 때
+			return nil, nil
 		}
 		log.Println("Error finding room by ID:", err)
 		return nil, err
@@ -162,16 +150,13 @@ func (c *ChatRoom) GetRoomByID(roomID int) (*ChatRoom, error) {
 }
 
 // 특정 유저의 채팅방 목록 조회
-func (c *ChatRoom) GetRoomsByUserID(userID int) ([]ChatRoom, error) {
+func (c *ChatRoom) GetRoomsByUserID(userID string) ([]ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("rooms")
 	cursor, err := collection.Find(ctx, bson.M{
-		"$or": []bson.M{
-			{"user_a_id": userID},
-			{"user_b_id": userID},
-		},
+		"users": userID,
 	})
 	if err != nil {
 		log.Println("Error finding rooms:", err)

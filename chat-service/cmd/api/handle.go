@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/baaami/dorandoran/chat/cmd/data"
 	"github.com/go-chi/chi/v5"
@@ -40,12 +39,7 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 
 // 특정 유저의 채팅방 목록 조회
 func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) {
-	userIDStr := chi.URLParam(r, "user_id")
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
+	userID := chi.URLParam(r, "user_id")
 
 	// MongoDB에서 특정 유저가 참여한 채팅방 목록 조회
 	rooms, err := app.Models.ChatRoom.GetRoomsByUserID(userID)
@@ -60,12 +54,7 @@ func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) 
 
 // Room ID로 채팅방 상세 정보 조회
 func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
-	roomIDStr := chi.URLParam(r, "id")
-	roomID, err := strconv.Atoi(roomIDStr)
-	if err != nil {
-		http.Error(w, "Invalid room ID", http.StatusBadRequest)
-		return
-	}
+	roomID := chi.URLParam(r, "id")
 
 	// MongoDB에서 Room ID로 채팅방 조회
 	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
@@ -84,15 +73,10 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 
 // 특정 Room ID로 채팅방 삭제
 func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
-	roomIDStr := chi.URLParam(r, "id")
-	roomID, err := strconv.Atoi(roomIDStr)
-	if err != nil {
-		http.Error(w, "Invalid room ID", http.StatusBadRequest)
-		return
-	}
+	roomID := chi.URLParam(r, "id")
 
 	// MongoDB에서 Room ID로 채팅방 삭제
-	err = app.Models.ChatRoom.DeleteRoom(roomID)
+	err := app.Models.ChatRoom.DeleteRoom(roomID)
 	if err != nil {
 		http.Error(w, "Failed to delete chat room", http.StatusInternalServerError)
 		return

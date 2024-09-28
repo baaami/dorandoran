@@ -80,8 +80,6 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("loginUser: %v", loginUser)
-
 	var sessionID string
 
 	if (loginUser == User{}) {
@@ -107,9 +105,6 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 			sessionID = app.RedisClient.CreateSession(strconv.Itoa(loginUser.ID))
 		}
 	}
-
-	// TODO: SNSID 없음
-	log.Printf("Finally Login User: %v", loginUser)
 
 	SetSessionCookie(&w, sessionID)
 
@@ -197,8 +192,6 @@ func GetExistUserByUserSrv(snsType int, snsID int64) (User, error) {
 	if err != nil {
 		return User{}, fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	log.Printf("[GetExistUserByUserSrv] Decoded user: %v", user)
 
 	// 유저가 존재하는 경우
 	return user, nil

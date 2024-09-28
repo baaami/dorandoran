@@ -1,7 +1,9 @@
 package socket
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -102,6 +104,12 @@ func (app *Config) MonitorQueue() {
 		if len(matchList) == MatchTotalNum {
 			roomID := uuid.New().String()
 			log.Printf("Matched %v in room %s", matchList, roomID)
+
+			err = app.createRoom(roomID, matchList)
+			if err != nil {
+				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
+			}
+
 			app.notifyUsers(matchList, roomID)
 		}
 
@@ -122,6 +130,49 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 			log.Printf("User %s not connected", userID)
 		}
 	}
+}
+
+// [Hub Network] Chat 서비스에 API를 호출하여 방 생성
+func (app *Config) createRoom(roomID string, matchList []string) error {
+	client := &http.Client{
+		Timeout: time.Second * 10, // 요청 타임아웃 설정
+	}
+
+	chatRoom := ChatRoom{
+		ID:    roomID,
+		Users: matchList,
+	}
+
+	reqBody, err := json.Marshal(chatRoom)
+	if err != nil {
+		log.Printf("Failed to marshal chatroom, chatroom: %v, err: %s", chatRoom, err.Error())
+		return nil
+	}
+
+	// 요청 URL 생성
+	url := "http://chat-service/room/create"
+
+	// GET 요청 생성
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %v", err)
+	}
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("failed to send request: %v", err)
+		return fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 응답 처리
+	if resp.StatusCode != http.StatusCreated {
+		// room이 생성되지 않은 경우
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // Register 메시지 처리
