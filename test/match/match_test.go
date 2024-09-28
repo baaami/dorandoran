@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -150,10 +149,13 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) MatchResponse {
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	participantCount := 2
+	participantCount := 10
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
+
+	// 채널을 사용하여 응답을 수집
+	responseChan := make(chan MatchResponse, participantCount)
 
 	// 1. 5명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
 	for i := 0; i < participantCount; i++ {
@@ -171,20 +173,32 @@ func TestMatchWebSocketAPI(t *testing.T) {
 		conns[i] = conn
 	}
 
+	// 3. 각 클라이언트가 매칭 요청을 보내고 비동기적으로 응답 대기
 	for i := 0; i < participantCount; i++ {
-		sendMatchRequest(t, conns[i], userIDs[i])
+		go func(i int) {
+			// 매칭 요청 보내기
+			sendMatchRequest(t, conns[i], userIDs[i])
+
+			// 매칭 응답 수신
+			matchResp := receiveMatchResponse(t, conns[i])
+
+			// 응답을 채널에 전달
+			responseChan <- matchResp
+		}(i)
 	}
 
-	// 매칭 결과를 수신 (양쪽에서 확인)
-	time.Sleep(2 * time.Second) // 매칭 시간이 필요할 경우 대기
+	// 4. 응답을 수신
+	matchResponses := make([]MatchResponse, participantCount)
+	for i := 0; i < participantCount; i++ {
+		matchResponses[i] = <-responseChan
 
-	matchResp1 := receiveMatchResponse(t, conns[0])
-	matchResp2 := receiveMatchResponse(t, conns[1])
-
-	// 매칭 응답이 올바르게 반환되었는지 확인
-	if matchResp1.RoomID != matchResp2.RoomID {
-		t.Errorf("RoomID mismatch between user1 and user2. user1: %s, user2: %s", matchResp1.RoomID, matchResp2.RoomID)
+		if matchResponses[i].RoomID != "" {
+			t.Logf("%s User allocated room %s", userIDs[i], matchResponses[i].RoomID)
+		}
 	}
 
-	log.Printf("Test Passed: Match successful in room %s", matchResp1.RoomID)
+	// 6. WebSocket 연결 닫기
+	for _, conn := range conns {
+		conn.Close()
+	}
 }

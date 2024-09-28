@@ -112,7 +112,6 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(loginUser)
-	w.Write([]byte("Login successful, session ID issued"))
 }
 
 // [Network] 카카오 API 호출을 통해 access token 검증
