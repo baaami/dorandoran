@@ -54,26 +54,18 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Redis 대기열을 계속 확인하고 매칭 시도
 func (app *Config) MonitorQueue() {
 	const MatchTotalNum = 2
 
 	for {
-		// 대기열의 길이 확인
-		queueLength, err := app.RedisClient.GetQueueLength()
+		matchList, err := app.RedisClient.PopNUsersFromQueue(MatchTotalNum)
 		if err != nil {
-			log.Printf("Error getting queue length: %v", err)
+			log.Printf("Error in matching: %v", err)
 			continue
 		}
 
-		if queueLength >= MatchTotalNum {
-			// 충분한 유저가 있으므로 Pop 수행
-			matchList, err := app.RedisClient.PopNUsersFromQueue(MatchTotalNum)
-			if err != nil {
-				log.Printf("Error in matching: %v", err)
-				continue
-			}
-
-			// 매칭 로직 수행
+		if len(matchList) == MatchTotalNum {
 			roomID := uuid.New().String()
 			log.Printf("Matched %v in room %s", matchList, roomID)
 
