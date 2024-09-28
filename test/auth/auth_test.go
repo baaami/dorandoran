@@ -11,6 +11,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type User struct {
+	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int    `gorm:"index" json:"sns_type"`
+	SnsID    int64  `gorm:"index" json:"sns_id"`
+	Name     string `gorm:"size:100" json:"name"`
+	Nickname string `gorm:"size:100" json:"nickname"`
+	Gender   int    `json:"gender"`
+	Age      int    `json:"age"`
+	Email    string `gorm:"size:100" json:"email"`
+}
+
 const API_GATEWAY_URL = "http://localhost:2719"
 
 // 로그인 API를 호출하여 세션 ID를 발급받는 함수
@@ -42,6 +53,34 @@ func loginAndGetSessionID() (string, error) {
 func GetUserExist(t *testing.T, sessionID string) {
 	// 테스트 요청 생성
 	req, err := http.NewRequest(http.MethodGet, API_GATEWAY_URL+"/user/exist?sns_type=0&sns_id=1", nil)
+	assert.NoError(t, err)
+
+	// 세션 ID 쿠키 설정
+	req.AddCookie(&http.Cookie{
+		Name:  "session_id",
+		Value: sessionID,
+	})
+
+	// 클라이언트로 요청 보내기
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// 응답 상태 코드 확인
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// 응답 본문 확인 (필요 시 추가)
+	body, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	t.Logf("Response: %s", string(body))
+}
+
+// 테스트 요청을 쿠키와 함께 보내는 함수
+func UpdateUserProfile(t *testing.T, sessionID string) {
+
+	// 테스트 요청 생성
+	req, err := http.NewRequest(http.MethodPut, API_GATEWAY_URL+"/user/update", nil)
 	assert.NoError(t, err)
 
 	// 세션 ID 쿠키 설정

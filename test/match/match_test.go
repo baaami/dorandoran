@@ -1,12 +1,34 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
 )
+
+const (
+	API_GATEWAY_URL = "http://localhost:2719"
+	WS_MATCH_URL    = "ws://localhost:2719/ws/match"
+)
+
+type User struct {
+	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int    `gorm:"index" json:"sns_type"`
+	SnsID    int64  `gorm:"index" json:"sns_id"`
+	Name     string `gorm:"size:100" json:"name"`
+	Nickname string `gorm:"size:100" json:"nickname"`
+	Gender   int    `json:"gender"`
+	Age      int    `json:"age"`
+	Email    string `gorm:"size:100" json:"email"`
+}
 
 // WebSocketMessage 구조체 정의
 type WebSocketMessage struct {
@@ -28,30 +50,80 @@ type UnRegisterMessage struct {
 	UserID string `json:"user_id"`
 }
 
-// WebSocket 서버와 연결하는 함수
-func connectToWebSocket(t *testing.T, userID string) *websocket.Conn {
-	wsURL := "ws://localhost:2719/ws" // 서버 WebSocket 주소
-
-	// WebSocket 연결 생성
-	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+// 로그인 API를 호출하여 세션 ID와 유저 ID를 발급받는 함수
+func loginAndGetSessionIDAndUserID(accessToken string) (string, string, error) {
+	// 로그인 요청 데이터 설정
+	loginData := map[string]string{
+		"accessToken": accessToken,
+	}
+	reqBody, err := json.Marshal(loginData)
 	if err != nil {
-		t.Fatalf("Failed to connect to WebSocket server: %v", err)
+		log.Printf("[ERROR] Error marshaling login data: %v", err)
+		return "", "", err
 	}
-	log.Printf("User %s connected to WebSocket", userID)
 
-	// Register 메시지 전송 (유저 등록)
-	registerMsg := WebSocketMessage{
-		Type: "register",
-		Payload: map[string]string{
-			"user_id": userID,
-		},
-	}
-	err = conn.WriteJSON(registerMsg)
+	// 로그인 API 호출
+	resp, err := http.Post(API_GATEWAY_URL+"/auth/kakao", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
-		t.Fatalf("Failed to send register message for user %s: %v", userID, err)
+		log.Printf("[ERROR] Error sending login request: %v", err)
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	// 상태 코드 확인
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[ERROR] Login request failed, status code: %d", resp.StatusCode)
+		return "", "", fmt.Errorf("login failed with status code: %d", resp.StatusCode)
 	}
 
-	return conn
+	// 세션 ID 추출
+	sessionID := ""
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "session_id" {
+			sessionID = cookie.Value
+			break
+		}
+	}
+
+	if sessionID == "" {
+		log.Printf("[ERROR] No session_id found in cookies")
+		return "", "", fmt.Errorf("session_id not found in response cookies")
+	}
+
+	// 유저 ID 추출
+	var user User
+	err = json.NewDecoder(resp.Body).Decode(&user)
+	if err != nil {
+		log.Printf("[ERROR] Error decoding user data: %v", err)
+		return "", "", err
+	}
+
+	if user.ID == 0 {
+		log.Printf("[ERROR] User ID is 0, failed to retrieve user data: %v", user)
+		return "", "", fmt.Errorf("failed to retrieve user ID from response")
+	}
+
+	log.Printf("[INFO] User logged in successfully: %v", user)
+
+	// 유저 ID를 문자열로 변환
+	userID := strconv.Itoa(user.ID)
+
+	return sessionID, userID, nil
+}
+
+// WebSocket 서버에 접속하는 함수
+func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket.Conn, error) {
+	header := http.Header{}
+	header.Add("Cookie", "session_id="+sessionID)
+	header.Add("X-User-ID", userID)
+
+	conn, _, err := websocket.DefaultDialer.Dial(WS_MATCH_URL, header)
+	if err != nil {
+		log.Printf("[ERROR] Failed to connect to WebSocket for User %s: %v", userID, err)
+		return nil, err
+	}
+	log.Printf("[INFO] User %s connected to WebSocket", userID)
+	return conn, nil
 }
 
 // 매칭 요청을 보내고 응답을 기다리는 함수
@@ -78,28 +150,36 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) MatchResponse {
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	// 유저1과 유저2 WebSocket 연결 생성
-	conn1 := connectToWebSocket(t, "user1")
-	defer func() {
-		conn1.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		conn1.Close()
-	}()
+	participantCount := 2
+	sessionIDs := make([]string, participantCount)
+	userIDs := make([]string, participantCount)
+	conns := make([]*websocket.Conn, participantCount)
 
-	conn2 := connectToWebSocket(t, "user2")
-	defer func() {
-		conn2.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		conn2.Close()
-	}()
+	// 1. 5명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
+	for i := 0; i < participantCount; i++ {
+		accessToken := fmt.Sprintf("masterkey-%d", i+1)
+		sessionID, userID, err := loginAndGetSessionIDAndUserID(accessToken)
+		assert.NoError(t, err)
+		sessionIDs[i] = sessionID
+		userIDs[i] = userID
+	}
 
-	// 유저1과 유저2 매칭 요청 전송
-	sendMatchRequest(t, conn1, "user1")
-	sendMatchRequest(t, conn2, "user2")
+	// 2. 5명의 참가자가 WebSocket으로 접속
+	for i := 0; i < participantCount; i++ {
+		conn, err := connectWebSocket(t, sessionIDs[i], userIDs[i])
+		assert.NoError(t, err)
+		conns[i] = conn
+	}
+
+	for i := 0; i < participantCount; i++ {
+		sendMatchRequest(t, conns[i], userIDs[i])
+	}
 
 	// 매칭 결과를 수신 (양쪽에서 확인)
 	time.Sleep(2 * time.Second) // 매칭 시간이 필요할 경우 대기
 
-	matchResp1 := receiveMatchResponse(t, conn1)
-	matchResp2 := receiveMatchResponse(t, conn2)
+	matchResp1 := receiveMatchResponse(t, conns[0])
+	matchResp2 := receiveMatchResponse(t, conns[1])
 
 	// 매칭 응답이 올바르게 반환되었는지 확인
 	if matchResp1.RoomID != matchResp2.RoomID {

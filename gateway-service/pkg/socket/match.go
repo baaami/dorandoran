@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	common "github.com/baaami/dorandoran/common/chat"
@@ -43,14 +42,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	// URL에서 유저 ID 가져오기
-	userIDStr := r.Header.Get("X-User-ID")
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
-		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
-		return
-	}
-
+	userID := r.Header.Get("X-User-ID")
 	app.RegisterMatchClient(conn, userID)
 
 	for {
@@ -73,21 +65,15 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 
 		switch wsMsg.Type {
 		case MessageTypeMatch:
-			app.handleMatchMessage(wsMsg.Payload)
+			app.handleMatchMessage(userID)
 		}
 	}
 }
 
 // Match 메시지 처리
-func (app *Config) handleMatchMessage(payload json.RawMessage) {
-	var matchMsg MatchMessage
-	if err := json.Unmarshal(payload, &matchMsg); err != nil {
-		log.Printf("Failed to unmarshal match message: %v", err)
-		return
-	}
-
-	app.RedisClient.AddUserToQueue(matchMsg.UserID)
-	log.Printf("User %s added to waiting queue", matchMsg.UserID)
+func (app *Config) handleMatchMessage(userID string) {
+	app.RedisClient.AddUserToQueue(userID)
+	log.Printf("User %s added to waiting queue", userID)
 }
 
 // Redis 대기열을 계속 확인하고 매칭 시도
@@ -122,7 +108,11 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 		RoomID: roomID,
 	}
 
+	log.Printf("Match Notify Start!!!")
+
 	for _, userID := range matchList {
+		log.Printf("Try to notify user, %s", userID)
+
 		if conn, ok := app.MatchClients.Load(userID); ok {
 			conn.(*websocket.Conn).WriteJSON(matchMsg)
 			log.Printf("Notified %s about match in room %s", userID, roomID)
@@ -130,6 +120,8 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 			log.Printf("User %s not connected", userID)
 		}
 	}
+
+	log.Printf("Match Notify End!!!")
 }
 
 // [Hub Network] Chat 서비스에 API를 호출하여 방 생성
@@ -176,13 +168,13 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 }
 
 // Register 메시지 처리
-func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID int) {
+func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) {
 	app.MatchClients.Store(userID, conn)
-	log.Printf("User %d register match server", userID)
+	log.Printf("User %s register match server", userID)
 }
 
 // UnRegister 메시지 처리
-func (app *Config) UnRegisterMatchClient(userID int) {
+func (app *Config) UnRegisterMatchClient(userID string) {
 	app.MatchClients.Delete(userID)
-	log.Printf("User %d unregister match server", userID)
+	log.Printf("User %s unregister match server", userID)
 }
