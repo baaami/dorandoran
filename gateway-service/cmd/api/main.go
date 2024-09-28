@@ -36,6 +36,7 @@ func main() {
 
 	// WebSocket 설정
 	wsConfig := &socket.Config{
+		Rooms:        sync.Map{},
 		ChatClients:  sync.Map{},
 		MatchClients: sync.Map{},
 		Rabbit:       rabbitConn,
