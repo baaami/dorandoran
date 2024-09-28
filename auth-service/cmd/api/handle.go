@@ -54,14 +54,14 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 사용자 정보에서 카카오 사용자 ID 추출
-		snsID, err = strconv.ParseInt(fmt.Sprintf("%v", kakaoResponse["id"]), 10, 64)
-		if err != nil {
+		idValue, ok := kakaoResponse["id"].(float64)
+		if !ok {
+			log.Printf("Invalid Kakao Id: %s", kakaoResponse["id"])
 			http.Error(w, fmt.Sprintf("Invalid Kakao Id: %s", kakaoResponse["id"]), http.StatusUnauthorized)
 			return
 		}
+		snsID = int64(idValue)
 	}
-
-	log.Printf("snsID 1: %d", snsID)
 
 	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
 	loginUser, err := GetExistUserByUserSrv(types.KAKAO, snsID)
