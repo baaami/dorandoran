@@ -9,10 +9,16 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type Chat struct {
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+}
+
 type ChatMessage struct {
-	RoomID   string `json:"room_id"`
-	SenderID string `json:"sender_id"`
-	Message  string `json:"message"`
+	RoomID  string `json:"room_id"`
+	Message string `json:"message"`
 }
 
 type ChatRoom struct {

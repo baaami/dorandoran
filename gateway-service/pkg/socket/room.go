@@ -9,7 +9,7 @@ import (
 )
 
 // Room에 있는 모든 사용자에게 브로드캐스트
-func (app *Config) BroadcastToRoom(chatMsg ChatMessage) {
+func (app *Config) BroadcastToRoom(chatMsg Chat) {
 	roomID := chatMsg.RoomID
 	if room, ok := app.Rooms.Load(roomID); ok {
 		roomMap := room.(*sync.Map)
@@ -46,7 +46,7 @@ func (app *Config) BroadcastToRoom(chatMsg ChatMessage) {
 	if err == nil {
 		log.Printf("[INFO] Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
 		// TODO: 재시도 로직이나 대체 방안을 고려
-		emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
+		emitter.PushChatToQueue(event.Chat(chatMsg))
 	} else {
 		log.Printf("[ERROR] Failed to create event emitter: %v", err)
 	}

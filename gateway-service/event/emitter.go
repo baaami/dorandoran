@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -13,10 +14,11 @@ type EventPayload struct {
 	Data      json.RawMessage `json:"data"`
 }
 
-type ChatMessage struct {
-	RoomID   string `bson:"room_id"`
-	SenderID string `bson:"sender_id"`
-	Message  string `bson:"message"`
+type Chat struct {
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
 type Emitter struct {
@@ -72,7 +74,7 @@ func NewEventEmitter(conn *amqp.Connection) (Emitter, error) {
 
 	return emitter, nil
 }
-func (e *Emitter) PushChatMessageToQueue(chatMsg ChatMessage) error {
+func (e *Emitter) PushChatToQueue(chatMsg Chat) error {
 	if e.connection == nil {
 		log.Println("RabbitMQ connection is nil")
 		return fmt.Errorf("RabbitMQ connection is nil")

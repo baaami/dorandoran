@@ -50,7 +50,7 @@ func (c *Chat) Insert(entry Chat) error {
 		RoomID:    entry.RoomID,
 		SenderID:  entry.SenderID,
 		Message:   entry.Message,
-		CreatedAt: time.Now(),
+		CreatedAt: entry.CreatedAt,
 	})
 	if err != nil {
 		log.Println("Error inserting chat message:", err)

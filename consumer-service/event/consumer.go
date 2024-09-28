@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// ChatMessage 구조체 정의
-type ChatMessage struct {
-	RoomID   string `bson:"room_id"`
-	SenderID string `bson:"sender_id"`
-	Message  string `bson:"message"`
+// Chat 구조체 정의
+type Chat struct {
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
 // User 구조체 정의
@@ -121,7 +123,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 
 			switch eventPayload.EventType {
 			case "chat":
-				var chatMsg ChatMessage
+				var chatMsg Chat
 				// eventPayload.Data는 json.RawMessage이므로 다시 언마샬링
 				if err := json.Unmarshal(eventPayload.Data, &chatMsg); err != nil {
 					log.Printf("Failed to unmarshal chat message: %v", err)
@@ -152,7 +154,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 }
 
 // handleChatPayload는 채팅 메시지를 처리하는 함수
-func handleChatPayload(chatMsg ChatMessage) error {
+func handleChatPayload(chatMsg Chat) error {
 	jsonData, _ := json.MarshalIndent(&chatMsg, "", "\t")
 
 	chatServiceURL := "http://chat-service/msg"

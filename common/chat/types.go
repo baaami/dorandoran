@@ -32,10 +32,11 @@ type MatchMessage struct {
 	UserID string `json:"user_id"`
 }
 
-type ChatMessage struct {
-	RoomID   string `json:"room_id"`
-	SenderID string `json:"sender_id"`
-	Message  string `json:"message"`
+type Chat struct {
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
 type ChatRoom struct {

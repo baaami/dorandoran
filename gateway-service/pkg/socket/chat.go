@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/gorilla/websocket"
@@ -68,7 +69,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 
 		switch wsMsg.Type {
 		case MessageTypeBroadCast:
-			app.handleBroadCastMessage(wsMsg.Payload)
+			app.handleBroadCastMessage(wsMsg.Payload, userID)
 		case MessageTypeJoin:
 			app.handleJoinMessage(wsMsg.Payload, userID)
 		case MessageTypeLeave:
@@ -78,14 +79,21 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 // BroadCast 메시지 처리
-func (app *Config) handleBroadCastMessage(payload json.RawMessage) {
+func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
 	var broadCastMsg ChatMessage
 	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
 		log.Printf("[ERROR] Failed to unmarshal join message: %v", err)
 		return
 	}
 
-	app.BroadcastToRoom(broadCastMsg)
+	chat := Chat{
+		RoomID:    broadCastMsg.RoomID,
+		SenderID:  userID,
+		Message:   broadCastMsg.Message,
+		CreatedAt: time.Now(),
+	}
+
+	app.BroadcastToRoom(chat)
 }
 
 // Join 메시지 처리

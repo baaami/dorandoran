@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/baaami/dorandoran/chat/cmd/data"
 	"github.com/go-chi/chi/v5"
 )
 
-type ChatMessage struct {
-	RoomID   string `bson:"room_id"`
-	SenderID string `bson:"sender_id"`
-	Message  string `bson:"message"`
+type Chat struct {
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
 // 채팅방 생성
@@ -88,7 +90,7 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 
 // 채팅 메시지 추가
 func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
-	var chatMsg ChatMessage
+	var chatMsg Chat
 	err := json.NewDecoder(r.Body).Decode(&chatMsg)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)

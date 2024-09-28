@@ -24,6 +24,13 @@ const (
 	RoomID          = "100" // 테스트용 RoomID
 )
 
+type Chat struct {
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+}
+
 type User struct {
 	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType  int    `gorm:"index" json:"sns_type"`
@@ -112,8 +119,8 @@ func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket
 }
 
 // WebSocket으로 메시지를 보내는 함수
-func sendChatMessage(t *testing.T, conn *websocket.Conn, senderID string, message string) {
-	chatMessage := common.ChatMessage{
+func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message string) {
+	Chat := Chat{
 		RoomID:   RoomID,
 		SenderID: senderID,
 		Message:  message,
@@ -121,7 +128,7 @@ func sendChatMessage(t *testing.T, conn *websocket.Conn, senderID string, messag
 
 	wsMessage := common.WebSocketMessage{
 		Type:    "broadcast",
-		Payload: toJSONRawMessage(chatMessage),
+		Payload: toJSONRawMessage(Chat),
 	}
 
 	err := conn.WriteJSON(wsMessage)
@@ -131,7 +138,7 @@ func sendChatMessage(t *testing.T, conn *websocket.Conn, senderID string, messag
 }
 
 // WebSocket에서 수신된 메시지를 처리하는 goroutine 함수
-func receiveChatMessages(t *testing.T, conn *websocket.Conn, userID string, wg *sync.WaitGroup) {
+func receiveChats(t *testing.T, conn *websocket.Conn, userID string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		_, msg, err := conn.ReadMessage()
@@ -140,7 +147,7 @@ func receiveChatMessages(t *testing.T, conn *websocket.Conn, userID string, wg *
 			return
 		}
 
-		var chatMsg common.ChatMessage
+		var chatMsg Chat
 		err = json.Unmarshal(msg, &chatMsg)
 		if err != nil {
 			log.Printf("[ERROR] Failed to unmarshal message for User %s: %v", userID, err)
@@ -196,7 +203,7 @@ func TestChatAmongFiveClients(t *testing.T) {
 	var receiveWg sync.WaitGroup
 	receiveWg.Add(participantCount)
 	for i := 0; i < participantCount; i++ {
-		go receiveChatMessages(t, conns[i], userIDs[i], &receiveWg)
+		go receiveChats(t, conns[i], userIDs[i], &receiveWg)
 	}
 
 	// 수신 메시지 대기
@@ -205,7 +212,7 @@ func TestChatAmongFiveClients(t *testing.T) {
 	// 5. 각 참가자들이 채팅 메시지 1개씩 송신
 	for i := 0; i < participantCount; i++ {
 		message := fmt.Sprintf("Hello from User %s", userIDs[i])
-		sendChatMessage(t, conns[i], userIDs[i], message)
+		sendChat(t, conns[i], userIDs[i], message)
 	}
 
 	// 메시지가 모두 전달될 시간을 기다림
