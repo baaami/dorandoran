@@ -7,14 +7,14 @@ import (
 )
 
 type User struct {
-	ID       int    `gorm:"primaryKey;autoIncrement"`
-	SnsType  int    `gorm:"index"`
-	SnsID    int64  `gorm:"index"`
-	Name     string `gorm:"size:100"`
-	Nickname string `gorm:"size:100"`
-	Gender   int
-	Age      int
-	Email    string `gorm:"size:100"`
+	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int    `gorm:"index" json:"sns_type"`
+	SnsID    int64  `gorm:"index" json:"sns_id"`
+	Name     string `gorm:"size:100" json:"name"`
+	Nickname string `gorm:"size:100" json:"nickname"`
+	Gender   int    `json:"gender"`
+	Age      int    `json:"age"`
+	Email    string `gorm:"size:100" json:"email"`
 }
 
 // GORM 클라이언트 설정

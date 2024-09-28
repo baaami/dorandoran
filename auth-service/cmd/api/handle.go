@@ -13,9 +13,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/baaami/dorandoran/auth/pkg/data"
 	"github.com/baaami/dorandoran/auth/pkg/types"
 )
+
+type User struct {
+	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int    `gorm:"index" json:"sns_type"`
+	SnsID    int64  `gorm:"index" json:"sns_id"`
+	Name     string `gorm:"size:100" json:"name"`
+	Nickname string `gorm:"size:100" json:"nickname"`
+	Gender   int    `json:"gender"`
+	Age      int    `json:"age"`
+	Email    string `gorm:"size:100" json:"email"`
+}
 
 // Redis 클라이언트 생성
 
@@ -70,9 +80,11 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("loginUser: %v", loginUser)
+
 	var sessionID string
 
-	if (loginUser == data.User{}) {
+	if (loginUser == User{}) {
 		// 유저가 존재하지 않는 경우 -> 회원가입 진행
 		loginUser, err = RegisterNewUser(app, snsID)
 		if err != nil {
@@ -96,6 +108,7 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// TODO: SNSID 없음
 	log.Printf("Finally Login User: %v", loginUser)
 
 	SetSessionCookie(&w, sessionID)
@@ -138,7 +151,7 @@ func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
-func GetExistUserByUserSrv(snsType int, snsID int64) (data.User, error) {
+func GetExistUserByUserSrv(snsType int, snsID int64) (User, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
@@ -149,39 +162,51 @@ func GetExistUserByUserSrv(snsType int, snsID int64) (data.User, error) {
 	// GET 요청 생성
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to create request: %v", err)
+		return User{}, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	// 요청 실행
 	resp, err := client.Do(req)
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to send request: %v", err)
+		return User{}, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	// 응답 처리
 	if resp.StatusCode == http.StatusNotFound {
 		// 유저가 존재하지 않는 경우
-		return data.User{}, nil
+		return User{}, nil
 	} else if resp.StatusCode != http.StatusOK {
 		// 다른 에러가 발생한 경우
-		return data.User{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return User{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	// 응답 본문에서 유저 정보 디코딩
-	var user data.User
-	err = json.NewDecoder(resp.Body).Decode(&user)
+	var user User
+
+	// 응답 본문 로깅 추가
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to decode response: %v", err)
+		return User{}, fmt.Errorf("failed to read response body: %v", err)
 	}
+
+	log.Printf("[GetExistUserByUserSrv] Raw response body: %s", string(body))
+
+	// 본문을 다시 디코딩
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		return User{}, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	log.Printf("[GetExistUserByUserSrv] Decoded user: %v", user)
 
 	// 유저가 존재하는 경우
 	return user, nil
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 새로운 사용자 생성
-func RegisterNewUser(app *Config, snsID int64) (data.User, error) {
-	newUser := data.User{
+func RegisterNewUser(app *Config, snsID int64) (User, error) {
+	newUser := User{
 		SnsType: types.KAKAO, // Kakao SNS 유형
 		SnsID:   snsID,       // Kakao 사용자 ID
 	}
@@ -190,29 +215,29 @@ func RegisterNewUser(app *Config, snsID int64) (data.User, error) {
 	client := &http.Client{}
 	reqBody, err := json.Marshal(newUser)
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to marshal new user data: %v", err)
+		return User{}, fmt.Errorf("failed to marshal new user data: %v", err)
 	}
 
 	req, err := http.NewRequest("POST", "http://user-service/register", bytes.NewBuffer(reqBody))
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to create request: %v", err)
+		return User{}, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to send request to user-service: %v", err)
+		return User{}, fmt.Errorf("failed to send request to user-service: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return data.User{}, fmt.Errorf("failed to create user, status code: %d", resp.StatusCode)
+		return User{}, fmt.Errorf("failed to create user, status code: %d", resp.StatusCode)
 	}
 
-	var createdUser data.User
+	var createdUser User
 	err = json.NewDecoder(resp.Body).Decode(&createdUser)
 	if err != nil {
-		return data.User{}, fmt.Errorf("failed to decode response: %v", err)
+		return User{}, fmt.Errorf("failed to decode response: %v", err)
 	}
 
 	log.Printf("Registered User: %v", createdUser)

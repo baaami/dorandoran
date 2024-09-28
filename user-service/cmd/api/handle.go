@@ -9,14 +9,14 @@ import (
 )
 
 type User struct {
-	ID       int    `json:"id"`
-	SnsType  int    `json:"sns_type"`
-	SnsID    int64  `json:"sns_id"`
-	Name     string `json:"name"`
-	Nickname string `json:"nickname"`
+	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int    `gorm:"index" json:"sns_type"`
+	SnsID    int64  `gorm:"index" json:"sns_id"`
+	Name     string `gorm:"size:100" json:"name"`
+	Nickname string `gorm:"size:100" json:"nickname"`
 	Gender   int    `json:"gender"`
 	Age      int    `json:"age"`
-	Email    string `json:"email"`
+	Email    string `gorm:"size:100" json:"email"`
 }
 
 // 유저 정보 조회
@@ -94,7 +94,8 @@ func (app *Config) checkUserExistence(w http.ResponseWriter, r *http.Request) {
 	// 유저가 존재하는 경우, StatusOK와 함께 유저 정보 반환
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(user); err != nil {
+
+	if err := json.NewEncoder(w).Encode(*user); err != nil {
 		log.Printf("Error encoding user data: %v", err)
 		http.Error(w, "Error encoding user data", http.StatusInternalServerError)
 	}

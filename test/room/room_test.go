@@ -25,14 +25,14 @@ const (
 )
 
 type User struct {
-	ID       int    `json:"id"`
-	SnsType  int    `json:"sns_type"`
-	SnsID    int64  `json:"sns_id"`
-	Name     string `json:"name"`
-	Nickname string `json:"nickname"`
+	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int    `gorm:"index" json:"sns_type"`
+	SnsID    int64  `gorm:"index" json:"sns_id"`
+	Name     string `gorm:"size:100" json:"name"`
+	Nickname string `gorm:"size:100" json:"nickname"`
 	Gender   int    `json:"gender"`
 	Age      int    `json:"age"`
-	Email    string `json:"email"`
+	Email    string `gorm:"size:100" json:"email"`
 }
 
 // 로그인 API를 호출하여 세션 ID와 유저 ID를 발급받는 함수
