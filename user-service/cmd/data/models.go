@@ -78,17 +78,19 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 }
 
 // 유저 업데이트
-func (s *UserService) UpdateUser(id int, name, nickname string, gender, age int) error {
+func (s *UserService) UpdateUser(id int, name, nickname, email string, gender, age int) error {
 	user := User{
 		ID: id,
 	}
-	updateFields := map[string]interface{}{
-		"name":     name,
-		"nickname": nickname,
-		"gender":   gender,
-		"age":      age,
+
+	updateUser := User{
+		Name:     name,
+		Nickname: nickname,
+		Gender:   gender,
+		Age:      age,
+		Email:    email,
 	}
-	if err := s.DB.Model(&user).Updates(updateFields).Error; err != nil {
+	if err := s.DB.Model(&user).Updates(updateUser).Error; err != nil {
 		return err
 	}
 	return nil

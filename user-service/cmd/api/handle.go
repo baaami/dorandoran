@@ -160,19 +160,25 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 	updatedUser.ID = userID
 
 	// DB에서 유저 정보 업데이트
-	err = app.Models.UpdateUser(updatedUser.ID, updatedUser.Name, updatedUser.Nickname, updatedUser.Gender, updatedUser.Age)
+	err = app.Models.UpdateUser(updatedUser.ID, updatedUser.Name, updatedUser.Nickname, updatedUser.Email, updatedUser.Gender, updatedUser.Age)
 	if err != nil {
 		log.Printf("Failed to update user, user: %v, err: %s", updatedUser, err.Error())
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Update User: %v", updatedUser)
+	// DB에서 유저 정보 획득
+	user, err := app.Models.GetUserByID(updatedUser.ID)
+	if err != nil {
+		log.Printf("Failed to get updated user, err: %s", err.Error())
+		http.Error(w, "Failed to get updated user", http.StatusInternalServerError)
+		return
+	}
 
 	// 업데이트된 유저 정보 반환
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(updatedUser)
+	json.NewEncoder(w).Encode(user)
 }
 
 // 유저 정보 삭제
