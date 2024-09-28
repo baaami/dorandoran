@@ -8,14 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
-
-type MatchMessage struct {
-	UserID string `json:"user_id"`
-}
 
 type MatchResponse struct {
 	RoomID string `json:"room_id"`
@@ -46,7 +41,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	app.RegisterMatchClient(conn, userID)
 
 	for {
-		_, msg, err := conn.ReadMessage()
+		_, _, err := conn.ReadMessage()
 		if err != nil {
 			// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
@@ -56,24 +51,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-
-		var wsMsg common.WebSocketMessage
-		if err := json.Unmarshal(msg, &wsMsg); err != nil {
-			log.Printf("Failed to unmarshal message: %v", err)
-			continue
-		}
-
-		switch wsMsg.Type {
-		case MessageTypeMatch:
-			app.handleMatchMessage(userID)
-		}
 	}
-}
-
-// Match 메시지 처리
-func (app *Config) handleMatchMessage(userID string) {
-	app.RedisClient.AddUserToQueue(userID)
-	log.Printf("User %s added to waiting queue", userID)
 }
 
 // Redis 대기열을 계속 확인하고 매칭 시도
@@ -171,6 +149,9 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) {
 	app.MatchClients.Store(userID, conn)
 	log.Printf("User %s register match server", userID)
+
+	app.RedisClient.AddUserToQueue(userID)
+	log.Printf("User %s added to waiting queue", userID)
 }
 
 // UnRegister 메시지 처리

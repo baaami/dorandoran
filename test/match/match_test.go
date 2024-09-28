@@ -35,11 +35,6 @@ type WebSocketMessage struct {
 	Payload interface{} `json:"payload"`
 }
 
-// MatchMessage 구조체 정의
-type MatchMessage struct {
-	UserID string `json:"user_id"`
-}
-
 // MatchResponse 구조체 정의
 type MatchResponse struct {
 	RoomID string `json:"room_id"`
@@ -126,17 +121,17 @@ func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket
 }
 
 // 매칭 요청을 보내고 응답을 기다리는 함수
-func sendMatchRequest(t *testing.T, conn *websocket.Conn, userID string) {
-	matchMsg := WebSocketMessage{
-		Type:    "match",
-		Payload: MatchMessage{UserID: userID},
-	}
+// func sendMatchRequest(t *testing.T, conn *websocket.Conn, userID string) {
+// 	matchMsg := WebSocketMessage{
+// 		Type:    "match",
+// 		Payload: MatchMessage{UserID: userID},
+// 	}
 
-	err := conn.WriteJSON(matchMsg)
-	if err != nil {
-		t.Fatalf("Failed to send match request for user %s: %v", userID, err)
-	}
-}
+// 	err := conn.WriteJSON(matchMsg)
+// 	if err != nil {
+// 		t.Fatalf("Failed to send match request for user %s: %v", userID, err)
+// 	}
+// }
 
 // 매칭 결과를 수신하는 함수
 func receiveMatchResponse(t *testing.T, conn *websocket.Conn) MatchResponse {
@@ -177,7 +172,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	for i := 0; i < participantCount; i++ {
 		go func(i int) {
 			// 매칭 요청 보내기
-			sendMatchRequest(t, conns[i], userIDs[i])
+			// sendMatchRequest(t, conns[i], userIDs[i])
 
 			// 매칭 응답 수신
 			matchResp := receiveMatchResponse(t, conns[i])
