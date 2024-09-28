@@ -27,11 +27,10 @@ type Models struct {
 }
 
 type Chat struct {
-	RoomID     string    `bson:"room_id" json:"room_id"`
-	SenderID   string    `bson:"sender_id" json:"sender_id"`
-	ReceiverID string    `bson:"receiver_id" json:"receiver_id"`
-	Message    string    `bson:"message" json:"message"`
-	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
+	RoomID    string    `bson:"room_id" json:"room_id"`
+	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	Message   string    `bson:"message" json:"message"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
 type ChatRoom struct {
@@ -49,11 +48,10 @@ func (c *Chat) Insert(entry Chat) error {
 	collection := client.Database("chat_db").Collection("messages")
 
 	_, err := collection.InsertOne(context.TODO(), Chat{
-		RoomID:     entry.RoomID,
-		SenderID:   entry.SenderID,
-		ReceiverID: entry.ReceiverID,
-		Message:    entry.Message,
-		CreatedAt:  time.Now(),
+		RoomID:    entry.RoomID,
+		SenderID:  entry.SenderID,
+		Message:   entry.Message,
+		CreatedAt: time.Now(),
 	})
 	if err != nil {
 		log.Println("Error inserting chat message:", err)

@@ -11,10 +11,9 @@ import (
 )
 
 type ChatMessage struct {
-	RoomID     string `bson:"room_id"`
-	SenderID   string `bson:"sender_id"`
-	ReceiverID string `bson:"receiver_id"`
-	Message    string `bson:"message"`
+	RoomID   string `bson:"room_id"`
+	SenderID string `bson:"sender_id"`
+	Message  string `bson:"message"`
 }
 
 // 채팅방 생성
@@ -116,10 +115,9 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 
 	// Chat에 삽입
 	entry := data.Chat{
-		RoomID:     chatMsg.RoomID,
-		SenderID:   chatMsg.SenderID,
-		ReceiverID: chatMsg.ReceiverID,
-		Message:    chatMsg.Message,
+		RoomID:   chatMsg.RoomID,
+		SenderID: chatMsg.SenderID,
+		Message:  chatMsg.Message,
 	}
 
 	err = app.Models.Chat.Insert(entry)

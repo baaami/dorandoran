@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/baaami/dorandoran/broker/event"
 	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/gorilla/websocket"
 )
@@ -68,8 +67,6 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch wsMsg.Type {
-		case MessageTypeChat:
-			app.handleChatMessage(wsMsg.Payload)
 		case MessageTypeBroadCast:
 			app.handleBroadCastMessage(wsMsg.Payload)
 		case MessageTypeJoin:
@@ -80,41 +77,9 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Chat 메시지 처리
-func (app *Config) handleChatMessage(payload json.RawMessage) {
-	var chatMsg common.ChatMessage
-	if err := json.Unmarshal(payload, &chatMsg); err != nil {
-		log.Printf("[ERROR] Failed to unmarshal chat message: %v", err)
-		return
-	}
-
-	log.Printf("[INFO] Received chat message from SenderID: %s, RoomID: %s, Message: %s", chatMsg.SenderID, chatMsg.RoomID, chatMsg.Message)
-
-	// 수신자가 존재하는지 확인
-	if receiverClient, ok := app.ChatClients.Load(chatMsg.ReceiverID); ok {
-		client := receiverClient.(*Client)
-		log.Printf("[INFO] Sending message to ReceiverID: %s", chatMsg.ReceiverID)
-
-		// 메시지를 Send 채널에 보냅니다.
-		client.Send <- chatMsg
-
-		emitter, err := event.NewEventEmitter(app.Rabbit)
-		if err == nil {
-			log.Printf("[INFO] Pushing chat message to RabbitMQ for ReceiverID: %s", chatMsg.ReceiverID)
-			// TODO: 재시도 로직이나 대체 방안을 고려
-			emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
-		} else {
-			log.Printf("[ERROR] Failed to create event emitter: %v", err)
-		}
-	} else {
-		// 수신자가 존재하지 않는 경우
-		log.Printf("[WARNING] ReceiverID %s not connected", chatMsg.ReceiverID)
-	}
-}
-
 // BroadCast 메시지 처리
 func (app *Config) handleBroadCastMessage(payload json.RawMessage) {
-	var broadCastMsg common.ChatMessage
+	var broadCastMsg ChatMessage
 	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
 		log.Printf("[ERROR] Failed to unmarshal join message: %v", err)
 		return

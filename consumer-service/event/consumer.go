@@ -12,10 +12,9 @@ import (
 
 // ChatMessage 구조체 정의
 type ChatMessage struct {
-	RoomID     string `bson:"room_id"`
-	SenderID   string `bson:"sender_id"`
-	ReceiverID string `bson:"receiver_id"`
-	Message    string `bson:"message"`
+	RoomID   string `bson:"room_id"`
+	SenderID string `bson:"sender_id"`
+	Message  string `bson:"message"`
 }
 
 // User 구조체 정의

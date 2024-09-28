@@ -8,6 +8,12 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type ChatMessage struct {
+	RoomID   string `json:"room_id"`
+	SenderID string `json:"sender_id"`
+	Message  string `json:"message"`
+}
+
 const (
 	MessageTypeChat       = "chat"
 	MessageTypeMatch      = "match"

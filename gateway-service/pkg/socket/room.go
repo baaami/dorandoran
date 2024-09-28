@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
-	common "github.com/baaami/dorandoran/common/chat"
 )
 
 // Room에 있는 모든 사용자에게 브로드캐스트
-func (app *Config) BroadcastToRoom(chatMsg common.ChatMessage) {
+func (app *Config) BroadcastToRoom(chatMsg ChatMessage) {
 	roomID := chatMsg.RoomID
 	if room, ok := app.Rooms.Load(roomID); ok {
 		roomMap := room.(*sync.Map)
@@ -45,7 +44,7 @@ func (app *Config) BroadcastToRoom(chatMsg common.ChatMessage) {
 
 	emitter, err := event.NewEventEmitter(app.Rabbit)
 	if err == nil {
-		log.Printf("[INFO] Pushing chat message to RabbitMQ for ReceiverID: %s", chatMsg.RoomID)
+		log.Printf("[INFO] Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
 		// TODO: 재시도 로직이나 대체 방안을 고려
 		emitter.PushChatMessageToQueue(event.ChatMessage(chatMsg))
 	} else {
