@@ -62,6 +62,18 @@ func (r *RedisClient) PopNUsersFromQueue(n int) ([]string, error) {
 		}
 		users = append(users, user)
 	}
+
+	if len(users) < n {
+		// Pop된 유저가 부족하면 다시 대기열에 삽입
+		for _, user := range users {
+			err := r.Client.RPush(ctx, "waiting_queue", user).Err()
+			if err != nil {
+				return nil, err
+			}
+		}
+		return []string{}, nil
+	}
+
 	return users, nil
 }
 
