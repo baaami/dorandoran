@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	common "github.com/baaami/dorandoran/common/chat"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -57,7 +58,7 @@ func (consumer *Consumer) setup() error {
 	}
 
 	// Exchange 선언
-	return declareChatExchange(channel)
+	return declareExchange(channel)
 }
 
 // EventPayload 구조체 정의
@@ -88,7 +89,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 		err = ch.QueueBind(
 			q.Name,
 			s,
-			"chat_topic", // 이벤트를 수신할 exchange
+			"app_topic", // 이벤트를 수신할 exchange
 			false,
 			nil,
 		)
@@ -130,7 +131,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 					continue
 				}
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
-				handleChatPayload(chatMsg)
+				handleChatAddPayload(chatMsg)
 
 			case "user.created":
 				var user User
@@ -139,22 +140,29 @@ func (consumer *Consumer) Listen(topics []string) error {
 					continue
 				}
 				log.Printf("User Created Message Unmarshaled: %+v", user)
-				handleUserPayload(user)
+				handleUserCreatedEvent(user)
 
+			case "room.deleted":
+				var room common.ChatRoom
+				if err := json.Unmarshal(eventPayload.Data, &room); err != nil {
+					log.Printf("Failed to unmarshal room message: %v", err)
+					continue
+				}
+				handleRoomDeletedEvent(room)
 			default:
 				log.Printf("Unknown event type: %s", eventPayload.EventType)
 			}
 		}
 	}()
 
-	fmt.Printf("Waiting for messages [Exchange: chat_topic, Queue: %s]\n", q.Name)
+	fmt.Printf("Waiting for messages [Exchange: app_topic, Queue: %s]\n", q.Name)
 	<-forever
 
 	return nil
 }
 
 // handleChatPayload는 채팅 메시지를 처리하는 함수
-func handleChatPayload(chatMsg Chat) error {
+func handleChatAddPayload(chatMsg Chat) error {
 	jsonData, _ := json.MarshalIndent(&chatMsg, "", "\t")
 
 	chatServiceURL := "http://chat-service/msg"
@@ -185,7 +193,7 @@ func handleChatPayload(chatMsg Chat) error {
 }
 
 // handleUserPayload는 유저 생성 이벤트를 처리하는 함수
-func handleUserPayload(user User) error {
+func handleUserCreatedEvent(user User) error {
 	jsonData, _ := json.MarshalIndent(&user, "", "\t")
 
 	userServiceURL := "http://user-service/user/insert"
@@ -213,5 +221,35 @@ func handleUserPayload(user User) error {
 	}
 
 	log.Println("User creation event successfully sent to user-service")
+	return nil
+}
+
+// handleUserPayload는 유저 생성 이벤트를 처리하는 함수
+func handleRoomDeletedEvent(room common.ChatRoom) error {
+	// url := fmt.Sprintf("http://chat-service/room/delete/%s", room.ID)
+
+	// request, err := http.NewRequest("DELETE", url, nil)
+	// if err != nil {
+	// 	log.Printf("Failed to create request: %v", err)
+	// 	return err
+	// }
+
+	// request.Header.Set("Content-Type", "application/json")
+
+	// client := &http.Client{}
+
+	// response, err := client.Do(request)
+	// if err != nil {
+	// 	log.Printf("Failed to send request: %v", err)
+	// 	return err
+	// }
+	// defer response.Body.Close()
+
+	// if response.StatusCode != http.StatusCreated {
+	// 	log.Printf("Failed to send room delete event: %v", err)
+	// 	return err
+	// }
+
+	log.Println("Room delete event successfully sent to chat-service")
 	return nil
 }

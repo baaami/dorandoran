@@ -45,7 +45,7 @@ func (e *Emitter) Push(event string, severity string) error {
 	log.Println("Pushing to channel")
 
 	err = channel.Publish(
-		"chat_topic",
+		"app_topic",
 		severity,
 		false,
 		false,
@@ -74,6 +74,7 @@ func NewEventEmitter(conn *amqp.Connection) (Emitter, error) {
 
 	return emitter, nil
 }
+
 func (e *Emitter) PushChatToQueue(chatMsg Chat) error {
 	if e.connection == nil {
 		log.Println("RabbitMQ connection is nil")
@@ -123,10 +124,10 @@ func (e *Emitter) PushBytes(event []byte, severity string) error {
 
 	// 메시지 전송
 	err = channel.Publish(
-		"chat_topic", // 교환기 이름
-		severity,     // 라우팅 키
-		false,        // mandatory
-		false,        // immediate
+		"app_topic", // 교환기 이름
+		severity,    // 라우팅 키
+		false,       // mandatory
+		false,       // immediate
 		amqp.Publishing{
 			ContentType: "application/json", // 콘텐츠 타입 설정
 			Body:        event,              // 바이트 슬라이스 데이터를 메시지로 전송

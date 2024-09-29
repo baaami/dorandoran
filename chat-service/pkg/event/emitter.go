@@ -27,7 +27,7 @@ func (e *Emitter) setup() error {
 	}
 
 	defer channel.Close()
-	return declareRoomExchange(channel)
+	return declareExchange(channel)
 }
 
 // 이후 확장될 경우 Parameter에 event type을 넘겨주도록 개선
@@ -77,7 +77,7 @@ func (e *Emitter) PushRoomToQueue(room data.ChatRoom) error {
 		return err
 	}
 
-	log.Printf("Chat message successfully pushed to RabbitMQ")
+	log.Printf("Deleted Room event successfully publish to RabbitMQ")
 	return nil
 }
 
@@ -93,10 +93,10 @@ func (e *Emitter) PushBytes(event []byte, severity string) error {
 
 	// 메시지 전송
 	err = channel.Publish(
-		"room_topic", // 교환기 이름
-		severity,     // 라우팅 키
-		false,        // mandatory
-		false,        // immediate
+		"app_topic", // 교환기 이름
+		severity,    // 라우팅 키
+		false,       // mandatory
+		false,       // immediate
 		amqp.Publishing{
 			ContentType: "application/json", // 콘텐츠 타입 설정
 			Body:        event,              // 바이트 슬라이스 데이터를 메시지로 전송

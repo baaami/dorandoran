@@ -17,8 +17,8 @@ func declareExchange(ch *amqp.Channel) error {
 }
 
 // declareChatExchange declares the exchange for chat messages
-func declareChatExchange(channel *amqp.Channel) error {
-	return channel.ExchangeDeclare(
+func declareChatExchange(ch *amqp.Channel) error {
+	return ch.ExchangeDeclare(
 		"chat_topic", // 새로운 chat exchange 이름
 		"topic",      // topic type
 		true,         // durable
