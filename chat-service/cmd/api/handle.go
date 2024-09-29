@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/chat/cmd/data"
+	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -77,11 +78,27 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "id")
 
+	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
+	if err != nil {
+		log.Printf("Failed to get chat room, id: %s, err: %s", roomID, err.Error())
+		http.Error(w, "Failed to get chat room", http.StatusInternalServerError)
+		return
+	}
+
 	// MongoDB에서 Room ID로 채팅방 삭제
-	err := app.Models.ChatRoom.DeleteRoom(roomID)
+	err = app.Models.ChatRoom.DeleteRoom(roomID)
 	if err != nil {
 		http.Error(w, "Failed to delete chat room", http.StatusInternalServerError)
 		return
+	}
+
+	// 채팅방 삭제 이벤트 발행
+	emitter, err := event.NewEventEmitter(app.Rabbit)
+	if err == nil {
+		log.Printf("[INFO] Pushing Room Delete Event to RabbitMQ, room: %s", roomID)
+		emitter.PushRoomToQueue(*room)
+	} else {
+		log.Printf("[ERROR] Failed to create event emitter: %v", err)
 	}
 
 	w.WriteHeader(http.StatusOK)

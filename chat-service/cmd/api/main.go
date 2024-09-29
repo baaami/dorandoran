@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/baaami/dorandoran/chat/cmd/data"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const (
@@ -21,9 +24,18 @@ var client *mongo.Client
 
 type Config struct {
 	Models data.Models
+	Rabbit *amqp.Connection
 }
 
 func main() {
+	// RabbitMQ 연결
+	rabbitConn, err := connectToRabbitMQ()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	defer rabbitConn.Close()
+
 	// MongoDB 연결
 	mongoClient, err := connectToMongo()
 	if err != nil {
@@ -45,6 +57,7 @@ func main() {
 	// Config 구조체 초기화
 	app := Config{
 		Models: data.New(client),
+		Rabbit: rabbitConn,
 	}
 
 	// 웹 서버 시작
@@ -79,4 +92,8 @@ func connectToMongo() (*mongo.Client, error) {
 	log.Println("Connected to MongoDB!")
 
 	return c, nil
+}
+
+func connectToRabbitMQ() (*amqp.Connection, error) {
+	return amqp.Dial("amqp://guest:guest@rabbitmq")
 }
