@@ -224,31 +224,32 @@ func handleUserCreatedEvent(user User) error {
 	return nil
 }
 
-// handleUserPayload는 유저 생성 이벤트를 처리하는 함수
+// 채팅방 삭제 이벤트 발생 시 동작
 func handleRoomDeletedEvent(room common.ChatRoom) error {
-	// url := fmt.Sprintf("http://chat-service/room/delete/%s", room.ID)
+	// 채팅방에서 사용한 채팅 데이터 삭제
+	url := fmt.Sprintf("http://chat-service/all/%s", room.ID)
 
-	// request, err := http.NewRequest("DELETE", url, nil)
-	// if err != nil {
-	// 	log.Printf("Failed to create request: %v", err)
-	// 	return err
-	// }
+	request, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		log.Printf("Failed to create request: %v", err)
+		return err
+	}
 
-	// request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", "application/json")
 
-	// client := &http.Client{}
+	client := &http.Client{}
 
-	// response, err := client.Do(request)
-	// if err != nil {
-	// 	log.Printf("Failed to send request: %v", err)
-	// 	return err
-	// }
-	// defer response.Body.Close()
+	response, err := client.Do(request)
+	if err != nil {
+		log.Printf("Failed to send request: %v", err)
+		return err
+	}
+	defer response.Body.Close()
 
-	// if response.StatusCode != http.StatusCreated {
-	// 	log.Printf("Failed to send room delete event: %v", err)
-	// 	return err
-	// }
+	if response.StatusCode != http.StatusOK {
+		log.Printf("Failed to send chat delete all, stats: %d, err: %v", response.StatusCode, err)
+		return err
+	}
 
 	log.Println("Room delete event successfully sent to chat-service")
 	return nil

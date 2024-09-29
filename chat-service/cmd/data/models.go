@@ -94,6 +94,28 @@ func (c *Chat) GetByRoomID(roomID string) ([]*Chat, error) {
 	return messages, nil
 }
 
+// 채팅 목록 삭제 (by ChatRoom ID)
+func (c *Chat) DeleteChatByRoomID(roomID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	// 삭제할 문서의 필터 조건 설정
+	filter := bson.M{"room_id": roomID}
+
+	// DeleteMany 메서드를 사용하여 해당 조건의 모든 문서 삭제
+	result, err := collection.DeleteMany(ctx, filter)
+	if err != nil {
+		log.Println("Error deleting chat messages:", err)
+		return err
+	}
+
+	log.Printf("Deleted %d chat messages for room_id %s", result.DeletedCount, roomID)
+
+	return nil
+}
+
 // 새로운 채팅방 삽입
 func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

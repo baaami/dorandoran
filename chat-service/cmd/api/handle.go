@@ -135,7 +135,7 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 }
 
 // 특정 방의 채팅 메시지 리스트 획득
-func (app *Config) getChatMsgList(w http.ResponseWriter, r *http.Request) {
+func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")
 
@@ -153,4 +153,17 @@ func (app *Config) getChatMsgList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (app *Config) deleteChatByRoomID(w http.ResponseWriter, r *http.Request) {
+	// URL에서 room ID 가져오기
+	roomID := chi.URLParam(r, "id")
+
+	err := app.Models.Chat.DeleteChatByRoomID(roomID)
+	if err != nil {
+		log.Printf("Failed to Delete Chat Data, roomID: %s, err: %s", roomID, err)
+		http.Error(w, "Failed to Delete Chat Data, roomID", http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
