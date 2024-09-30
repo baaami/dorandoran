@@ -14,6 +14,11 @@ type EventPayload struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+type RoomJoinEvent struct {
+	RoomID string `bson:"room_id" json:"room_id"`
+	UserID string `bson:"user_id" json:"user_id"`
+}
+
 type Chat struct {
 	RoomID    string    `bson:"room_id" json:"room_id"`
 	SenderID  string    `bson:"sender_id" json:"sender_id"`
@@ -109,6 +114,43 @@ func (e *Emitter) PushChatToQueue(chatMsg Chat) error {
 	}
 
 	log.Printf("Chat message successfully pushed to RabbitMQ")
+	return nil
+}
+
+func (e *Emitter) PushRoomJoinToQueue(roomJoinMsg RoomJoinEvent) error {
+	if e.connection == nil {
+		log.Println("RabbitMQ connection is nil")
+		return fmt.Errorf("RabbitMQ connection is nil")
+	}
+
+	// 채팅 확인 메시지 데이터를 JSON으로 변환
+	roomJoinData, err := json.Marshal(roomJoinMsg)
+	if err != nil {
+		log.Printf("Failed to marshal room message: %v", err)
+		return err
+	}
+
+	// EventPayload에 맞게 데이터를 래핑
+	payload := EventPayload{
+		EventType: "room_join",
+		Data:      roomJoinData,
+	}
+
+	// EventPayload를 JSON으로 변환 (문자열로 변환하지 않음)
+	eventJSON, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal event payload: %v", err)
+		return err
+	}
+
+	// 메시지 발행 (eventJSON을 문자열이 아닌 바이트 슬라이스로 전송)
+	err = e.PushBytes(eventJSON, "room.join")
+	if err != nil {
+		log.Printf("Failed to push message to queue: %v", err)
+		return err
+	}
+
+	log.Printf("Room join event successfully pushed to RabbitMQ")
 	return nil
 }
 

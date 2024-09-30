@@ -8,6 +8,11 @@ import (
 	"github.com/baaami/dorandoran/broker/event"
 )
 
+type RoomJoinEvent struct {
+	RoomID string `bson:"room_id" json:"room_id"`
+	UserID string `bson:"user_id" json:"user_id"`
+}
+
 // Room에 있는 모든 사용자에게 브로드캐스트
 func (app *Config) BroadcastToRoom(chatMsg Chat) {
 	roomID := chatMsg.RoomID
@@ -45,8 +50,11 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) {
 	emitter, err := event.NewEventEmitter(app.Rabbit)
 	if err == nil {
 		log.Printf("[INFO] Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
-		// TODO: 재시도 로직이나 대체 방안을 고려
-		emitter.PushChatToQueue(event.Chat(chatMsg))
+
+		err = emitter.PushChatToQueue(event.Chat(chatMsg))
+		if err != nil {
+			log.Printf("Failed to push chat event to queue, chatMsg: %v, err: %v", chatMsg, err)
+		}
 	} else {
 		log.Printf("[ERROR] Failed to create event emitter: %v", err)
 	}
@@ -66,6 +74,23 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 
 	room.(*sync.Map).Store(userID, client) // roomID에 해당하는 클라이언트 저장
 	log.Printf("User %s joined room %s", userID, roomID)
+
+	roomJoinMsg := RoomJoinEvent{
+		RoomID: roomID,
+		UserID: userID,
+	}
+
+	emitter, err := event.NewEventEmitter(app.Rabbit)
+	if err == nil {
+		log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s", roomJoinMsg.RoomID, roomJoinMsg.UserID)
+
+		err = emitter.PushRoomJoinToQueue(event.RoomJoinEvent(roomJoinMsg))
+		if err != nil {
+			log.Printf("Failed to push room join to queue, roomJoinMsg: %v, err: %v", roomJoinMsg, err)
+		}
+	} else {
+		log.Printf("Failed to create event emitter: %v", err)
+	}
 }
 
 // Room에서 사용자 제거하기
