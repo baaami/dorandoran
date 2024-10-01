@@ -27,6 +27,7 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/room/create", app.createChatRoom)
 
 	mux.Put("/room/confirm/{room_id}/{user_id}", app.confirmChatRoom)
+	mux.Put("/room/confirm/{room_id}", app.confirmChatRoomByUser)
 
 	mux.Delete("/room/delete/{id}", app.deleteChatRoom)
 

@@ -20,14 +20,14 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) {
 		roomMap := room.(*sync.Map)
 		roomMap.Range(func(userID, clientInterface interface{}) bool {
 			if clientInterface == nil {
-				log.Printf("[ERROR] Client for user %v in room %s is nil", userID, roomID)
+				log.Printf("Client for user %v in room %s is nil", userID, roomID)
 				roomMap.Delete(userID)
 				return true
 			}
 
 			client, ok := clientInterface.(*Client)
 			if !ok || client == nil {
-				log.Printf("[ERROR] Invalid client for user %v in room %s", userID, roomID)
+				log.Printf("Invalid client for user %v in room %s", userID, roomID)
 				roomMap.Delete(userID)
 				return true
 			}
@@ -37,14 +37,14 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) {
 			case client.Send <- chatMsg:
 				// 메시지 전송 성공
 			case <-time.After(time.Second * 1):
-				log.Printf("[ERROR] Sending message to user %v in room %s timed out", userID, roomID)
+				log.Printf("Time out send message to user %v in room %s", userID, roomID)
 				// Optionally remove client or handle the timeout
 				roomMap.Delete(userID)
 			}
 			return true
 		})
 	} else {
-		log.Printf("[WARNING] Room %s not found", roomID)
+		log.Printf("Room %s not found", roomID)
 	}
 
 	emitter, err := event.NewEventEmitter(app.Rabbit)

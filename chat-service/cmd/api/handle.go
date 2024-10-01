@@ -81,10 +81,12 @@ func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
 	// 채팅방이 존재하는지 확인
 	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
 	if err != nil {
+		log.Printf("Failed to find chat room, roomID: %s", roomID)
 		http.Error(w, "Failed to find chat room", http.StatusInternalServerError)
 		return
 	}
 	if room == nil {
+		log.Printf("Failed to find chat room, roomID: %s", roomID)
 		http.Error(w, "Chat room not found", http.StatusNotFound)
 		return
 	}
@@ -98,6 +100,55 @@ func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !isMember {
+		log.Printf("User is not a member of the chat room, roomID: %s, userID: %s", roomID, userID)
+		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
+		return
+	}
+
+	// 채팅방의 UserLastRead 필드를 업데이트
+	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID)
+	if err != nil {
+		http.Error(w, "Failed to confirm chat room", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	log.Printf("Chat room confirmed, roomID: %s, userID: %s", roomID, userID)
+}
+
+func (app *Config) confirmChatRoomByUser(w http.ResponseWriter, r *http.Request) {
+	roomID := chi.URLParam(r, "room_id")
+
+	// 사용자 ID를 가져옵니다. (예: 헤더에서 "X-User-ID"로 전달된다고 가정)
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		return
+	}
+
+	// 채팅방이 존재하는지 확인
+	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
+	if err != nil {
+		log.Printf("Failed to find chat room, roomID: %s", roomID)
+		http.Error(w, "Failed to find chat room", http.StatusInternalServerError)
+		return
+	}
+	if room == nil {
+		log.Printf("Failed to find chat room, roomID: %s", roomID)
+		http.Error(w, "Chat room not found", http.StatusNotFound)
+		return
+	}
+
+	// 사용자가 해당 채팅방의 멤버인지 확인
+	isMember := false
+	for _, id := range room.Users {
+		if id == userID {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		log.Printf("User is not a member of the chat room, roomID: %s, userID: %s", roomID, userID)
 		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
 		return
 	}
