@@ -12,6 +12,11 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+type RoomJoinEvent struct {
+	RoomID string `bson:"room_id" json:"room_id"`
+	UserID string `bson:"user_id" json:"user_id"`
+}
+
 // Chat 구조체 정의
 type Chat struct {
 	RoomID    string    `bson:"room_id" json:"room_id"`
@@ -142,6 +147,13 @@ func (consumer *Consumer) Listen(topics []string) error {
 				log.Printf("User Created Message Unmarshaled: %+v", user)
 				handleUserCreatedEvent(user)
 
+			case "room.join":
+				var roomJoin RoomJoinEvent
+				if err := json.Unmarshal(eventPayload.Data, &roomJoin); err != nil {
+					log.Printf("Failed to unmarshal room join event: %v", err)
+					continue
+				}
+				handleRoomJoinEvent(roomJoin)
 			case "room.deleted":
 				var room common.ChatRoom
 				if err := json.Unmarshal(eventPayload.Data, &room); err != nil {
@@ -167,7 +179,7 @@ func handleChatAddPayload(chatMsg Chat) error {
 
 	chatServiceURL := "http://chat-service/msg"
 
-	request, err := http.NewRequest("POST", chatServiceURL, bytes.NewBuffer(jsonData))
+	request, err := http.NewRequest(http.MethodPost, chatServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Failed to create request: %v", err)
 		return err
@@ -198,7 +210,7 @@ func handleUserCreatedEvent(user User) error {
 
 	userServiceURL := "http://user-service/user/insert"
 
-	request, err := http.NewRequest("POST", userServiceURL, bytes.NewBuffer(jsonData))
+	request, err := http.NewRequest(http.MethodPost, userServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Failed to create request: %v", err)
 		return err
@@ -224,12 +236,12 @@ func handleUserCreatedEvent(user User) error {
 	return nil
 }
 
-// 채팅방 삭제 이벤트 발생 시 동작
-func handleRoomDeletedEvent(room common.ChatRoom) error {
-	// 채팅방에서 사용한 채팅 데이터 삭제
-	url := fmt.Sprintf("http://chat-service/all/%s", room.ID)
+// 채팅방 참가 시 이벤트 발생 동작
+func handleRoomJoinEvent(roomJoin RoomJoinEvent) error {
+	// 채팅방에서 유저가 마지막으로 확인한 시간 업데이트
+	url := fmt.Sprintf("http://chat-service/room/confirm/%s/%s", roomJoin.RoomID, roomJoin.UserID)
 
-	request, err := http.NewRequest("DELETE", url, nil)
+	request, err := http.NewRequest(http.MethodPut, url, nil)
 	if err != nil {
 		log.Printf("Failed to create request: %v", err)
 		return err
@@ -247,10 +259,41 @@ func handleRoomDeletedEvent(room common.ChatRoom) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
-		log.Printf("Failed to send chat delete all, stats: %d, err: %v", response.StatusCode, err)
+		log.Printf("Failed to send room confirm, status: %d, err: %v", response.StatusCode, err)
 		return err
 	}
 
-	log.Println("Room delete event successfully sent to chat-service")
+	log.Println("Room join event successfully consumed")
+	return nil
+}
+
+// 채팅방 삭제 이벤트 발생 시 동작
+func handleRoomDeletedEvent(room common.ChatRoom) error {
+	// 채팅방에서 사용한 채팅 데이터 삭제
+	url := fmt.Sprintf("http://chat-service/all/%s", room.ID)
+
+	request, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		log.Printf("Failed to create request: %v", err)
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+
+	response, err := client.Do(request)
+	if err != nil {
+		log.Printf("Failed to send request: %v", err)
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		log.Printf("Failed to send chat delete all, status: %d, err: %v", response.StatusCode, err)
+		return err
+	}
+
+	log.Println("Room delete event successfully consumed")
 	return nil
 }

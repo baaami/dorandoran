@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -130,6 +131,36 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	_, err := collection.InsertOne(ctx, room)
 	if err != nil {
 		log.Println("Error inserting new room:", err)
+		return err
+	}
+
+	return nil
+}
+
+// 채팅방 정보 업데이트
+func (c *ChatRoom) ConfirmRoom(roomID string, userID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("rooms")
+
+	currentTime := time.Now()
+
+	// 필터: 해당 Room ID를 가진 문서
+	filter := bson.M{"id": roomID}
+
+	// 업데이트 내용: UserLastRead 맵의 해당 사용자에 대한 시간 업데이트
+	update := bson.M{
+		"$set": bson.M{
+			fmt.Sprintf("user_last_read.%s", userID): currentTime,
+			"modified_at":                            currentTime,
+		},
+	}
+
+	// 업데이트 실행
+	_, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Println("Error updating room:", err)
 		return err
 	}
 

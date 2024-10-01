@@ -74,6 +74,45 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(room)
 }
 
+func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
+	roomID := chi.URLParam(r, "room_id")
+	userID := chi.URLParam(r, "user_id")
+
+	// 채팅방이 존재하는지 확인
+	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
+	if err != nil {
+		http.Error(w, "Failed to find chat room", http.StatusInternalServerError)
+		return
+	}
+	if room == nil {
+		http.Error(w, "Chat room not found", http.StatusNotFound)
+		return
+	}
+
+	// 사용자가 해당 채팅방의 멤버인지 확인
+	isMember := false
+	for _, id := range room.Users {
+		if id == userID {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
+		return
+	}
+
+	// 채팅방의 UserLastRead 필드를 업데이트
+	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID)
+	if err != nil {
+		http.Error(w, "Failed to confirm chat room", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	log.Printf("Chat room confirmed, roomID: %s, userID: %s", roomID, userID)
+}
+
 // 특정 Room ID로 채팅방 삭제
 func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "id")
@@ -102,7 +141,7 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Chat room deleted"})
+	log.Printf("Chat room deleted, roomID: %s", roomID)
 }
 
 // 채팅 메시지 추가
