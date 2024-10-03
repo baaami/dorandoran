@@ -56,9 +56,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 			} else {
 				log.Println("WebSocket connection closed by client")
 			}
-
-			app.UnRegisterChatClient(userID)
-			return
+			break
 		}
 
 		var wsMsg common.WebSocketMessage
@@ -82,7 +80,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
 	var broadCastMsg ChatMessage
 	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
-		log.Printf("[ERROR] Failed to unmarshal join message: %v", err)
+		log.Printf("Failed to unmarshal broadcast message: %v", err)
 		return
 	}
 
@@ -100,7 +98,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
 	var joinMsg JoinRoomMessage
 	if err := json.Unmarshal(payload, &joinMsg); err != nil {
-		log.Printf("[ERROR] Failed to unmarshal join message: %v", err)
+		log.Printf("Failed to unmarshal join message: %v, err: %v", payload, err)
 		return
 	}
 
@@ -111,7 +109,7 @@ func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
 func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 	var leaveMsg LeaveRoomMessage
 	if err := json.Unmarshal(payload, &leaveMsg); err != nil {
-		log.Printf("[ERROR] Failed to unmarshal leave message: %v", err)
+		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
 		return
 	}
 
@@ -136,8 +134,13 @@ func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
 func (app *Config) UnRegisterChatClient(userID string) {
 	if clientInterface, ok := app.ChatClients.Load(userID); ok {
 		client := clientInterface.(*Client)
-		close(client.Send) // Send 채널 닫기
+
+		// Send 채널 닫기
+		close(client.Send)
+
+		// Channel에서 유저 제거
 		app.ChatClients.Delete(userID)
+
 		log.Printf("User %s unregistered chat server", userID)
 	}
 }
