@@ -84,7 +84,7 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	if (loginUser == User{}) {
 		// 유저가 존재하지 않는 경우 -> 회원가입 진행
-		loginUser, err = RegisterNewUser(app, snsID)
+		loginUser, err = RegisterNewUser(snsID)
 		if err != nil {
 			log.Printf("Failed to register new user")
 			http.Error(w, "Failed to register new user", http.StatusInternalServerError)
@@ -184,7 +184,7 @@ func GetExistUserByUserSrv(snsType int, snsID int64) (User, error) {
 		return User{}, fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	log.Printf("[GetExistUserByUserSrv] Raw response body: %s", string(body))
+	log.Printf("Raw response body: %s", string(body))
 
 	// 본문을 다시 디코딩
 	err = json.Unmarshal(body, &user)
@@ -197,7 +197,7 @@ func GetExistUserByUserSrv(snsType int, snsID int64) (User, error) {
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 새로운 사용자 생성
-func RegisterNewUser(app *Config, snsID int64) (User, error) {
+func RegisterNewUser(snsID int64) (User, error) {
 	newUser := User{
 		SnsType: types.KAKAO, // Kakao SNS 유형
 		SnsID:   snsID,       // Kakao 사용자 ID
