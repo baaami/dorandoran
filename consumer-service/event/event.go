@@ -16,44 +16,6 @@ func declareExchange(ch *amqp.Channel) error {
 	)
 }
 
-func declareChatExchange(channel *amqp.Channel) error {
-	return channel.ExchangeDeclare(
-		"chat_topic", // chat_topic exchange
-		"topic",      // topic type
-		true,         // durable
-		false,        // auto-deleted
-		false,        // internal
-		false,        // no-wait
-		nil,          // arguments
-	)
-}
-
-// declareAuthExchange declares the exchange for login
-func declareAuthExchange(channel *amqp.Channel) error {
-	return channel.ExchangeDeclare(
-		"auth_topic", // 새로운 auth exchange 이름
-		"topic",      // topic type
-		true,         // durable
-		false,        // auto-deleted
-		false,        // internal
-		false,        // no-wait
-		nil,          // arguments
-	)
-}
-
-// declareRoomExchange declares the exchange for chat messages
-func declareRoomExchange(ch *amqp.Channel) error {
-	return ch.ExchangeDeclare(
-		"room_topic", // 새로운 chat exchange 이름
-		"topic",      // topic type
-		true,         // durable
-		false,        // auto-deleted
-		false,        // internal
-		false,        // no-wait
-		nil,          // arguments
-	)
-}
-
 func declareRandomQueue(ch *amqp.Channel) (amqp.Queue, error) {
 	return ch.QueueDeclare(
 		"",    // name?
