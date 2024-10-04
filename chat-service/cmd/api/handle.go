@@ -9,6 +9,7 @@ import (
 	"github.com/baaami/dorandoran/chat/cmd/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/go-chi/chi/v5"
+	"github.com/samber/lo"
 )
 
 type Chat struct {
@@ -91,15 +92,7 @@ func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 사용자가 해당 채팅방의 멤버인지 확인
-	isMember := false
-	for _, id := range room.Users {
-		if id == userID {
-			isMember = true
-			break
-		}
-	}
-	if !isMember {
+	if !lo.Contains(room.Users, userID) {
 		log.Printf("User is not a member of the chat room, roomID: %s, userID: %s", roomID, userID)
 		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
 		return
@@ -140,14 +133,7 @@ func (app *Config) confirmChatRoomByUser(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 사용자가 해당 채팅방의 멤버인지 확인
-	isMember := false
-	for _, id := range room.Users {
-		if id == userID {
-			isMember = true
-			break
-		}
-	}
-	if !isMember {
+	if !lo.Contains(room.Users, userID) {
 		log.Printf("User is not a member of the chat room, roomID: %s, userID: %s", roomID, userID)
 		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
 		return
