@@ -38,6 +38,17 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 
 	// URL에서 유저 ID 가져오기
 	userID := r.Header.Get("X-User-ID")
+
+	// MatchClients에서 이미 존재하는지 확인
+	if _, exists := app.MatchClients.Load(userID); exists {
+		log.Printf("User %s is already Register Matching Queue", userID)
+
+		// 이미 등록된 경우 409 Conflict 상태 코드 반환
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(fmt.Sprintf("User %s is already in the matching queue", userID)))
+		return
+	}
+
 	app.RegisterMatchClient(conn, userID)
 
 	for {
@@ -149,6 +160,8 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 
 // Register 메시지 처리
 func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) {
+	// 존재하는 사람의 경우 pass
+
 	app.MatchClients.Store(userID, conn)
 	log.Printf("User %s register match server", userID)
 
