@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/baaami/dorandoran/chat/cmd/data"
@@ -215,11 +216,26 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")
 
-	messages, err := app.Models.Chat.GetByRoomID(roomID)
+	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
+	page := r.URL.Query().Get("page")
+
+	// 기본값 설정: 페이지 번호는 1, limit는 50으로 설정
+	pageNumber := 1
+	pageSize := 50
+
+	if page != "" {
+		pageNumber, _ = strconv.Atoi(page)
+	}
+
+	messages, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
 	if err != nil {
 		log.Printf("Failed to GetByRoomID, err: %v", err)
 		http.Error(w, "Failed to Chat", http.StatusInternalServerError)
 		return
+	}
+
+	if messages == nil {
+		messages = []*data.Chat{}
 	}
 
 	// 결과를 JSON으로 변환하여 반환
