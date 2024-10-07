@@ -1,6 +1,8 @@
 package socket
 
 import (
+	"context"
+	"log"
 	"sync"
 	"time"
 
@@ -51,4 +53,29 @@ type Config struct {
 	MatchClients sync.Map
 	Rabbit       *amqp.Connection
 	RedisClient  *redis.RedisClient
+}
+
+const (
+	pingPeriod = 60 * time.Second
+	pongWait   = 70 * time.Second
+	writeWait  = 10 * time.Second
+)
+
+// Ping 메시지 전송
+func (app *Config) pingPump(ctx context.Context, conn *websocket.Conn) {
+	ticker := time.NewTicker(pingPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return // 컨텍스트가 취소되면 종료
+		case <-ticker.C:
+			conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("Failed to send ping message: %v", err)
+				return
+			}
+		}
+	}
 }

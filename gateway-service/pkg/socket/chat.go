@@ -12,12 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	pingPeriod = 60 * time.Second
-	pongWait   = 70 * time.Second
-	writeWait  = 10 * time.Second
-)
-
 type JoinRoomMessage struct {
 	RoomID string `json:"room_id"`
 }
@@ -60,12 +54,12 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
-	wg.Add(2) // 두 개의 고루틴 (readPump, pingPump)
+	wg.Add(2) // 두 개의 고루틴 (listenChatEvent, pingPump)
 
 	// 메시지 처리 고루틴
 	go func() {
 		defer wg.Done()
-		app.readPump(ctx, conn, userID)
+		app.listenChatEvent(ctx, conn, userID)
 	}()
 
 	// Ping 메시지 전송 고루틴
@@ -147,27 +141,8 @@ func (app *Config) UnRegisterChatClient(userID string) {
 	}
 }
 
-// Ping 메시지 전송
-func (app *Config) pingPump(ctx context.Context, conn *websocket.Conn) {
-	ticker := time.NewTicker(pingPeriod)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return // 컨텍스트가 취소되면 종료
-		case <-ticker.C:
-			conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf("Failed to send ping message: %v", err)
-				return
-			}
-		}
-	}
-}
-
 // 메시지 읽기 처리
-func (app *Config) readPump(ctx context.Context, conn *websocket.Conn, userID string) {
+func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, userID string) {
 	for {
 		select {
 		case <-ctx.Done():

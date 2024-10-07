@@ -2,10 +2,12 @@ package socket
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +20,10 @@ type MatchResponse struct {
 
 // WebSocket 연결 처리
 func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
+	// 컨텍스트 생성 및 취소 함수 정의
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	var upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true
@@ -34,7 +40,6 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	defer conn.Close()
 
 	// URL에서 유저 ID 가져오기
 	userID := r.Header.Get("X-User-ID")
@@ -49,18 +54,49 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer func() {
+		app.UnRegisterMatchClient(userID)
+		conn.Close()
+	}()
+
 	app.RegisterMatchClient(conn, userID)
 
+	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
+	var wg sync.WaitGroup
+	wg.Add(2) // 두 개의 고루틴 (listenChatEvent, pingPump)
+
+	// 메시지 처리 고루틴
+	go func() {
+		defer wg.Done()
+		app.listenMatchEvent(ctx, conn, userID)
+	}()
+
+	// Ping 메시지 전송 고루틴
+	go func() {
+		defer wg.Done()
+		app.pingPump(ctx, conn)
+	}()
+
+	// 모든 고루틴이 종료될 때까지 대기
+	wg.Wait()
+}
+
+func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, userID string) {
 	for {
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-				log.Printf("Unexpected WebSocket close error: %v", err)
-			} else {
-				log.Println("WebSocket connection closed by client")
-			}
+		select {
+		case <-ctx.Done():
 			return
+		default:
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+					log.Printf("Unexpected WebSocket close error: %v", err)
+				} else {
+					log.Println("WebSocket connection closed by client")
+				}
+				return
+			}
 		}
 	}
 }
