@@ -154,6 +154,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 					continue
 				}
 				handleRoomJoinEvent(roomJoin)
+
 			case "room.deleted":
 				var room common.ChatRoom
 				if err := json.Unmarshal(eventPayload.Data, &room); err != nil {
