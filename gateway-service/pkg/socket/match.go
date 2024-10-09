@@ -68,7 +68,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	// 메시지 처리 고루틴
 	go func() {
 		defer wg.Done()
-		app.listenMatchEvent(ctx, conn, userID)
+		app.listenMatchEvent(ctx, conn)
 	}()
 
 	// Ping 메시지 전송 고루틴
@@ -81,7 +81,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	wg.Wait()
 }
 
-func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, userID string) {
+func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn) {
 	for {
 		select {
 		case <-ctx.Done():

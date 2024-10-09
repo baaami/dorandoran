@@ -3,6 +3,7 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/baaami/dorandoran/broker/pkg/redis"
@@ -34,10 +35,10 @@ func SessionMiddleware(redisClient *redis.RedisClient) func(http.Handler) http.H
 				return
 			}
 
-			log.Printf("User[%s]'s Request!!!", userID)
+			log.Printf("User[%d]'s Request!!!", userID)
 
 			// 사용자 ID를 요청의 헤더에 추가
-			r.Header.Set("X-User-ID", userID)
+			r.Header.Set("X-User-ID", strconv.Itoa(userID))
 
 			// 다음 핸들러로 요청을 전달
 			next.ServeHTTP(w, r)

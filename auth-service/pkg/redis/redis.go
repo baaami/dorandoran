@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -42,8 +43,8 @@ func NewRedisClient() (*RedisClient, error) {
 	return &RedisClient{Client: client}, nil
 }
 
-// SetSession: Redis에 세션 저장
-func (r *RedisClient) SetSession(sessionID string, userID string, expiresAt time.Duration) error {
+// setSession: Redis에 세션 저장
+func (r *RedisClient) setSession(sessionID string, userID string, expiresAt time.Duration) error {
 	err := r.Client.Set(ctx, sessionID, userID, expiresAt).Err()
 	if err != nil {
 		log.Printf("Failed to set session in Redis: %v", err)
@@ -59,7 +60,7 @@ func (r *RedisClient) SetSession(sessionID string, userID string, expiresAt time
 }
 
 // 세션 생성 함수 (Redis에 세션 저장)
-func (r *RedisClient) CreateSession(userID string) string {
+func (r *RedisClient) CreateSession(userID int) string {
 	// 고유한 세션 ID 생성 (UUID 사용)
 	sessionID := uuid.New().String()
 
@@ -67,7 +68,7 @@ func (r *RedisClient) CreateSession(userID string) string {
 	expiresAt := time.Hour * 24
 
 	// Redis에 세션 저장
-	err := r.SetSession(sessionID, userID, expiresAt)
+	err := r.setSession(sessionID, strconv.Itoa(userID), expiresAt)
 	if err != nil {
 		log.Printf("Failed to store session in Redis: %v", err)
 	}
@@ -76,28 +77,38 @@ func (r *RedisClient) CreateSession(userID string) string {
 	return sessionID
 }
 
-// GetUserBySession: Redis에서 세션 조회
-func (r *RedisClient) GetUserBySessionID(sessionID string) (string, error) {
-	userID, err := r.Client.Get(ctx, sessionID).Result()
+// GetSession: Redis에서 세션 조회
+func (r *RedisClient) GetUserBySessionID(sessionID string) (int, error) {
+	sUserID, err := r.Client.Get(ctx, sessionID).Result()
 	if err == redis.Nil {
-		return "", fmt.Errorf("session not found")
+		log.Printf("sessionID is not exist in DB")
+		return 0, fmt.Errorf("session not found")
 	} else if err != nil {
-		return "", err
+		log.Printf("Get Session Error, %s", err.Error())
+		return 0, err
 	}
+
+	userID, err := strconv.Atoi(sUserID)
+	if err != nil {
+		log.Printf("Failed to Atoi, user id: %s", sUserID)
+		return 0, nil
+	}
+	
 	return userID, nil
 }
 
+
 // GetSessionByUserID: 사용자 ID로 세션 ID 조회
-func (r *RedisClient) GetSessionByUserID(userID string) (string, error) {
+func (r *RedisClient) GetSessionByUserID(userID int) (string, error) {
 	// Redis Hash에서 userID에 해당하는 sessionID를 조회
-	sessionID, err := r.Client.Get(ctx, userID).Result()
+	sessionID, err := r.Client.Get(ctx, strconv.Itoa(userID)).Result()
 	if err == redis.Nil {
 		// 해당 userID가 없는 경우 처리
-		log.Printf("not found user in db, userID: %s, err: %v", userID, err)
-		return "", fmt.Errorf("not found user in db, userID: %s", userID)
+		log.Printf("not found user in db, userID: %d, err: %v", userID, err)
+		return "", fmt.Errorf("not found user in db, userID: %d", userID)
 	} else if err != nil {
 		// Redis 오류 처리
-		log.Printf("failed to get session by userID, userID: %s, err: %v", userID, err)
+		log.Printf("failed to get session by userID, userID: %d, err: %v", userID, err)
 		return "", fmt.Errorf("failed to get session by userID: %v", err)
 	}
 
@@ -105,24 +116,25 @@ func (r *RedisClient) GetSessionByUserID(userID string) (string, error) {
 	return sessionID, nil
 }
 
-// DeleteSession: Redis에서 세션 삭제
-func (r *RedisClient) DeleteSession(sessionID string) error {
-	userID, err := r.GetSessionByUserID(sessionID)
-	if err != nil {
-		log.Printf("Failed to GetSessionByUserID, session id: %s, err: %v", sessionID, err)
-		return err
-	}
+// TODO: Session Delete 여부 확인 필요
+// // DeleteSession: Redis에서 세션 삭제
+// func (r *RedisClient) DeleteSession(userID int) error {
+// 	sessionID, err := r.GetSessionByUserID(userID)
+// 	if err != nil {
+// 		log.Printf("Failed to GetSessionByUserID, user id: %d, err: %v", userID, err)
+// 		return err
+// 	}
 
-	err = r.Client.Del(ctx, sessionID).Err()
-	if err != nil {
-		log.Printf("Failed to delete session in Redis, session id: %s, err: %v", sessionID, err)
-		return err
-	}
+// 	err = r.Client.Del(ctx, sessionID).Err()
+// 	if err != nil {
+// 		log.Printf("Failed to delete user in Redis, user id: %d, err: %v", userID, err)
+// 		return err
+// 	}
 
-	err = r.Client.Del(ctx, userID).Err()
-	if err != nil {
-		log.Printf("Failed to delete user in Redis, user id: %s, err: %v", userID, err)
-		return err
-	}
-	return nil
-}
+// 	err = r.Client.Del(ctx, userID).Err()
+// 	if err != nil {
+// 		log.Printf("Failed to delete user in Redis, user id: %s, err: %v", userID, err)
+// 		return err
+// 	}
+// 	return nil
+// }

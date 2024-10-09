@@ -53,6 +53,8 @@ func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// TODO: room list 내 유저 상세 정보를 포함하여 Response
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(rooms)
 }
