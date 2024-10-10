@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/baaami/dorandoran/chat/cmd/data"
+	"github.com/baaami/dorandoran/chat/pkg/data"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

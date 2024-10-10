@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/baaami/dorandoran/chat/cmd/data"
+	"github.com/baaami/dorandoran/chat/pkg/data"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 

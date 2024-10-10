@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/baaami/dorandoran/chat/cmd/data"
+	"github.com/baaami/dorandoran/chat/pkg/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/lo"
@@ -53,8 +53,6 @@ func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// TODO: room list 내 유저 상세 정보를 포함하여 Response
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(rooms)
 }
@@ -74,6 +72,8 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: chatRoom 내 유저 정보를 상세 정보로 포함하여 Response
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(room)
 }
