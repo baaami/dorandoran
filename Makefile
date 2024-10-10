@@ -16,7 +16,7 @@ up_build: build_gateway build_user build_chat build_consumer build_auth
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
-	docker-compose up --build -d
+	docker-compose up --build -d --no-cache
 	@echo "Docker images built and started!"
 
 ## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
