@@ -3,13 +3,13 @@ package socket
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
 )
 
 type JoinRoomMessage struct {
@@ -37,9 +37,9 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
 		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-			log.Printf("Unexpected WebSocket close error: %v", err)
+			log.Error().Str("err", err.Error()).Msgf("Unexpected WebSocket close error")
 		} else {
-			log.Println("WebSocket connection closed by client")
+			log.Info().Msg("WebSocket connection closed by client")
 		}
 		return
 	}
@@ -151,9 +151,9 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-					log.Printf("Unexpected WebSocket close error: %v", err)
+					log.Error().Str("err", err.Error()).Msgf("Unexpected WebSocket close error")
 				} else {
-					log.Println("WebSocket connection closed by client")
+					log.Info().Msg("WebSocket connection closed by client")
 				}
 				return
 			}
