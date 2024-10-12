@@ -20,7 +20,7 @@ type User struct {
 }
 
 // 유저 정보 조회
-func (app *Config) readUser(w http.ResponseWriter, r *http.Request) {
+func (app *Config) findUser(w http.ResponseWriter, r *http.Request) {
 	// URL에서 유저 ID 가져오기
 	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
