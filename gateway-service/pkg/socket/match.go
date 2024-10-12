@@ -10,13 +10,10 @@ import (
 	"sync"
 	"time"
 
+	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
-
-type MatchResponse struct {
-	RoomID string `json:"room_id"`
-}
 
 // WebSocket 연결 처리
 func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +126,7 @@ func (app *Config) MonitorQueue() {
 }
 
 func (app *Config) notifyUsers(matchList []string, roomID string) {
-	matchMsg := MatchResponse{
+	matchMsg := common.MatchResponse{
 		RoomID: roomID,
 	}
 

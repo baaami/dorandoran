@@ -12,14 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type JoinRoomMessage struct {
-	RoomID string `json:"room_id"`
-}
-
-type LeaveRoomMessage struct {
-	RoomID string `json:"room_id"`
-}
-
 // WebSocket 연결 처리
 func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	// 컨텍스트 생성 및 취소 함수 정의
@@ -92,7 +84,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 
 // Join 메시지 처리
 func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
-	var joinMsg JoinRoomMessage
+	var joinMsg common.JoinRoomMessage
 	if err := json.Unmarshal(payload, &joinMsg); err != nil {
 		log.Printf("Failed to unmarshal join message: %v, err: %v", payload, err)
 		return
@@ -103,7 +95,7 @@ func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
 
 // Leave 메시지 처리
 func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
-	var leaveMsg LeaveRoomMessage
+	var leaveMsg common.LeaveRoomMessage
 	if err := json.Unmarshal(payload, &leaveMsg); err != nil {
 		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
 		return
