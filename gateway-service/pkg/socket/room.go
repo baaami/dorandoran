@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -11,6 +12,24 @@ import (
 type RoomJoinEvent struct {
 	RoomID string `bson:"room_id" json:"room_id"`
 	UserID string `bson:"user_id" json:"user_id"`
+}
+
+// BroadCast 메시지 처리
+func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
+	var broadCastMsg ChatMessage
+	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
+		log.Printf("Failed to unmarshal broadcast message: %v", err)
+		return
+	}
+
+	chat := Chat{
+		RoomID:    broadCastMsg.RoomID,
+		SenderID:  userID,
+		Message:   broadCastMsg.Message,
+		CreatedAt: time.Now(),
+	}
+
+	app.BroadcastToRoom(chat)
 }
 
 // Room에 있는 모든 사용자에게 브로드캐스트

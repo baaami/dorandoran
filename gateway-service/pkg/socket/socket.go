@@ -35,6 +35,8 @@ type ChatRoom struct {
 const (
 	MessageTypeChat       = "chat"
 	MessageTypeMatch      = "match"
+	MessageTypeRoom       = "room"
+	MessageTypeGame       = "game"
 	MessageTypeRegister   = "register"
 	MessageTypeUnRegister = "unregister"
 	MessageTypeBroadCast  = "broadcast"

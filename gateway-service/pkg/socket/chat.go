@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-	"time"
 
 	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/gorilla/websocket"
@@ -64,22 +63,57 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	wg.Wait()
 }
 
-// BroadCast 메시지 처리
-func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
-	var broadCastMsg ChatMessage
-	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
-		log.Printf("Failed to unmarshal broadcast message: %v", err)
-		return
-	}
+// 메시지 읽기 처리
+func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, userID string) {
+	for {
+		select {
+		case <-ctx.Done():
+			return // 컨텍스트가 취소되면 고루틴 종료
+		default:
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+					log.Error().Str("err", err.Error()).Msgf("Unexpected WebSocket close error")
+				} else {
+					log.Info().Msg("WebSocket connection closed by client")
+				}
+				return
+			}
 
-	chat := Chat{
-		RoomID:    broadCastMsg.RoomID,
-		SenderID:  userID,
-		Message:   broadCastMsg.Message,
-		CreatedAt: time.Now(),
-	}
+			var wsMsg common.WebSocketMessage
+			if err := json.Unmarshal(msg, &wsMsg); err != nil {
+				log.Printf("Failed to unmarshal message: %v", err)
+				continue
+			}
 
-	app.BroadcastToRoom(chat)
+			switch wsMsg.Type {
+			case MessageTypeBroadCast:
+				app.handleBroadCastMessage(wsMsg.Payload, userID)
+			case MessageTypeJoin:
+				app.handleJoinMessage(wsMsg.Payload, userID)
+			case MessageTypeLeave:
+				app.handleLeaveMessage(wsMsg.Payload, userID)
+			case MessageTypeChat:
+				app.handleChatType(wsMsg.Payload)
+			case MessageTypeRoom:
+				app.handleRoomType(wsMsg.Payload)
+			case MessageTypeGame:
+				app.handleGameType(wsMsg.Payload)
+			}
+		}
+	}
+}
+
+// chat type 메시지 처리
+func (app *Config) handleChatType(payload json.RawMessage) {
+}
+
+// room type 메시지 처리
+func (app *Config) handleRoomType(payload json.RawMessage) {
+}
+
+// game type 메시지 처리
+func (app *Config) handleGameType(payload json.RawMessage) {
 }
 
 // Join 메시지 처리
@@ -130,41 +164,6 @@ func (app *Config) UnRegisterChatClient(userID string) {
 		app.ChatClients.Delete(userID)
 
 		log.Printf("User %s unregistered chat server", userID)
-	}
-}
-
-// 메시지 읽기 처리
-func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, userID string) {
-	for {
-		select {
-		case <-ctx.Done():
-			return // 컨텍스트가 취소되면 고루틴 종료
-		default:
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-					log.Error().Str("err", err.Error()).Msgf("Unexpected WebSocket close error")
-				} else {
-					log.Info().Msg("WebSocket connection closed by client")
-				}
-				return
-			}
-
-			var wsMsg common.WebSocketMessage
-			if err := json.Unmarshal(msg, &wsMsg); err != nil {
-				log.Printf("Failed to unmarshal message: %v", err)
-				continue
-			}
-
-			switch wsMsg.Type {
-			case MessageTypeBroadCast:
-				app.handleBroadCastMessage(wsMsg.Payload, userID)
-			case MessageTypeJoin:
-				app.handleJoinMessage(wsMsg.Payload, userID)
-			case MessageTypeLeave:
-				app.handleLeaveMessage(wsMsg.Payload, userID)
-			}
-		}
 	}
 }
 
