@@ -30,11 +30,26 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		CreatedAt: time.Now(),
 	}
 
-	app.BroadcastToRoom(chat)
+	err := app.BroadcastToRoom(chat)
+	if err != nil {
+		log.Printf("Failed to BroadcastToRoom, err: %s", err.Error())
+	}
 }
 
 // Room에 있는 모든 사용자에게 브로드캐스트
-func (app *Config) BroadcastToRoom(chatMsg Chat) {
+func (app *Config) BroadcastToRoom(chatMsg Chat) error {
+	payload, err := json.Marshal(chatMsg)
+	if err != nil {
+		log.Printf("Failed to marshal chatMsg: %v", err)
+		return err
+	}
+
+	webSocketMsg := WebSocketMessage{
+		Type:    MessageTypeChat,
+		Status:  MessageStatusChatBroadCast,
+		Payload: json.RawMessage(payload),
+	}
+
 	roomID := chatMsg.RoomID
 	if room, ok := app.Rooms.Load(roomID); ok {
 		roomMap := room.(*sync.Map)
@@ -54,7 +69,7 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) {
 
 			// 메시지를 Send 채널에 보냅니다.
 			select {
-			case client.Send <- chatMsg:
+			case client.Send <- webSocketMsg:
 				// 메시지 전송 성공
 			case <-time.After(time.Second * 1):
 				log.Printf("Time out send message to user %v in room %s", userID, roomID)
@@ -78,6 +93,8 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) {
 	} else {
 		log.Printf("[ERROR] Failed to create event emitter: %v", err)
 	}
+
+	return nil
 }
 
 // Join 메시지 처리

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,6 +22,12 @@ const (
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
 	RoomID          = "605c460d-2b43-418b-bbb3-8bff1955e1a8" // 테스트용 RoomID
 )
+
+type WebSocketMessage struct {
+	Type    string          `json:"type"`
+	Status  string          `json:"status"`
+	Payload json.RawMessage `json:"payload"`
+}
 
 type Chat struct {
 	RoomID    string    `bson:"room_id" json:"room_id"`
@@ -126,8 +131,9 @@ func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message strin
 		Message:  message,
 	}
 
-	wsMessage := common.WebSocketMessage{
-		Type:    "broadcast",
+	wsMessage := WebSocketMessage{
+		Type:    "chat",
+		Status:  "broadcast",
 		Payload: toJSONRawMessage(Chat),
 	}
 
@@ -141,16 +147,24 @@ func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message strin
 func receiveChats(t *testing.T, conn *websocket.Conn, userID string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
+
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("[INFO] User %s disconnected: %v", userID, err)
 			return
 		}
 
-		var chatMsg Chat
-		err = json.Unmarshal(msg, &chatMsg)
+		var webSocketMsg WebSocketMessage
+		err = json.Unmarshal(msg, &webSocketMsg)
 		if err != nil {
-			log.Printf("[ERROR] Failed to unmarshal message for User %s: %v", userID, err)
+			log.Printf("[ERROR] Failed to unmarshal websocket message for User %s: %v", userID, err)
+			continue
+		}
+
+		var chatMsg Chat
+		err = json.Unmarshal(webSocketMsg.Payload, &chatMsg)
+		if err != nil {
+			log.Printf("[ERROR] Failed to unmarshal chat message for User %s: %v", userID, err)
 			continue
 		}
 
@@ -243,8 +257,9 @@ func TestChatAmongFiveClients(t *testing.T) {
 
 // 참가자가 방에 참여하는 함수
 func joinRoom(t *testing.T, conn *websocket.Conn, userID string) {
-	joinMsg := common.WebSocketMessage{
-		Type: "join",
+	joinMsg := WebSocketMessage{
+		Type:   "room",
+		Status: "join",
 		Payload: toJSONRawMessage(map[string]string{
 			"room_id": RoomID,
 		}),
@@ -260,8 +275,9 @@ func joinRoom(t *testing.T, conn *websocket.Conn, userID string) {
 
 // 참가자가 방을 떠나는 함수
 func leaveRoom(t *testing.T, conn *websocket.Conn, userID string) {
-	leaveMsg := common.WebSocketMessage{
-		Type: "leave",
+	leaveMsg := WebSocketMessage{
+		Type:   "room",
+		Status: "leave",
 		Payload: toJSONRawMessage(map[string]string{
 			"room_id": RoomID,
 		}),
