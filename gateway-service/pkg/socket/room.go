@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
+	common "github.com/baaami/dorandoran/common/chat"
 )
 
 type RoomJoinEvent struct {
@@ -77,6 +78,28 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) {
 	} else {
 		log.Printf("[ERROR] Failed to create event emitter: %v", err)
 	}
+}
+
+// Join 메시지 처리
+func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
+	var joinMsg common.JoinRoomMessage
+	if err := json.Unmarshal(payload, &joinMsg); err != nil {
+		log.Printf("Failed to unmarshal join message: %v, err: %v", payload, err)
+		return
+	}
+
+	app.JoinRoom(joinMsg.RoomID, userID)
+}
+
+// Leave 메시지 처리
+func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
+	var leaveMsg common.LeaveRoomMessage
+	if err := json.Unmarshal(payload, &leaveMsg); err != nil {
+		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
+		return
+	}
+
+	app.LeaveRoom(leaveMsg.RoomID, userID)
 }
 
 // Room에 사용자 추가하기

@@ -130,14 +130,30 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 		RoomID: roomID,
 	}
 
+	payload, err := json.Marshal(matchMsg)
+	if err != nil {
+		log.Printf("Failed to marshal match response: %v", err)
+		return
+	}
+
+	webSocketMsg := WebSocketMessage{
+		Type:    MessageTypeMatch,
+		Status:  MessageStatusMatchSuccess,
+		Payload: json.RawMessage(payload),
+	}
+
 	log.Printf("Match Notify Start!!!")
 
 	for _, userID := range matchList {
 		log.Printf("Try to notify user, %s", userID)
 
 		if conn, ok := app.MatchClients.Load(userID); ok {
-			conn.(*websocket.Conn).WriteJSON(matchMsg)
-			log.Printf("Notified %s about match in room %s", userID, roomID)
+			err := conn.(*websocket.Conn).WriteJSON(webSocketMsg)
+			if err != nil {
+				log.Printf("Failed to notify user %s: %v", userID, err)
+			} else {
+				log.Printf("Notified %s about match in room %s", userID, roomID)
+			}
 
 			conn.(*websocket.Conn).Close()
 		} else {

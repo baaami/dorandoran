@@ -2,6 +2,7 @@ package socket
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -10,6 +11,12 @@ import (
 	"github.com/gorilla/websocket"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+type WebSocketMessage struct {
+	Type    string          `json:"type"`
+	Status  string          `json:"status"`
+	Payload json.RawMessage `json:"payload"`
+}
 
 type Chat struct {
 	RoomID    string    `bson:"room_id" json:"room_id"`
@@ -33,15 +40,50 @@ type ChatRoom struct {
 }
 
 const (
-	MessageTypeChat       = "chat"
-	MessageTypeMatch      = "match"
-	MessageTypeRoom       = "room"
-	MessageTypeGame       = "game"
-	MessageTypeRegister   = "register"
-	MessageTypeUnRegister = "unregister"
-	MessageTypeBroadCast  = "broadcast"
-	MessageTypeJoin       = "join"
-	MessageTypeLeave      = "leave"
+	MessageTypeChat  = "chat"
+	MessageTypeMatch = "match"
+	MessageTypeRoom  = "room"
+	MessageTypeGame  = "game"
+)
+
+// Chat Type (Receive)
+const (
+	MessageStatusChatBroadCast = "broadcast"
+)
+
+// Room Type (Receive)
+const (
+	MessageStatusRoomJoin  = "join"
+	MessageStatusRoomLeave = "leave"
+)
+
+// Game Type (Receive)
+const (
+	MessageStatusGameFirstImpressionVote = "first_impression_vote" // 첫인상 투표
+	MessageStatusGameSecretChatRequest   = "secret_chat_request"   // 비밀 채팅권 사용
+	MessageStatusGameFinalSelection      = "final_selection"       // 최종 선택
+)
+
+const (
+	MessageStatusMatchSuccess = "success"
+)
+
+// Game Type (Push)
+const (
+	PushMessageStatusGameStart                     = "start"
+	PushMessageStatusGameIntroduceStart            = "introduce_start"
+	PushMessageStatusGameIntroduceTurn             = "introduce_turn"
+	PushMessageStatusGameIntroduceEnd              = "introduce_end"
+	PushMessageStatusGameFirstImpressionVoteStart  = "first_impression_vote_start"
+	PushMessageStatusGameFirstImpressionVoteEnd    = "first_impression_vote_end"
+	PushMessageStatusGameFirstImpressionVoteResult = "first_impression_vote_result"
+	PushMessageStatusGameMiniGameStart             = "mini_game_start"
+	PushMessageStatusGameMiniGameEnd               = "mini_game_end"
+	PushMessageStatusGameSecretChatRoomCreated     = "secret_chat_room_created"
+	PushMessageStatusGameFinalSelectionStart       = "final_selection_start"
+	PushMessageStatusGameFinalSelectionEnd         = "final_selection_end"
+	PushMessageStatusGameFinalSelectionResult      = "final_selection_result"
+	PushMessageStatusGameEnd                       = "end"
 )
 
 type Client struct {

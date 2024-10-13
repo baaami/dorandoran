@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/baaami/dorandoran/common v0.0.0-20241012051011-508ea543fdb6
+	github.com/baaami/dorandoran/common v0.0.0-20241013022941-66ab62bdbccc
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3

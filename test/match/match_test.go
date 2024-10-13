@@ -31,8 +31,9 @@ type User struct {
 
 // WebSocketMessage 구조체 정의
 type WebSocketMessage struct {
-	Type    string      `json:"type"`
-	Payload interface{} `json:"payload"`
+	Type    string          `json:"type"`
+	Status  string          `json:"status"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // MatchResponse 구조체 정의
@@ -120,27 +121,14 @@ func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket
 	return conn, nil
 }
 
-// 매칭 요청을 보내고 응답을 기다리는 함수
-// func sendMatchRequest(t *testing.T, conn *websocket.Conn, userID string) {
-// 	matchMsg := WebSocketMessage{
-// 		Type:    "match",
-// 		Payload: MatchMessage{UserID: userID},
-// 	}
-
-// 	err := conn.WriteJSON(matchMsg)
-// 	if err != nil {
-// 		t.Fatalf("Failed to send match request for user %s: %v", userID, err)
-// 	}
-// }
-
 // 매칭 결과를 수신하는 함수
-func receiveMatchResponse(t *testing.T, conn *websocket.Conn) MatchResponse {
-	var matchResp MatchResponse
-	err := conn.ReadJSON(&matchResp)
+func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
+	var webSocketMsg WebSocketMessage
+	err := conn.ReadJSON(&webSocketMsg)
 	if err != nil {
 		t.Fatalf("Failed to receive match response: %v", err)
 	}
-	return matchResp
+	return webSocketMsg
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
@@ -150,7 +138,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	conns := make([]*websocket.Conn, participantCount)
 
 	// 채널을 사용하여 응답을 수집
-	responseChan := make(chan MatchResponse, participantCount)
+	responseChan := make(chan WebSocketMessage, participantCount)
 
 	// 1. 5명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
 	for i := 0; i < participantCount; i++ {
@@ -175,20 +163,25 @@ func TestMatchWebSocketAPI(t *testing.T) {
 			// sendMatchRequest(t, conns[i], userIDs[i])
 
 			// 매칭 응답 수신
-			matchResp := receiveMatchResponse(t, conns[i])
+			webSocketMsg := receiveMatchResponse(t, conns[i])
 
 			// 응답을 채널에 전달
-			responseChan <- matchResp
+			responseChan <- webSocketMsg
 		}(i)
 	}
 
 	// 4. 응답을 수신
-	matchResponses := make([]MatchResponse, participantCount)
+	matchResponses := make([]WebSocketMessage, participantCount)
 	for i := 0; i < participantCount; i++ {
 		matchResponses[i] = <-responseChan
 
-		if matchResponses[i].RoomID != "" {
-			t.Logf("%s User allocated room %s", userIDs[i], matchResponses[i].RoomID)
+		if matchResponses[i].Type == "match" && matchResponses[i].Status == "success" {
+			var matchResp MatchResponse
+			err := json.Unmarshal(matchResponses[i].Payload, &matchResp)
+			assert.NoError(t, err)
+			if matchResp.RoomID != "" {
+				t.Logf("%s User allocated room %s", userIDs[i], matchResp.RoomID)
+			}
 		}
 	}
 

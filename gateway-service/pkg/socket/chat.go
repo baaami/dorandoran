@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sync"
 
-	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -80,62 +79,48 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				return
 			}
 
-			var wsMsg common.WebSocketMessage
+			var wsMsg WebSocketMessage
 			if err := json.Unmarshal(msg, &wsMsg); err != nil {
 				log.Printf("Failed to unmarshal message: %v", err)
 				continue
 			}
 
 			switch wsMsg.Type {
-			case MessageTypeBroadCast:
-				app.handleBroadCastMessage(wsMsg.Payload, userID)
-			case MessageTypeJoin:
-				app.handleJoinMessage(wsMsg.Payload, userID)
-			case MessageTypeLeave:
-				app.handleLeaveMessage(wsMsg.Payload, userID)
 			case MessageTypeChat:
-				app.handleChatType(wsMsg.Payload)
+				app.handleChatType(wsMsg.Status, userID, wsMsg.Payload)
 			case MessageTypeRoom:
-				app.handleRoomType(wsMsg.Payload)
+				app.handleRoomType(wsMsg.Status, userID, wsMsg.Payload)
 			case MessageTypeGame:
-				app.handleGameType(wsMsg.Payload)
+				app.handleGameType(wsMsg.Status, userID, wsMsg.Payload)
 			}
 		}
 	}
 }
 
 // chat type 메시지 처리
-func (app *Config) handleChatType(payload json.RawMessage) {
+func (app *Config) handleChatType(status, userID string, payload json.RawMessage) {
+	switch status {
+	case MessageStatusChatBroadCast:
+		app.handleBroadCastMessage(payload, userID)
+	}
 }
 
 // room type 메시지 처리
-func (app *Config) handleRoomType(payload json.RawMessage) {
+func (app *Config) handleRoomType(status, userID string, payload json.RawMessage) {
+	switch status {
+	case MessageStatusRoomJoin:
+		app.handleJoinMessage(payload, userID)
+	case MessageStatusRoomLeave:
+		app.handleLeaveMessage(payload, userID)
+	}
 }
 
 // game type 메시지 처리
-func (app *Config) handleGameType(payload json.RawMessage) {
-}
+func (app *Config) handleGameType(status, userID string, payload json.RawMessage) {
+	switch status {
 
-// Join 메시지 처리
-func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
-	var joinMsg common.JoinRoomMessage
-	if err := json.Unmarshal(payload, &joinMsg); err != nil {
-		log.Printf("Failed to unmarshal join message: %v, err: %v", payload, err)
-		return
+	default:
 	}
-
-	app.JoinRoom(joinMsg.RoomID, userID)
-}
-
-// Leave 메시지 처리
-func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
-	var leaveMsg common.LeaveRoomMessage
-	if err := json.Unmarshal(payload, &leaveMsg); err != nil {
-		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
-		return
-	}
-
-	app.LeaveRoom(leaveMsg.RoomID, userID)
 }
 
 // Register
