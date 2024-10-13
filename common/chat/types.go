@@ -9,6 +9,7 @@ import (
 
 type WebSocketMessage struct {
 	Type    string          `json:"type"`
+	Status  string          `json:"status"`
 	Payload json.RawMessage `json:"payload"`
 }
 
