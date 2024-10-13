@@ -138,7 +138,7 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 
 	webSocketMsg := WebSocketMessage{
 		Type:    MessageTypeMatch,
-		Status:  MessageStatusMatchSuccess,
+		Status:  PushMessageStatusMatchSuccess,
 		Payload: json.RawMessage(payload),
 	}
 
@@ -154,8 +154,6 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 			} else {
 				log.Printf("Notified %s about match in room %s", userID, roomID)
 			}
-
-			conn.(*websocket.Conn).Close()
 		} else {
 			log.Printf("User %s not connected", userID)
 		}

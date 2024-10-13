@@ -64,8 +64,14 @@ const (
 	MessageStatusGameFinalSelection      = "final_selection"       // 최종 선택
 )
 
+// Room Type (Push)
 const (
-	MessageStatusMatchSuccess = "success"
+	PushMessageStatusRoomInfo = "info"
+)
+
+// Match Type (Push)
+const (
+	PushMessageStatusMatchSuccess = "success"
 )
 
 // Game Type (Push)

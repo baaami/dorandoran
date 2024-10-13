@@ -46,6 +46,8 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(2) // 두 개의 고루틴 (listenChatEvent, pingPump)
 
+	// 게임에 필요한 초기 정보 전달
+
 	// 메시지 처리 고루틴
 	go func() {
 		defer wg.Done()
