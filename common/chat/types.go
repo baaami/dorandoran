@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/json"
 	"time"
+
+	common "github.com/baaami/dorandoran/common/user"
 )
 
 // Request
@@ -49,8 +51,13 @@ type ChatRoom struct {
 	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
-// Response
-
-type MatchResponse struct {
+// Push Message
+type PushMatchSuccessMessage struct {
 	RoomID string `json:"room_id"`
+}
+
+type PushRoomInfoMessage struct {
+	ID        string        `bson:"id" json:"id"` // UUID 사용
+	Users     []common.User `bson:"users" json:"users"`
+	CreatedAt time.Time     `bson:"created_at" json:"created_at"`
 }
