@@ -99,8 +99,9 @@ type Client struct {
 
 type Config struct {
 	Rooms        sync.Map // key: roomID, value: *sync.Map (key: userID, value: *Client)
+	MatchClients sync.Map // key: userID, value: *websocket.Conn
 	ChatClients  sync.Map // key: userID, value: *Client
-	MatchClients sync.Map
+	GameClients  sync.Map // key: userID, value: *websocket.Conn
 	Rabbit       *amqp.Connection
 	RedisClient  *redis.RedisClient
 }

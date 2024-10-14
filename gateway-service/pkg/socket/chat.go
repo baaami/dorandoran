@@ -92,8 +92,6 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				app.handleChatType(wsMsg.Status, userID, wsMsg.Payload)
 			case MessageTypeRoom:
 				app.handleRoomType(wsMsg.Status, userID, wsMsg.Payload)
-			case MessageTypeGame:
-				app.handleGameType(wsMsg.Status, userID, wsMsg.Payload)
 			}
 		}
 	}
@@ -114,14 +112,6 @@ func (app *Config) handleRoomType(status, userID string, payload json.RawMessage
 		app.handleJoinMessage(payload, userID)
 	case MessageStatusRoomLeave:
 		app.handleLeaveMessage(payload, userID)
-	}
-}
-
-// game type 메시지 처리
-func (app *Config) handleGameType(status, userID string, payload json.RawMessage) {
-	switch status {
-
-	default:
 	}
 }
 

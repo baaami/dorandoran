@@ -26,8 +26,9 @@ func (app *Config) routes(wsConfig *socket.Config) http.Handler {
 	// 세션 검증 미들웨어 추가
 	mux.Use(middleware.SessionMiddleware(wsConfig.RedisClient))
 
-	mux.HandleFunc("/ws/chat", wsConfig.HandleChatSocket)
 	mux.HandleFunc("/ws/match", wsConfig.HandleMatchSocket)
+	mux.HandleFunc("/ws/chat", wsConfig.HandleChatSocket)
+	mux.HandleFunc("/ws/game", wsConfig.HandleChatSocket)
 
 	// 매칭
 	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))
