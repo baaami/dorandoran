@@ -132,7 +132,7 @@ func (e *Emitter) PushRoomJoinToQueue(roomJoinMsg RoomJoinEvent) error {
 
 	// EventPayload에 맞게 데이터를 래핑
 	payload := EventPayload{
-		EventType: "room_join",
+		EventType: "room.join",
 		Data:      roomJoinData,
 	}
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/baaami/dorandoran/broker/pkg/socket"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -17,7 +18,7 @@ const webPort = 80
 
 type Config struct{}
 
-func main() {		
+func main() {
 	// RabbitMQ 연결
 	rabbitConn, err := connect()
 	if err != nil {
@@ -31,15 +32,21 @@ func main() {
 	if err != nil {
 		log.Error().Msgf("Failed to initialize Redis client: %v", err)
 	}
-	
+
 	app := Config{}
+
+	chatEmitter, err := event.NewEventEmitter(rabbitConn)
+	if err != nil {
+		log.Error().Msgf("Failed to make new event emitter: %v", err)
+		os.Exit(1)
+	}
 
 	// WebSocket 설정
 	wsConfig := &socket.Config{
 		Rooms:        sync.Map{},
 		ChatClients:  sync.Map{},
 		MatchClients: sync.Map{},
-		Rabbit:       rabbitConn,
+		ChatEmitter:  &chatEmitter,
 		RedisClient:  redisClient,
 	}
 

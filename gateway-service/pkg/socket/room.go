@@ -82,16 +82,11 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) error {
 		log.Printf("Room %s not found", roomID)
 	}
 
-	emitter, err := event.NewEventEmitter(app.Rabbit)
-	if err == nil {
-		log.Printf("[INFO] Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
+	log.Printf("[INFO] Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
 
-		err = emitter.PushChatToQueue(event.Chat(chatMsg))
-		if err != nil {
-			log.Printf("Failed to push chat event to queue, chatMsg: %v, err: %v", chatMsg, err)
-		}
-	} else {
-		log.Printf("[ERROR] Failed to create event emitter: %v", err)
+	err = app.ChatEmitter.PushChatToQueue(event.Chat(chatMsg))
+	if err != nil {
+		log.Printf("Failed to push chat event to queue, chatMsg: %v, err: %v", chatMsg, err)
 	}
 
 	return nil
@@ -139,16 +134,11 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 		UserID: userID,
 	}
 
-	emitter, err := event.NewEventEmitter(app.Rabbit)
-	if err == nil {
-		log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s", roomJoinMsg.RoomID, roomJoinMsg.UserID)
+	log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s", roomJoinMsg.RoomID, roomJoinMsg.UserID)
 
-		err = emitter.PushRoomJoinToQueue(event.RoomJoinEvent(roomJoinMsg))
-		if err != nil {
-			log.Printf("Failed to push room join to queue, roomJoinMsg: %v, err: %v", roomJoinMsg, err)
-		}
-	} else {
-		log.Printf("Failed to create event emitter: %v", err)
+	err := app.ChatEmitter.PushRoomJoinToQueue(event.RoomJoinEvent(roomJoinMsg))
+	if err != nil {
+		log.Printf("Failed to push room join to queue, roomJoinMsg: %v, err: %v", roomJoinMsg, err)
 	}
 
 	// room에 join한 사용자에게 채팅방 정보 전송

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/gorilla/websocket"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type WebSocketMessage struct {
@@ -102,7 +102,7 @@ type Config struct {
 	MatchClients sync.Map // key: userID, value: *websocket.Conn
 	ChatClients  sync.Map // key: userID, value: *Client
 	GameClients  sync.Map // key: userID, value: *websocket.Conn
-	Rabbit       *amqp.Connection
+	ChatEmitter  *event.Emitter
 	RedisClient  *redis.RedisClient
 }
 

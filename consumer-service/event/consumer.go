@@ -153,7 +153,8 @@ func (consumer *Consumer) Listen(topics []string) error {
 					log.Printf("Failed to unmarshal room join event: %v", err)
 					continue
 				}
-				handleRoomJoinEvent(roomJoin)
+				// TODO: room join event 발생 시점에 아직 room이 동기적으로 생성되지 않음
+				// handleRoomJoinEvent(roomJoin)
 
 			case "room.deleted":
 				var room common.ChatRoom
