@@ -102,6 +102,8 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn) {
 func (app *Config) MonitorQueue() {
 	const MatchTotalNum = 2
 
+	// TODO: 존재하는 모든 대기열에 대해서 모니터링 해야함
+	// -> 현재는 1:1 매칭으로 1개의 큐로 관리
 	for {
 		matchList, err := app.RedisClient.PopNUsersFromQueue(MatchTotalNum)
 		if err != nil {
@@ -208,11 +210,10 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 // Register 메시지 처리
 func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) {
 	// 존재하는 사람의 경우 pass
-
 	app.MatchClients.Store(userID, conn)
 	log.Printf("User %s register match server", userID)
 
-	app.RedisClient.AddUserToQueue(userID)
+	app.RedisClient.AddUserToQueue(userID, 1)
 	log.Printf("User %s added to waiting queue", userID)
 }
 
@@ -220,4 +221,6 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) {
 func (app *Config) UnRegisterMatchClient(userID string) {
 	app.MatchClients.Delete(userID)
 	log.Printf("User %s unregister match server", userID)
+
+	// TODO: RedisClient에 존재할 경우 삭제해줘야한다.
 }
