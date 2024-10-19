@@ -23,5 +23,8 @@ func (app *Config) routes() http.Handler {
 	// 카카오 로그인 API 라우팅
 	mux.Post("/kakao", app.KakaoLoginHandler)
 
+	// 네이버 로그인 API 라우팅
+	mux.Post("/naver", app.NaverLoginHandler)
+
 	return mux
 }
