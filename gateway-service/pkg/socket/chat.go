@@ -44,7 +44,7 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
-	wg.Add(2) // 두 개의 고루틴 (listenChatEvent, pingPump)
+	wg.Add(1) // 두 개의 고루틴 (listenChatEvent, pingPump)
 
 	// 게임에 필요한 초기 정보 전달
 
@@ -54,11 +54,11 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		app.listenChatEvent(ctx, conn, userID)
 	}()
 
-	// Ping 메시지 전송 고루틴
-	go func() {
-		defer wg.Done()
-		app.pingPump(ctx, conn)
-	}()
+	// // Ping 메시지 전송 고루틴
+	// go func() {
+	// 	defer wg.Done()
+	// 	app.pingPump(ctx, conn)
+	// }()
 
 	// 모든 고루틴이 종료될 때까지 대기
 	wg.Wait()

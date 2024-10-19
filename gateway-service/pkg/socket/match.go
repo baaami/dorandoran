@@ -60,7 +60,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
-	wg.Add(2) // 두 개의 고루틴 (listenChatEvent, pingPump)
+	wg.Add(1) // 두 개의 고루틴 (listenChatEvent, pingPump)
 
 	// 메시지 처리 고루틴
 	go func() {
@@ -68,11 +68,11 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 		app.listenMatchEvent(ctx, conn)
 	}()
 
-	// Ping 메시지 전송 고루틴
-	go func() {
-		defer wg.Done()
-		app.pingPump(ctx, conn)
-	}()
+	// // Ping 메시지 전송 고루틴
+	// go func() {
+	// 	defer wg.Done()
+	// 	app.pingPump(ctx, conn)
+	// }()
 
 	// 모든 고루틴이 종료될 때까지 대기
 	wg.Wait()
