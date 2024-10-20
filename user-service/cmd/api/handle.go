@@ -188,3 +188,68 @@ func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
+
+// 자신의 매칭 필터 정보 조회
+func (app *Config) findMatchFilter(w http.ResponseWriter, r *http.Request) {
+	// URL에서 유저 ID 가져오기
+	userIDStr := r.Header.Get("X-User-ID")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+		return
+	}
+	// DB에서 매치 필터 정보 조회
+	matchFilter, err := app.Models.GetMatchFilterByUserID(userID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve matchFilter", http.StatusInternalServerError)
+		return
+	}
+	if matchFilter == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	log.Printf("[%d] Match Filter: %v", userID, *matchFilter)
+
+	// JSON으로 응답 반환
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(*matchFilter)
+}
+
+// 자신의 매칭 필터 업데이트
+func (app *Config) updateMatchFilter(w http.ResponseWriter, r *http.Request) {
+	// URL에서 유저 ID 가져오기
+	userIDStr := r.Header.Get("X-User-ID")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
+		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+		return
+	}
+
+	var updateMatchFilter data.MatchFilter
+
+	// 요청에서 매칭 필터 데이터를 읽음
+	err = json.NewDecoder(r.Body).Decode(&updateMatchFilter)
+	if err != nil {
+		log.Printf("Body: %v, err: %s", updateMatchFilter, err.Error())
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	updateMatchFilter.UserID = userID
+
+	// DB에서 매칭 필터 업데이트
+	matchFilter, err := app.Models.UpsertMatchFilter(updateMatchFilter)
+	if err != nil {
+		log.Printf("Failed to update match filter, filter: %v, err: %s", updateMatchFilter, err.Error())
+		http.Error(w, "Failed to update filter", http.StatusInternalServerError)
+		return
+	}
+
+	// 업데이트된 매칭 필터 정보 반환
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(matchFilter)
+}

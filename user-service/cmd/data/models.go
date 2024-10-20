@@ -23,6 +23,16 @@ type User struct {
 	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 }
 
+type MatchFilter struct {
+	UserID      int     `gorm:"primaryKey" json:"user_id"`
+	CoupleCount int     `json:"couple_count"`
+	AddressUse  bool    `json:"address_use"`
+	Address     Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	AgeRangeUse bool    `json:"age_range_use"`
+	AgeMin      int     `json:"age_min"`
+	AgeMax      int     `json:"age_max"`
+}
+
 // GORM 클라이언트 설정
 type UserService struct {
 	DB *gorm.DB
@@ -31,17 +41,19 @@ type UserService struct {
 // MySQL 데이터베이스 및 테이블 초기화 함수
 func (s *UserService) InitDB() error {
 	// 데이터베이스 자동 마이그레이션 (테이블 생성)
-	err := s.DB.AutoMigrate(&User{})
+	err := s.DB.AutoMigrate(&User{}, &MatchFilter{})
 	if err != nil {
+		log.Printf("Failed to migrate tables: %v", err)
 		return err
 	}
-	log.Println("Table `users` migrated or already exists.")
+	log.Println("Tables `users` and `matchfilters` migrated or already exist.")
 	return nil
 }
 
 // 유저 생성 (삽입)
 func (s *UserService) InsertUser(user User) (int64, error) {
 	if err := s.DB.Create(&user).Error; err != nil {
+		log.Printf("Failed to insert user: %v", err)
 		return 0, err
 	}
 	return int64(user.ID), nil
@@ -52,6 +64,7 @@ func (s *UserService) GetUserByID(id int) (*User, error) {
 	var user User
 	err := s.DB.First(&user, id).Error
 	if err != nil {
+		log.Printf("Failed to get user by ID %d: %v", id, err)
 		return nil, err
 	}
 	return &user, nil
@@ -67,6 +80,7 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 			return nil, nil
 		}
 		// 다른 에러가 있는 경우 에러 반환
+		log.Printf("Failed to get user by SNS type %d and SNS ID %d: %v", snsType, snsID, err)
 		return nil, err
 	}
 	return &user, nil
@@ -75,6 +89,7 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 // 유저 업데이트
 func (s *UserService) UpdateUser(user User) error {
 	if err := s.DB.Model(&User{ID: user.ID}).Updates(user).Error; err != nil {
+		log.Printf("Failed to update user ID %d: %v", user.ID, err)
 		return err
 	}
 	return nil
@@ -83,7 +98,33 @@ func (s *UserService) UpdateUser(user User) error {
 // 유저 삭제
 func (s *UserService) DeleteUser(id int) error {
 	if err := s.DB.Delete(&User{}, id).Error; err != nil {
+		log.Printf("Failed to delete user ID %d: %v", id, err)
 		return err
 	}
 	return nil
+}
+
+// 매칭 필터 삽입 또는 업데이트
+func (s *UserService) UpsertMatchFilter(filter MatchFilter) (MatchFilter, error) {
+	if err := s.DB.Save(&filter).Error; err != nil {
+		log.Printf("Failed to upsert match filter for user ID %d: %v", filter.UserID, err)
+		return MatchFilter{}, err
+	}
+	return filter, nil
+}
+
+// 매칭 필터 조회
+func (s *UserService) GetMatchFilterByUserID(userID int) (*MatchFilter, error) {
+	var filter MatchFilter
+	err := s.DB.First(&filter, "user_id = ?", userID).Error
+	if err != nil {
+		// record not found인 경우 filter와 error 모두 nil 반환
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		// 다른 에러가 있는 경우 에러 반환
+		log.Printf("Failed to get match filter for user ID %d: %v", userID, err)
+		return nil, err
+	}
+	return &filter, nil
 }

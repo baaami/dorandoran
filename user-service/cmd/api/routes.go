@@ -14,7 +14,7 @@ func (app *Config) routes() http.Handler {
 	// CORS 설정
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
@@ -23,12 +23,16 @@ func (app *Config) routes() http.Handler {
 
 	mux.Use(LogRequestURL)
 
-	// 유저 서비스 관련 라우팅
+	// 회원 정보
 	mux.Get("/find/{id}", app.findUser)
 	mux.Get("/exist", app.checkUserExistence)
 	mux.Post("/register", app.registerUser)
-	mux.Put("/update", app.updateUser)
+	mux.Patch("/update", app.updateUser)
 	mux.Delete("/delete", app.deleteUser)
+
+	// 매칭 필터
+	mux.Get("/match/filter", app.findMatchFilter)
+	mux.Patch("/match/filter", app.updateMatchFilter)
 
 	return mux
 }
