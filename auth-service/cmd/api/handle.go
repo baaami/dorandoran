@@ -122,7 +122,7 @@ func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil || resp.StatusCode != http.StatusOK {
 		log.Printf("Invalid Kakao token, statuscode: %d, err: %s", resp.StatusCode, err.Error())
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func GetNaverUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
+	if err != nil || resp.StatusCode != http.StatusOK {
 		log.Printf("Invalid Naver token, status code: %d, err: %v", resp.StatusCode, err)
 		return nil, err
 	}
