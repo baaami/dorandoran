@@ -36,15 +36,20 @@ type Chat struct {
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
+type Address struct {
+	City     string `gorm:"size:100" json:"city"`
+	District string `gorm:"size:100" json:"district"`
+	Street   string `gorm:"size:100" json:"street"`
+}
+
 type User struct {
-	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType  int    `gorm:"index" json:"sns_type"`
-	SnsID    int64  `gorm:"index" json:"sns_id"`
-	Name     string `gorm:"size:100" json:"name"`
-	Nickname string `gorm:"size:100" json:"nickname"`
-	Gender   int    `json:"gender"`
-	Age      int    `json:"age"`
-	Email    string `gorm:"size:100" json:"email"`
+	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType int     `gorm:"index" json:"sns_type"`
+	SnsID   int64   `gorm:"index" json:"sns_id"`
+	Name    string  `gorm:"size:100" json:"name"`
+	Gender  int     `json:"gender"`
+	Birth   string  `gorm:"size:20" json:"birth"`
+	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 }
 
 // 로그인 API를 호출하여 세션 ID와 유저 ID를 발급받는 함수

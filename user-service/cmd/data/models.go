@@ -1,20 +1,26 @@
 package data
 
 import (
+	"errors"
 	"log"
 
 	"gorm.io/gorm"
 )
 
+type Address struct {
+	City     string `gorm:"size:100" json:"city"`
+	District string `gorm:"size:100" json:"district"`
+	Street   string `gorm:"size:100" json:"street"`
+}
+
 type User struct {
-	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType  int    `gorm:"index" json:"sns_type"`
-	SnsID    int64  `gorm:"index" json:"sns_id"`
-	Name     string `gorm:"size:100" json:"name"`
-	Nickname string `gorm:"size:100" json:"nickname"`
-	Gender   int    `json:"gender"`
-	Age      int    `json:"age"`
-	Email    string `gorm:"size:100" json:"email"`
+	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType int     `gorm:"index" json:"sns_type"`
+	SnsID   int64   `gorm:"index" json:"sns_id"`
+	Name    string  `gorm:"size:100" json:"name"`
+	Gender  int     `json:"gender"`
+	Birth   string  `gorm:"size:20" json:"birth"`
+	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 }
 
 // GORM 클라이언트 설정
@@ -34,21 +40,10 @@ func (s *UserService) InitDB() error {
 }
 
 // 유저 생성 (삽입)
-func (s *UserService) InsertUser(name, nickname string, snsID int64, gender, age, snsType int, email string) (int64, error) {
-	user := User{
-		Name:     name,
-		Nickname: nickname,
-		SnsID:    snsID,
-		Gender:   gender,
-		Age:      age,
-		SnsType:  snsType,
-		Email:    email,
-	}
+func (s *UserService) InsertUser(user User) (int64, error) {
 	if err := s.DB.Create(&user).Error; err != nil {
 		return 0, err
 	}
-
-	log.Printf("[DB] isnert user: %v", user)
 	return int64(user.ID), nil
 }
 
@@ -68,7 +63,7 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 	err := s.DB.Where("sns_type = ? AND sns_id = ?", snsType, snsID).First(&user).Error
 	if err != nil {
 		// record not found인 경우 user와 error 모두 nil 반환
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		// 다른 에러가 있는 경우 에러 반환
@@ -78,19 +73,8 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 }
 
 // 유저 업데이트
-func (s *UserService) UpdateUser(id int, name, nickname, email string, gender, age int) error {
-	user := User{
-		ID: id,
-	}
-
-	updateUser := User{
-		Name:     name,
-		Nickname: nickname,
-		Gender:   gender,
-		Age:      age,
-		Email:    email,
-	}
-	if err := s.DB.Model(&user).Updates(updateUser).Error; err != nil {
+func (s *UserService) UpdateUser(user User) error {
+	if err := s.DB.Model(&User{ID: user.ID}).Updates(user).Error; err != nil {
 		return err
 	}
 	return nil

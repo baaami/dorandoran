@@ -6,18 +6,9 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-)
 
-type User struct {
-	ID       int    `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType  int    `gorm:"index" json:"sns_type"`
-	SnsID    int64  `gorm:"index" json:"sns_id"`
-	Name     string `gorm:"size:100" json:"name"`
-	Nickname string `gorm:"size:100" json:"nickname"`
-	Gender   int    `json:"gender"`
-	Age      int    `json:"age"`
-	Email    string `gorm:"size:100" json:"email"`
-}
+	"github.com/baaami/dorandoran/user/cmd/data"
+)
 
 // 유저 정보 조회
 func (app *Config) findUser(w http.ResponseWriter, r *http.Request) {
@@ -103,28 +94,20 @@ func (app *Config) checkUserExistence(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 삽입
 func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
-	var newUser User
+	var newUser data.User
 
-	// 요청에서 sns_type과 sns_id만 읽음
+	// 요청에서 유저 데이터를 읽음
 	err := json.NewDecoder(r.Body).Decode(&newUser)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	// 나머지 필드들을 기본값으로 초기화
-	newUser.Name = ""     // 빈 문자열로 초기화
-	newUser.Nickname = "" // 빈 문자열로 초기화
-	newUser.Gender = 0    // 0으로 초기화
-	newUser.Age = 0       // 0으로 초기화
-	newUser.Email = ""    // 빈 문자열로 초기화
-
 	// 유저 정보 로그 출력
-	log.Printf("Registering user with the following details: sns_type=%d, sns_id=%d, name=%s, nickname=%s, gender=%d, age=%d, email=%s",
-		newUser.SnsType, newUser.SnsID, newUser.Name, newUser.Nickname, newUser.Gender, newUser.Age, newUser.Email)
+	log.Printf("Registering user with the following details: %v", newUser)
 
 	// DB에 유저 삽입
-	insertedID, err := app.Models.InsertUser(newUser.Name, newUser.Nickname, newUser.SnsID, newUser.Gender, newUser.Age, newUser.SnsType, newUser.Email)
+	insertedID, err := app.Models.InsertUser(newUser)
 	if err != nil {
 		http.Error(w, "Failed to insert user", http.StatusInternalServerError)
 		return
@@ -147,7 +130,7 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var updatedUser User
+	var updatedUser data.User
 
 	// 요청에서 유저 데이터를 읽음
 	err = json.NewDecoder(r.Body).Decode(&updatedUser)
@@ -160,7 +143,7 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 	updatedUser.ID = userID
 
 	// DB에서 유저 정보 업데이트
-	err = app.Models.UpdateUser(updatedUser.ID, updatedUser.Name, updatedUser.Nickname, updatedUser.Email, updatedUser.Gender, updatedUser.Age)
+	err = app.Models.UpdateUser(updatedUser)
 	if err != nil {
 		log.Printf("Failed to update user, user: %v, err: %s", updatedUser, err.Error())
 		http.Error(w, "Failed to update user", http.StatusInternalServerError)
