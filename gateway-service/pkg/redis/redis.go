@@ -41,23 +41,24 @@ func NewRedisClient() (*RedisClient, error) {
 	return &RedisClient{Client: client}, nil
 }
 
-// AddUserToQueue: 대기열에 유저 추가
+// AddUserToQueue: 대기열에 유저 추가 (coupleCnt에 따른 queue 분리)
 func (r *RedisClient) AddUserToQueue(userID string, coupleCnt int) error {
-	// TODO: 1:1 ~ 4:4 대기열 큐를 각기 다르게 생성해야함
-	err := r.Client.LPush(ctx, "waiting_queue", userID).Err()
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름 생성
+	err := r.Client.LPush(ctx, queueName, userID).Err()
 	if err != nil {
 		log.Printf("Failed to add user to queue: %v", err)
 		return err
 	}
-	log.Printf("User %s added to Redis matching queue", userID)
+	log.Printf("User %s added to Redis matching queue %s", userID, queueName)
 	return nil
 }
 
-// TODO: 존재하는 모든 대기열에 대해서 모니터링 해야함
-func (r *RedisClient) PopNUsersFromQueue(n int) ([]string, error) {
+// PopNUsersFromQueue: 특정 대기열에서 n명의 유저를 pop
+func (r *RedisClient) PopNUsersFromQueue(coupleCnt, n int) ([]string, error) {
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름
 	var users []string
 	for i := 0; i < n; i++ {
-		user, err := r.Client.RPop(ctx, "waiting_queue").Result()
+		user, err := r.Client.RPop(ctx, queueName).Result()
 		if err == redis.Nil {
 			break
 		} else if err != nil {
@@ -66,10 +67,10 @@ func (r *RedisClient) PopNUsersFromQueue(n int) ([]string, error) {
 		users = append(users, user)
 	}
 
+	// 매칭 인원이 부족하면 pop된 유저들을 다시 대기열에 삽입
 	if len(users) < n {
-		// Pop된 유저가 부족하면 다시 대기열에 삽입
 		for _, user := range users {
-			err := r.Client.RPush(ctx, "waiting_queue", user).Err()
+			err := r.Client.RPush(ctx, queueName, user).Err()
 			if err != nil {
 				return nil, err
 			}

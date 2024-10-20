@@ -15,6 +15,7 @@ import (
 )
 
 const webPort = 80
+const coupleMaxCount = 4
 
 type Config struct{}
 
@@ -51,7 +52,9 @@ func main() {
 	}
 
 	// Redis 대기열 모니터링 고루틴 실행
-	go wsConfig.MonitorQueue()
+	for copuleCnt := 1; copuleCnt <= coupleMaxCount; copuleCnt++ {
+		go wsConfig.MonitorQueue(copuleCnt)
+	}
 
 	log.Info().Msgf("Starting Gateway service on port %d", webPort)
 	srv := &http.Server{

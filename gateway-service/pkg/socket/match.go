@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/baaami/dorandoran/broker/pkg/types"
 	common "github.com/baaami/dorandoran/common/chat"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -56,7 +58,10 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 	}()
 
-	app.RegisterMatchClient(conn, userID)
+	err = app.RegisterMatchClient(conn, userID)
+	if err != nil {
+		log.Printf("Failed to register match queue, err: %s", err.Error())
+	}
 
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
@@ -98,22 +103,21 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
-// Redis 대기열을 계속 확인하고 매칭 시도
-func (app *Config) MonitorQueue() {
-	const MatchTotalNum = 2
+// MonitorQueue: Redis 대기열을 계속 확인하고 매칭 시도
+func (app *Config) MonitorQueue(coupleCnt int) {
+	matchTotalNum := coupleCnt * 2 // 남녀 비율을 고려한 총 매칭 인원수
 
-	// TODO: 존재하는 모든 대기열에 대해서 모니터링 해야함
-	// -> 현재는 1:1 매칭으로 1개의 큐로 관리
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름
 	for {
-		matchList, err := app.RedisClient.PopNUsersFromQueue(MatchTotalNum)
+		matchList, err := app.RedisClient.PopNUsersFromQueue(coupleCnt, matchTotalNum)
 		if err != nil {
-			log.Printf("Error in matching: %v", err)
+			log.Printf("Error in matching from queue %s: %v", queueName, err)
 			continue
 		}
 
-		if len(matchList) == MatchTotalNum {
+		if len(matchList) == matchTotalNum {
 			roomID := uuid.New().String()
-			log.Printf("Matched %v in room %s", matchList, roomID)
+			log.Printf("Matched %v in room %s from queue %s", matchList, roomID, queueName)
 
 			err = app.createRoom(roomID, matchList)
 			if err != nil {
@@ -208,13 +212,22 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 }
 
 // Register 메시지 처리
-func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) {
-	// 존재하는 사람의 경우 pass
+func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) error {
+	// TODO: 존재하는 사람의 경우 pass, 중복 처리 필요
 	app.MatchClients.Store(userID, conn)
 	log.Printf("User %s register match server", userID)
 
-	app.RedisClient.AddUserToQueue(userID, 1)
+	matchFilter, err := GetMatchFilter(userID)
+	if err != nil {
+		log.Printf("Failed to get matchfilter, user: %s", userID)
+		return err
+	}
+
+	// matchFilter에 따른 처리가 필요함
+	app.RedisClient.AddUserToQueue(userID, matchFilter.CoupleCount)
 	log.Printf("User %s added to waiting queue", userID)
+
+	return nil
 }
 
 // UnRegister 메시지 처리
@@ -223,4 +236,42 @@ func (app *Config) UnRegisterMatchClient(userID string) {
 	log.Printf("User %s unregister match server", userID)
 
 	// TODO: RedisClient에 존재할 경우 삭제해줘야한다.
+}
+
+func GetMatchFilter(userID string) (*types.MatchFilter, error) {
+	var matchFilter types.MatchFilter
+
+	// Matching 필터 획득
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, "http://user-service/match/filter", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 사용자 ID를 요청의 헤더에 추가
+	req.Header.Set("X-User-ID", userID)
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &matchFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &matchFilter, nil
 }
