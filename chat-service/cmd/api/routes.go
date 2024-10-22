@@ -21,7 +21,7 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	// 채팅방
-	mux.Get("/room/list/{user_id}", app.getChatRoomsByUserID)
+	mux.Get("/room/list", app.getChatRoomList)
 	mux.Get("/room/{id}", app.getChatRoomByID)
 
 	mux.Post("/room/create", app.createChatRoom)

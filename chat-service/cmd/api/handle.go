@@ -43,8 +43,13 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 // 특정 유저의 채팅방 목록 조회
-func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) {
-	userID := chi.URLParam(r, "user_id")
+func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
+	// 사용자 ID를 가져옵니다. (예: 헤더에서 "X-User-ID"로 전달된다고 가정)
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		return
+	}
 
 	// MongoDB에서 특정 유저가 참여한 채팅방 목록 조회
 	rooms, err := app.Models.ChatRoom.GetRoomsByUserID(userID)
@@ -53,8 +58,38 @@ func (app *Config) getChatRoomsByUserID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// ChatRoomLatestResponse 배열을 생성
+	var response []data.ChatRoomLatestResponse
+	for _, room := range rooms {
+
+		// TODO: 채팅방 내 최신 id 획득
+		// 각 채팅방에 대한 마지막 메시지 처리 (임시 데이터로 가정)
+		// 실제로는 roomID를 사용하여 MongoDB에서 마지막 메시지를 조회해야 함
+		lastMessage := data.LastMessage{
+			SenderID:  "temp_sender_id", // 임시 데이터
+			Message:   "temp_message",   // 임시 데이터
+			CreatedAt: time.Now(),       // 임시 데이터
+		}
+
+		// 유저의 마지막 읽은 시간 가져오기
+		lastReadTime := room.UserLastRead[userID]
+
+		// ChatRoomLatestResponse 생성
+		chatRoomResponse := data.ChatRoomLatestResponse{
+			ID:          room.ID,
+			RoomName:    "Room Name", // 필요 시 채팅방 이름 필드 추가 가능
+			LastMessage: lastMessage,
+			LastRead:    lastReadTime,
+			CreatedAt:   room.CreatedAt.Format(time.RFC3339),
+			ModifiedAt:  room.ModifiedAt.Format(time.RFC3339),
+		}
+
+		// 배열에 추가
+		response = append(response, chatRoomResponse)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rooms)
+	json.NewEncoder(w).Encode(response)
 }
 
 // Room ID로 채팅방 상세 정보 조회
@@ -73,7 +108,7 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: chatRoom 내 유저 정보를 상세 정보로 포함하여 Response
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(room)
 }
