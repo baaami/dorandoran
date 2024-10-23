@@ -81,6 +81,46 @@ func (r *RedisClient) PopNUsersFromQueue(coupleCnt, n int) ([]string, error) {
 	return users, nil
 }
 
+// 특정 대기열에서 주어진 userID를 pop
+func (r *RedisClient) PopUserFromQueue(userID string) (bool, error) {
+	// TODO: 모든 매칭 큐를 순회하도록 만들어야함
+	coupleCnt := 1
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름
+	var popped bool
+
+	// Redis 리스트의 길이를 먼저 구하고 대기열을 순회하면서 특정 userID를 pop
+	queueLength, err := r.Client.LLen(ctx, queueName).Result()
+	if err != nil {
+		return false, err
+	}
+
+	for i := 0; i < int(queueLength); i++ {
+		user, err := r.Client.LIndex(ctx, queueName, int64(i)).Result()
+		if err == redis.Nil {
+			break
+		} else if err != nil {
+			return false, err
+		}
+
+		if user == userID {
+			// 특정 userID를 pop하기 위해 Redis 리스트에서 해당 인덱스의 값을 삭제
+			_, err = r.Client.LRem(ctx, queueName, 1, userID).Result()
+			if err != nil {
+				return false, err
+			}
+			log.Printf("User %s removed from Redis matching queue %s", userID, queueName)
+			popped = true
+			break
+		}
+	}
+
+	if !popped {
+		log.Printf("User %s not found in Redis matching queue %s", userID, queueName)
+	}
+
+	return popped, nil
+}
+
 // GetSession: Redis에서 세션 조회
 func (r *RedisClient) GetUserBySessionID(sessionID string) (int, error) {
 	sUserID, err := r.Client.Get(ctx, sessionID).Result()

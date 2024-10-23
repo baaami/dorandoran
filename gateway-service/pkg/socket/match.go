@@ -213,6 +213,12 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 
 // Register 메시지 처리
 func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) error {
+	_, ok := app.MatchClients.Load(userID)
+	if ok {
+		log.Printf("User %s already registered match server", userID)
+		return fmt.Errorf("user %s already registered match server", userID)
+	}
+
 	// TODO: 존재하는 사람의 경우 pass, 중복 처리 필요
 	app.MatchClients.Store(userID, conn)
 	log.Printf("User %s register match server", userID)
@@ -233,9 +239,12 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) erro
 // UnRegister 메시지 처리
 func (app *Config) UnRegisterMatchClient(userID string) {
 	app.MatchClients.Delete(userID)
-	log.Printf("User %s unregister match server", userID)
 
-	// TODO: RedisClient에 존재할 경우 삭제해줘야한다.
+	_, err := app.RedisClient.PopUserFromQueue(userID)
+	if err != nil {
+		log.Printf("fail pop %s user from redis queue", userID)
+	}
+	log.Printf("User %s unregister match server", userID)
 }
 
 func GetMatchFilter(userID string) (*types.MatchFilter, error) {
