@@ -24,7 +24,8 @@ func (app *Config) routes() http.Handler {
 	mux.Use(LogRequestURL)
 
 	// 회원 정보
-	mux.Get("/find/{id}", app.findUser)
+	mux.Get("/find/list", app.findUserList)
+	mux.Get("/find", app.findUser)
 	mux.Get("/exist", app.checkUserExistence)
 	mux.Post("/register", app.registerUser)
 	mux.Patch("/update", app.updateUser)

@@ -70,6 +70,17 @@ func (s *UserService) GetUserByID(id int) (*User, error) {
 	return &user, nil
 }
 
+// 유저 리스트 조회
+func (s *UserService) GetUserList() (*[]User, error) {
+	var users []User
+	err := s.DB.Find(&users).Error
+	if err != nil {
+		log.Printf("Failed to get user list: %v", err)
+		return nil, err
+	}
+	return &users, nil
+}
+
 // 유저 조회 (sns_type과 sns_id를 기반으로 조회)
 func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 	var user User

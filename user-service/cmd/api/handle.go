@@ -10,6 +10,26 @@ import (
 	"github.com/baaami/dorandoran/user/cmd/data"
 )
 
+// [TEST 전용] 존재하는 유저 리스트 획득
+func (app *Config) findUserList(w http.ResponseWriter, r *http.Request) {
+	// DB에서 유저 리스트 조회
+	userList, err := app.Models.GetUserList()
+	if err != nil {
+		http.Error(w, "Failed to retrieve userList", http.StatusInternalServerError)
+		return
+	}
+	if userList == nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	log.Printf("Select User: %v", *userList)
+
+	// JSON으로 응답 반환
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(*userList)
+}
+
 // 유저 정보 조회
 func (app *Config) findUser(w http.ResponseWriter, r *http.Request) {
 	// URL에서 유저 ID 가져오기
@@ -113,6 +133,25 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defaultFilter := data.MatchFilter{
+		UserID:      int(insertedID),
+		CoupleCount: 4,
+		AddressUse:  false,
+		Address: data.Address{
+			City:     "",
+			District: "",
+			Street:   "",
+		},
+		AgeRangeUse: false,
+		AgeMin:      0,
+		AgeMax:      999,
+	}
+	_, err = app.Models.UpsertMatchFilter(defaultFilter)
+	if err != nil {
+		http.Error(w, "Failed to update match filter", http.StatusInternalServerError)
+		return
+	}
+
 	newUser.ID = int(insertedID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -206,7 +245,7 @@ func (app *Config) findMatchFilter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if matchFilter == nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		http.Error(w, "Match filter not found", http.StatusNotFound)
 		return
 	}
 
