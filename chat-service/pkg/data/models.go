@@ -265,3 +265,34 @@ func (c *ChatRoom) GetRoomsByUserID(userID string) ([]ChatRoom, error) {
 
 	return rooms, nil
 }
+
+// 마지막 채팅 데이터 조회
+func (c *Chat) GetLastMessageByRoomID(roomID string) (*Chat, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	opts := options.Find()
+	opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
+	opts.SetLimit(1) // 페이지당 메시지 수 제한
+
+	cursor, err := collection.Find(context.TODO(), bson.M{"room_id": roomID}, opts)
+	if err != nil {
+		log.Println("Finding chat messages error:", err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var messages Chat
+
+	for cursor.Next(ctx) {
+		err := cursor.Decode(&messages)
+		if err != nil {
+			log.Print("Error decoding chat message:", err)
+			return nil, err
+		}
+	}
+
+	return &messages, nil
+}

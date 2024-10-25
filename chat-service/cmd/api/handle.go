@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -62,13 +63,16 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	var response []data.ChatRoomLatestResponse
 	for _, room := range rooms {
 
-		// TODO: 채팅방 내 최신 id 획득
-		// 각 채팅방에 대한 마지막 메시지 처리 (임시 데이터로 가정)
-		// 실제로는 roomID를 사용하여 MongoDB에서 마지막 메시지를 조회해야 함
+		findLastMessage, err := app.Models.Chat.GetLastMessageByRoomID(room.ID)
+		if err != nil {
+			fmt.Printf("GetLastMessageByRoomID fail(), err: %s", err.Error())
+			continue
+		}
+
 		lastMessage := data.LastMessage{
-			SenderID:  "temp_sender_id", // 임시 데이터
-			Message:   "temp_message",   // 임시 데이터
-			CreatedAt: time.Now(),       // 임시 데이터
+			SenderID:  findLastMessage.SenderID,
+			Message:   findLastMessage.Message,
+			CreatedAt: findLastMessage.CreatedAt,
 		}
 
 		// 유저의 마지막 읽은 시간 가져오기
@@ -77,7 +81,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 		// ChatRoomLatestResponse 생성
 		chatRoomResponse := data.ChatRoomLatestResponse{
 			ID:          room.ID,
-			RoomName:    "Room Name", // 필요 시 채팅방 이름 필드 추가 가능
+			RoomName:    "나는솔로 게임방", // 필요 시 채팅방 이름 필드 추가 가능
 			LastMessage: lastMessage,
 			LastRead:    lastReadTime,
 			CreatedAt:   room.CreatedAt.Format(time.RFC3339),
@@ -90,6 +94,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(http.StatusOK)
 }
 
 // Room ID로 채팅방 상세 정보 조회
