@@ -41,9 +41,8 @@ func NewRedisClient() (*RedisClient, error) {
 	return &RedisClient{Client: client}, nil
 }
 
-// AddUserToQueue: 대기열에 유저 추가 (coupleCnt에 따른 queue 분리)
-func (r *RedisClient) AddUserToQueue(userID string, coupleCnt int) error {
-	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름 생성
+// AddUserToQueue: 성별 및 coupleCnt에 따른 대기열에 유저 추가
+func (r *RedisClient) AddUserToQueue(queueName, userID string) error {
 	err := r.Client.LPush(ctx, queueName, userID).Err()
 	if err != nil {
 		log.Printf("Failed to add user to queue: %v", err)
@@ -53,23 +52,22 @@ func (r *RedisClient) AddUserToQueue(userID string, coupleCnt int) error {
 	return nil
 }
 
-// PopNUsersFromQueue: 특정 대기열에서 n명의 유저를 pop
-func (r *RedisClient) PopNUsersFromQueue(coupleCnt, n int) ([]string, error) {
-	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름
-	var users []string
-	for i := 0; i < n; i++ {
+// PopNUsersFromQueue: 특정 대기열에서 matchNum 명의 유저를 pop
+func (r *RedisClient) PopNUsersFromQueue(queueName string, matchNum int) ([]string, error) {
+	var userIDList []string
+	for i := 0; i < matchNum; i++ {
 		user, err := r.Client.RPop(ctx, queueName).Result()
 		if err == redis.Nil {
 			break
 		} else if err != nil {
 			return nil, err
 		}
-		users = append(users, user)
+		userIDList = append(userIDList, user)
 	}
 
 	// 매칭 인원이 부족하면 pop된 유저들을 다시 대기열에 삽입
-	if len(users) < n {
-		for _, user := range users {
+	if len(userIDList) < matchNum {
+		for _, user := range userIDList {
 			err := r.Client.RPush(ctx, queueName, user).Err()
 			if err != nil {
 				return nil, err
@@ -78,14 +76,12 @@ func (r *RedisClient) PopNUsersFromQueue(coupleCnt, n int) ([]string, error) {
 		return []string{}, nil
 	}
 
-	return users, nil
+	return userIDList, nil
 }
 
-// 특정 대기열에서 주어진 userID를 pop
-func (r *RedisClient) PopUserFromQueue(userID string) (bool, error) {
-	// TODO: 모든 매칭 큐를 순회하도록 만들어야함
-	coupleCnt := 1
-	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름
+// 특정 대기열에서 주어진 userID를 pop (매칭 중에 매칭을 종료할 경우 사용)
+func (r *RedisClient) PopUserFromQueue(userID string, gender, coupleCnt int) (bool, error) {
+	queueName := fmt.Sprintf("matching_queue_%d_%d", gender, coupleCnt) // coupleCnt에 따른 대기열 이름
 	var popped bool
 
 	// Redis 리스트의 길이를 먼저 구하고 대기열을 순회하면서 특정 userID를 pop

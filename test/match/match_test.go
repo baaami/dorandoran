@@ -111,6 +111,43 @@ func loginAndGetSessionIDAndUserID(accessToken string) (string, string, error) {
 	return sessionID, userID, nil
 }
 
+func updateProfile(t *testing.T, sessionID string, userID string, gender int) error {
+	// Matching 필터 획득
+	client := http.Client{}
+
+	updatedUser := User{
+		Gender: gender,
+	}
+
+	reqBody, err := json.Marshal(updatedUser)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, API_GATEWAY_URL+"/user/update", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return err
+	}
+
+	header := http.Header{}
+
+	header.Set("Content-Type", "application/json")
+	header.Add("Cookie", "session_id="+sessionID)
+	req.Header = header
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request to user-service: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to create user, status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // WebSocket 서버에 접속하는 함수
 func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket.Conn, error) {
 	header := http.Header{}
@@ -154,14 +191,24 @@ func TestMatchWebSocketAPI(t *testing.T) {
 		userIDs[i] = userID
 	}
 
-	// 2. 8명의 참가자가 WebSocket으로 접속
+	// 2. 8명의 참가자가 사용자 프로필 정보 입력
+	for i := 0; i < participantCount; i++ {
+		// 남성, 여성을 반반으로 변경
+		err := updateProfile(t, sessionIDs[i], userIDs[i], i%2)
+		if err != nil {
+			fmt.Printf("Fail to updateProfile, user: %s, err: %s\n", userIDs[i], err)
+			continue
+		}
+	}
+
+	// 3. 8명의 참가자가 WebSocket으로 접속
 	for i := 0; i < participantCount; i++ {
 		conn, err := connectWebSocket(t, sessionIDs[i], userIDs[i])
 		assert.NoError(t, err)
 		conns[i] = conn
 	}
 
-	// 3. 각 클라이언트가 매칭 요청을 보내고 비동기적으로 응답 대기
+	// 4. 각 클라이언트가 매칭 요청을 보내고 비동기적으로 응답 대기
 	for i := 0; i < participantCount; i++ {
 		go func(i int) {
 			// 매칭 요청 보내기
@@ -175,7 +222,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 		}(i)
 	}
 
-	// 4. 응답을 수신
+	// 5. 응답을 수신
 	matchResponses := make([]WebSocketMessage, participantCount)
 	for i := 0; i < participantCount; i++ {
 		matchResponses[i] = <-responseChan

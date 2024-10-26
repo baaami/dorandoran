@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,16 +25,12 @@ func SessionMiddleware(redisClient *redis.RedisClient) func(http.Handler) http.H
 			}
 			sessionID := cookie.Value
 
-			log.Printf("sessionID: %s", sessionID)
-
 			// Redis에서 세션 ID로 사용자 정보 조회
 			userID, err := redisClient.GetUserBySessionID(sessionID)
 			if err != nil {
 				http.Error(w, "Unauthorized: Invalid session ID", http.StatusUnauthorized)
 				return
 			}
-
-			log.Printf("User[%d]'s Request!!!", userID)
 
 			// 사용자 ID를 요청의 헤더에 추가
 			r.Header.Set("X-User-ID", strconv.Itoa(userID))

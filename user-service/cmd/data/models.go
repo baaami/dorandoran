@@ -99,6 +99,7 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 
 // 유저 업데이트
 func (s *UserService) UpdateUser(user User) error {
+	// 값이 설정된 필드만 업데이트되며, 0, nil, "" 등의 zero value 필드는 기존 데이터베이스의 값이 유지
 	if err := s.DB.Model(&User{ID: user.ID}).Updates(user).Error; err != nil {
 		log.Printf("Failed to update user ID %d: %v", user.ID, err)
 		return err

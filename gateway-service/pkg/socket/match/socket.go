@@ -86,3 +86,7 @@ type Config struct {
 	MatchClients sync.Map // key: userID, value: *websocket.Conn
 	RedisClient  *redis.RedisClient
 }
+
+type MatchResponse struct {
+	RoomID string `json:"room_id"`
+}

@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/broker/pkg/types"
-	common "github.com/baaami/dorandoran/common/chat"
+	common "github.com/baaami/dorandoran/common/user"
+
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/samber/lo"
 )
 
 // WebSocket 연결 처리
@@ -107,24 +109,34 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn) {
 func (app *Config) MonitorQueue(coupleCnt int) {
 	matchTotalNum := coupleCnt * 2 // 남녀 비율을 고려한 총 매칭 인원수
 
-	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt) // coupleCnt에 따른 대기열 이름
 	for {
-		matchList, err := app.RedisClient.PopNUsersFromQueue(coupleCnt, matchTotalNum)
+		maleQueueName := fmt.Sprintf("matching_queue_0_%d", coupleCnt)
+		femaleQueueName := fmt.Sprintf("matching_queue_1_%d", coupleCnt)
+
+		maleMatchIDList, err := app.RedisClient.PopNUsersFromQueue(maleQueueName, coupleCnt)
 		if err != nil {
-			log.Printf("Error in matching from queue %s: %v", queueName, err)
+			log.Printf("Error in matching from queue %s: %v", maleQueueName, err)
 			continue
 		}
 
-		if len(matchList) == matchTotalNum {
-			roomID := uuid.New().String()
-			log.Printf("Matched %v in room %s from queue %s", matchList, roomID, queueName)
+		femaleMatchIDList, err := app.RedisClient.PopNUsersFromQueue(femaleQueueName, coupleCnt)
+		if err != nil {
+			log.Printf("Error in matching from queue %s: %v", femaleQueueName, err)
+			continue
+		}
 
-			err = app.createRoom(roomID, matchList)
+		matchIDList := lo.Union(maleMatchIDList, femaleMatchIDList)
+
+		if len(matchIDList) == matchTotalNum {
+			roomID := uuid.New().String()
+			log.Printf("Matched room %s")
+
+			err = app.createRoom(roomID, matchIDList)
 			if err != nil {
 				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
 			}
 
-			app.notifyUsers(matchList, roomID)
+			app.notifyUsers(matchIDList, roomID)
 		}
 
 		time.Sleep(2 * time.Second)
@@ -132,7 +144,7 @@ func (app *Config) MonitorQueue(coupleCnt int) {
 }
 
 func (app *Config) notifyUsers(matchList []string, roomID string) {
-	matchMsg := common.MatchResponse{
+	matchMsg := MatchResponse{
 		RoomID: roomID,
 	}
 
@@ -229,8 +241,17 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) erro
 		return err
 	}
 
+	user, err := GetUserInfo(userID)
+	if err != nil {
+		log.Printf("Failed to get GetUserInfo, user: %s", userID)
+		return err
+	}
+
 	// matchFilter에 따른 처리가 필요함
-	app.RedisClient.AddUserToQueue(userID, matchFilter.CoupleCount)
+	queueName := fmt.Sprintf("matching_queue_%d_%d", user.Gender, matchFilter.CoupleCount)
+
+	// matchFilter에 따른 처리가 필요함
+	app.RedisClient.AddUserToQueue(queueName, userID)
 	log.Printf("User %s added to waiting queue", userID)
 
 	return nil
@@ -240,13 +261,26 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) erro
 func (app *Config) UnRegisterMatchClient(userID string) {
 	app.MatchClients.Delete(userID)
 
-	_, err := app.RedisClient.PopUserFromQueue(userID)
+	matchFilter, err := GetMatchFilter(userID)
+	if err != nil {
+		log.Printf("Failed to get matchfilter, user: %s", userID)
+		return
+	}
+
+	user, err := GetUserInfo(userID)
+	if err != nil {
+		log.Printf("Failed to get GetUserInfo, user: %s", userID)
+		return
+	}
+
+	_, err = app.RedisClient.PopUserFromQueue(userID, user.Gender, matchFilter.CoupleCount)
 	if err != nil {
 		log.Printf("fail pop %s user from redis queue", userID)
 	}
 	log.Printf("User %s unregister match server", userID)
 }
 
+// [Hub Network]
 func GetMatchFilter(userID string) (*types.MatchFilter, error) {
 	var matchFilter types.MatchFilter
 
@@ -283,4 +317,43 @@ func GetMatchFilter(userID string) (*types.MatchFilter, error) {
 	}
 
 	return &matchFilter, nil
+}
+
+// [Hub Network]
+func GetUserInfo(userID string) (*common.User, error) {
+	var user common.User
+
+	// Matching 필터 획득
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, "http://user-service/find", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 사용자 ID를 요청의 헤더에 추가
+	req.Header.Set("X-User-ID", userID)
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &user, nil
 }
