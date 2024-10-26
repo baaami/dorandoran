@@ -185,7 +185,7 @@ func toJSONRawMessage(v interface{}) json.RawMessage {
 
 // 5명의 참가자가 채팅을 테스트하는 함수
 func TestChatAmongFiveClients(t *testing.T) {
-	participantCount := 5
+	participantCount := 8
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)

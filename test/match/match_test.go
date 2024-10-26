@@ -137,7 +137,7 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	participantCount := 10
+	participantCount := 8
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
@@ -145,7 +145,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	// 채널을 사용하여 응답을 수집
 	responseChan := make(chan WebSocketMessage, participantCount)
 
-	// 1. 5명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
+	// 1. 8명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
 	for i := 0; i < participantCount; i++ {
 		accessToken := fmt.Sprintf("masterkey-%d", i+1)
 		sessionID, userID, err := loginAndGetSessionIDAndUserID(accessToken)
@@ -154,7 +154,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 		userIDs[i] = userID
 	}
 
-	// 2. 5명의 참가자가 WebSocket으로 접속
+	// 2. 8명의 참가자가 WebSocket으로 접속
 	for i := 0; i < participantCount; i++ {
 		conn, err := connectWebSocket(t, sessionIDs[i], userIDs[i])
 		assert.NoError(t, err)

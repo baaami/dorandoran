@@ -9,7 +9,9 @@ import (
 
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
-	"github.com/baaami/dorandoran/broker/pkg/socket"
+	"github.com/baaami/dorandoran/broker/pkg/socket/chat"
+	"github.com/baaami/dorandoran/broker/pkg/socket/match"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
 )
@@ -43,23 +45,27 @@ func main() {
 	}
 
 	// WebSocket 설정
-	wsConfig := &socket.Config{
-		Rooms:        sync.Map{},
-		ChatClients:  sync.Map{},
+	chatWSConfig := &chat.Config{
+		Rooms:       sync.Map{},
+		ChatClients: sync.Map{},
+		ChatEmitter: &chatEmitter,
+		RedisClient: redisClient,
+	}
+
+	matchWSConfig := &match.Config{
 		MatchClients: sync.Map{},
-		ChatEmitter:  &chatEmitter,
 		RedisClient:  redisClient,
 	}
 
 	// Redis 대기열 모니터링 고루틴 실행
 	for copuleCnt := 1; copuleCnt <= coupleMaxCount; copuleCnt++ {
-		go wsConfig.MonitorQueue(copuleCnt)
+		go matchWSConfig.MonitorQueue(copuleCnt)
 	}
 
 	log.Info().Msgf("Starting Gateway service on port %d", webPort)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", webPort),
-		Handler: app.routes(wsConfig),
+		Handler: app.routes(chatWSConfig, matchWSConfig),
 	}
 
 	err = srv.ListenAndServe()
