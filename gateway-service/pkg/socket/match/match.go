@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -105,40 +106,80 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn) {
 	}
 }
 
-// MonitorQueue: Redis 대기열을 계속 확인하고 매칭 시도
-func (app *Config) MonitorQueue(coupleCnt int) {
-	matchTotalNum := coupleCnt * 2 // 남녀 비율을 고려한 총 매칭 인원수
+func (app *Config) MonitorQueue(coupleCnt int, maxRetry int) {
+	matchTotalNum := coupleCnt * 2 // 총 매칭 인원 수
 
 	for {
 		maleQueueName := fmt.Sprintf("matching_queue_0_%d", coupleCnt)
 		femaleQueueName := fmt.Sprintf("matching_queue_1_%d", coupleCnt)
+		retryCounter := 0 // 매칭 실패 횟수 초기화
 
-		maleMatchIDList, err := app.RedisClient.PopNUsersFromQueue(maleQueueName, coupleCnt)
+		// 남녀 대기열의 연도 범위 가져오기
+		maleOldYear, maleYoungYear, err := app.RedisClient.GetOldestAndYoungestYear(maleQueueName)
 		if err != nil {
-			log.Printf("Error in matching from queue %s: %v", maleQueueName, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		femaleMatchIDList, err := app.RedisClient.PopNUsersFromQueue(femaleQueueName, coupleCnt)
+		femaleOldYear, femaleYoungYear, err := app.RedisClient.GetOldestAndYoungestYear(femaleQueueName)
 		if err != nil {
-			log.Printf("Error in matching from queue %s: %v", femaleQueueName, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		matchIDList := lo.Union(maleMatchIDList, femaleMatchIDList)
+		// 전체 범위에서 가장 오래된 연도와 최근 연도 계산
+		oldYear := maleOldYear
+		if femaleOldYear < maleOldYear {
+			oldYear = femaleOldYear
+		}
 
-		if len(matchIDList) == matchTotalNum {
-			roomID := uuid.New().String()
-			log.Printf("Matched room %s")
+		youngYear := maleYoungYear
+		if femaleYoungYear > maleYoungYear {
+			youngYear = femaleYoungYear
+		}
 
-			err = app.createRoom(roomID, matchIDList)
-			if err != nil {
-				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
+		// 빠르게 ±3년 범위로 매칭할 사용자 검색
+		for year := youngYear; year <= oldYear; year++ {
+			minYear := year - 5
+			maxYear := year + 5
+
+			maleMatchIDList, err := app.RedisClient.PopNUsersByYearRange(maleQueueName, coupleCnt, minYear, maxYear)
+			if err != nil || len(maleMatchIDList) < coupleCnt {
+				retryCounter++
+				if retryCounter >= maxRetry {
+					log.Println("Max retry reached for male queue, switching to next available user.")
+					retryCounter = 0 // 카운터 초기화
+				}
+				continue
 			}
 
-			app.notifyUsers(matchIDList, roomID)
+			femaleMatchIDList, err := app.RedisClient.PopNUsersByYearRange(femaleQueueName, coupleCnt, minYear, maxYear)
+			if err != nil || len(femaleMatchIDList) < coupleCnt {
+				retryCounter++
+				if retryCounter >= maxRetry {
+					log.Println("Max retry reached for female queue, switching to next available user.")
+					retryCounter = 0 // 카운터 초기화
+				}
+				continue
+			}
+
+			// 매칭 성공 시 사용자 알림 및 방 생성
+			matchIDList := lo.Union(maleMatchIDList, femaleMatchIDList)
+			if len(matchIDList) == matchTotalNum {
+				roomID := uuid.New().String()
+				log.Printf("Matched room %s", roomID)
+
+				err = app.createRoom(roomID, matchIDList)
+				if err != nil {
+					log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
+				}
+
+				app.notifyUsers(matchIDList, roomID)
+				break // 매칭이 성공했으면 현재 루프 종료
+			}
 		}
 
+		// 일정 주기마다 실행
 		time.Sleep(2 * time.Second)
 	}
 }
@@ -247,11 +288,21 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) erro
 		return err
 	}
 
-	// matchFilter에 따른 처리가 필요함
 	queueName := fmt.Sprintf("matching_queue_%d_%d", user.Gender, matchFilter.CoupleCount)
 
-	// matchFilter에 따른 처리가 필요함
-	app.RedisClient.AddUserToQueue(queueName, userID)
+	// TODO: matchFilter에 따른 처리가 필요함
+	var birth int
+	if len(user.Birth) == 8 {
+		yearStr := user.Birth[:4] // 앞의 4자리 연도 부분 추출
+		birth, err = strconv.Atoi(yearStr)
+		if err != nil {
+			return fmt.Errorf("failed to parse year: %v", err)
+		}
+	} else {
+		birth = 1996
+	}
+	app.RedisClient.AddUserToQueue(queueName, userID, birth)
+
 	log.Printf("User %s added to waiting queue", userID)
 
 	return nil

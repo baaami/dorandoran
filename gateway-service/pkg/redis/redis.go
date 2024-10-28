@@ -41,41 +41,56 @@ func NewRedisClient() (*RedisClient, error) {
 	return &RedisClient{Client: client}, nil
 }
 
-// AddUserToQueue: 성별 및 coupleCnt에 따른 대기열에 유저 추가
-func (r *RedisClient) AddUserToQueue(queueName, userID string) error {
-	err := r.Client.LPush(ctx, queueName, userID).Err()
+// AddUserToQueue: 성별 및 매칭 타입에 따라 대기열에 사용자 추가
+func (r *RedisClient) AddUserToQueue(queueName, userID string, birthYear int) error {
+	// 나이 순으로 ZSET에 추가
+	err := r.Client.ZAdd(ctx, queueName, &redis.Z{
+		Score:  float64(birthYear),
+		Member: userID,
+	}).Err()
 	if err != nil {
-		log.Printf("Failed to add user to queue: %v", err)
+		log.Printf("Failed to add user to ZSET queue: %v", err)
 		return err
 	}
+
+	// 순서 유지를 위해 List에도 추가
+	err = r.Client.RPush(ctx, queueName+"_order", userID).Err()
+	if err != nil {
+		log.Printf("Failed to add user to List queue: %v", err)
+		return err
+	}
+
 	log.Printf("User %s added to Redis matching queue %s", userID, queueName)
 	return nil
 }
 
-// PopNUsersFromQueue: 특정 대기열에서 matchNum 명의 유저를 pop
-func (r *RedisClient) PopNUsersFromQueue(queueName string, matchNum int) ([]string, error) {
+func (r *RedisClient) PopNUsersByYearRange(queueName string, matchNum int, minYear, maxYear int) ([]string, error) {
 	var userIDList []string
-	for i := 0; i < matchNum; i++ {
-		user, err := r.Client.RPop(ctx, queueName).Result()
-		if err == redis.Nil {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		userIDList = append(userIDList, user)
+
+	// ±5년 범위 내에서 사용자 추출
+	users, err := r.Client.ZRangeByScore(ctx, queueName, &redis.ZRangeBy{
+		Min: fmt.Sprintf("%d", minYear),
+		Max: fmt.Sprintf("%d", maxYear),
+	}).Result()
+
+	// 인원이 부족한 경우 빈 배열 반환
+	if err != nil || len(users) < matchNum {
+		return []string{}, nil // 부족한 경우 빈 결과 반환
 	}
 
-	// 매칭 인원이 부족하면 pop된 유저들을 다시 대기열에 삽입
-	if len(userIDList) < matchNum {
-		for _, user := range userIDList {
-			err := r.Client.RPush(ctx, queueName, user).Err()
-			if err != nil {
-				return nil, err
-			}
+	// 필요한 인원만큼 추출하고, 나머지는 유지
+	userIDList = users[:matchNum]
+
+	// 대기열에서 매칭된 사용자 제거
+	for _, userID := range userIDList {
+		_, err := r.Client.ZRem(ctx, queueName, userID).Result()
+		if err != nil {
+			log.Printf("Failed to remove user %s from queue %s: %v", userID, queueName, err)
+			return []string{}, err
 		}
-		return []string{}, nil
 	}
 
+	log.Printf("Popped %d users from queue %s", len(userIDList), queueName)
 	return userIDList, nil
 }
 
@@ -115,6 +130,25 @@ func (r *RedisClient) PopUserFromQueue(userID string, gender, coupleCnt int) (bo
 	}
 
 	return popped, nil
+}
+
+// ZSET 대기열에서 가장 오래된 연도와 가장 최근 연도를 반환
+func (r *RedisClient) GetOldestAndYoungestYear(queueName string) (int, int, error) {
+	// 가장 오래된 연도 가져오기
+	oldestUser, err := r.Client.ZRangeWithScores(ctx, queueName, 0, 0).Result()
+	if err != nil || len(oldestUser) == 0 {
+		return 0, 0, fmt.Errorf("no users in queue")
+	}
+	oldYear := int(oldestUser[0].Score)
+
+	// 가장 최근 연도 가져오기
+	youngestUser, err := r.Client.ZRangeWithScores(ctx, queueName, -1, -1).Result()
+	if err != nil || len(youngestUser) == 0 {
+		return 0, 0, fmt.Errorf("no users in queue")
+	}
+	youngYear := int(youngestUser[0].Score)
+
+	return oldYear, youngYear, nil
 }
 
 // GetSession: Redis에서 세션 조회
