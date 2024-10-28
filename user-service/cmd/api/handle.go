@@ -79,25 +79,17 @@ func (app *Config) checkUserExistence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// sns_id를 정수로 변환
-	nSnsID, err := strconv.ParseInt(snsID, 10, 64)
-	if err != nil {
-		log.Printf("Invalid sns_id parameter: %s, error: %v", snsID, err)
-		http.Error(w, fmt.Sprintf("Bad Parameter sns_id: %s", snsID), http.StatusBadRequest)
-		return
-	}
-
 	// DB에서 사용자 조회
-	user, err := app.Models.GetUserBySNS(nSnsType, nSnsID)
+	user, err := app.Models.GetUserBySNS(nSnsType, snsID)
 	if err != nil {
-		log.Printf("Error fetching user for sns_type=%d, sns_id=%d, error: %v", nSnsType, nSnsID, err)
+		log.Printf("Error fetching user for sns_type=%d, sns_id=%s, error: %v", nSnsType, snsID, err)
 		http.Error(w, "Error fetching user", http.StatusInternalServerError)
 		return
 	}
 
 	// 유저가 존재하지 않는 경우
 	if user == nil {
-		log.Printf("User not found for sns_type=%d, sns_id=%d", nSnsType, nSnsID)
+		log.Printf("User not found for sns_type=%d, sns_id=%s", nSnsType, snsID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -134,7 +126,7 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defaultFilter := data.MatchFilter{
-		UserID:      int(insertedID),
+		UserID:      insertedID,
 		CoupleCount: 4,
 		AddressUse:  false,
 		Address: data.Address{

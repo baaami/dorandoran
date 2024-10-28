@@ -16,7 +16,7 @@ type Address struct {
 type User struct {
 	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType int     `gorm:"index" json:"sns_type"`
-	SnsID   int64   `gorm:"index" json:"sns_id"`
+	SnsID   string  `gorm:"index" json:"sns_id"`
 	Name    string  `gorm:"size:100" json:"name"`
 	Gender  int     `json:"gender"`
 	Birth   string  `gorm:"size:20" json:"birth"`
@@ -46,17 +46,17 @@ func (s *UserService) InitDB() error {
 		log.Printf("Failed to migrate tables: %v", err)
 		return err
 	}
-	log.Println("Tables `users` and `matchfilters` migrated or already exist.")
+	log.Println("Tables users and matchfilters migrated or already exist.")
 	return nil
 }
 
 // 유저 생성 (삽입)
-func (s *UserService) InsertUser(user User) (int64, error) {
+func (s *UserService) InsertUser(user User) (int, error) {
 	if err := s.DB.Create(&user).Error; err != nil {
 		log.Printf("Failed to insert user: %v", err)
 		return 0, err
 	}
-	return int64(user.ID), nil
+	return user.ID, nil
 }
 
 // 유저 조회
@@ -82,16 +82,14 @@ func (s *UserService) GetUserList() (*[]User, error) {
 }
 
 // 유저 조회 (sns_type과 sns_id를 기반으로 조회)
-func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
+func (s *UserService) GetUserBySNS(snsType int, snsID string) (*User, error) {
 	var user User
 	err := s.DB.Where("sns_type = ? AND sns_id = ?", snsType, snsID).First(&user).Error
 	if err != nil {
-		// record not found인 경우 user와 error 모두 nil 반환
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		// 다른 에러가 있는 경우 에러 반환
-		log.Printf("Failed to get user by SNS type %d and SNS ID %d: %v", snsType, snsID, err)
+		log.Printf("Failed to get user by SNS type %d and SNS ID %s: %v", snsType, snsID, err)
 		return nil, err
 	}
 	return &user, nil
@@ -99,7 +97,6 @@ func (s *UserService) GetUserBySNS(snsType int, snsID int64) (*User, error) {
 
 // 유저 업데이트
 func (s *UserService) UpdateUser(user User) error {
-	// 값이 설정된 필드만 업데이트되며, 0, nil, "" 등의 zero value 필드는 기존 데이터베이스의 값이 유지
 	if err := s.DB.Model(&User{ID: user.ID}).Updates(user).Error; err != nil {
 		log.Printf("Failed to update user ID %d: %v", user.ID, err)
 		return err
@@ -130,11 +127,9 @@ func (s *UserService) GetMatchFilterByUserID(userID int) (*MatchFilter, error) {
 	var filter MatchFilter
 	err := s.DB.First(&filter, "user_id = ?", userID).Error
 	if err != nil {
-		// record not found인 경우 filter와 error 모두 nil 반환
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		// 다른 에러가 있는 경우 에러 반환
 		log.Printf("Failed to get match filter for user ID %d: %v", userID, err)
 		return nil, err
 	}

@@ -25,7 +25,7 @@ type Address struct {
 type User struct {
 	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType int     `gorm:"index" json:"sns_type"`
-	SnsID   int64   `gorm:"index" json:"sns_id"`
+	SnsID   string  `gorm:"index" json:"sns_id"`
 	Name    string  `gorm:"size:100" json:"name"`
 	Gender  int     `json:"gender"`
 	Birth   string  `gorm:"size:20" json:"birth"`
@@ -50,13 +50,13 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var snsID int64
+	var snsID string
 
 	if strings.HasPrefix(requestData.AccessToken, "masterkey-") {
 		// 구분자 뒤의 숫자를 추출하여 snsID 사용
 		parts := strings.Split(requestData.AccessToken, "-")
 		if len(parts) == 2 {
-			snsID, _ = strconv.ParseInt(parts[1], 10, 64)
+			snsID = parts[1]
 		} else {
 			http.Error(w, "Invalid masterkey format", http.StatusBadRequest)
 			return
@@ -76,7 +76,7 @@ func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("Invalid Kakao Id: %s", kakaoResponse["id"]), http.StatusUnauthorized)
 			return
 		}
-		snsID = int64(idValue)
+		snsID = strconv.FormatInt(int64(idValue), 10)
 	}
 
 	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
@@ -163,13 +163,13 @@ func (app *Config) NaverLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var snsID int64
+	var snsID string
 
 	if strings.HasPrefix(requestData.AccessToken, "masterkey-") {
 		// 구분자 뒤의 숫자를 추출하여 snsID 사용
 		parts := strings.Split(requestData.AccessToken, "-")
 		if len(parts) == 2 {
-			snsID, _ = strconv.ParseInt(parts[1], 10, 64)
+			snsID = parts[1]
 		} else {
 			http.Error(w, "Invalid masterkey format", http.StatusBadRequest)
 			return
@@ -197,12 +197,7 @@ func (app *Config) NaverLoginHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		snsID, err = strconv.ParseInt(idValue, 10, 64)
-		if err != nil {
-			log.Printf("Failed to parse Naver ID: %v", err)
-			http.Error(w, "Invalid Naver ID", http.StatusUnauthorized)
-			return
-		}
+		snsID = idValue
 	}
 
 	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
@@ -277,13 +272,13 @@ func GetNaverUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
-func GetExistUserByUserSrv(snsType int, snsID int64) (User, error) {
+func GetExistUserByUserSrv(snsType int, snsID string) (User, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
 
 	// 요청 URL 생성
-	url := fmt.Sprintf("http://user-service/exist?sns_type=%d&sns_id=%d", snsType, snsID)
+	url := fmt.Sprintf("http://user-service/exist?sns_type=%d&sns_id=%s", snsType, snsID)
 
 	// GET 요청 생성
 	req, err := http.NewRequest("GET", url, nil)
@@ -329,7 +324,7 @@ func GetExistUserByUserSrv(snsType int, snsID int64) (User, error) {
 }
 
 // [Hub Network] User 서비스에 API를 호출하여 새로운 사용자 생성
-func RegisterNewUser(snsType int, snsID int64) (User, error) {
+func RegisterNewUser(snsType int, snsID string) (User, error) {
 	newUser := User{
 		SnsType: snsType, // Kakao SNS 유형
 		SnsID:   snsID,   // Kakao 사용자 ID
