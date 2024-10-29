@@ -170,11 +170,17 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
 	if err != nil {
 		t.Fatalf("Failed to receive match response: %v", err)
 	}
+
+	// 매칭 실패 메시지인 경우 로깅 및 출력
+	if webSocketMsg.Status == "fail" {
+		t.Logf("Received match failure message: %v", webSocketMsg)
+	}
+
 	return webSocketMsg
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	participantCount := 8
+	participantCount := 10
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
@@ -211,29 +217,25 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	// 4. 각 클라이언트가 매칭 요청을 보내고 비동기적으로 응답 대기
 	for i := 0; i < participantCount; i++ {
 		go func(i int) {
-			// 매칭 요청 보내기
-			// sendMatchRequest(t, conns[i], userIDs[i])
-
-			// 매칭 응답 수신
 			webSocketMsg := receiveMatchResponse(t, conns[i])
-
-			// 응답을 채널에 전달
 			responseChan <- webSocketMsg
 		}(i)
 	}
 
-	// 5. 응답을 수신
+	// 5. 응답을 수신하고, 성공 또는 실패 메시지 확인
 	matchResponses := make([]WebSocketMessage, participantCount)
 	for i := 0; i < participantCount; i++ {
 		matchResponses[i] = <-responseChan
 
-		if matchResponses[i].Type == "match" && matchResponses[i].Status == "success" {
+		if matchResponses[i].Status == "success" {
 			var matchResp MatchResponse
 			err := json.Unmarshal(matchResponses[i].Payload, &matchResp)
 			assert.NoError(t, err)
 			if matchResp.RoomID != "" {
 				t.Logf("%s User allocated room %s", userIDs[i], matchResp.RoomID)
 			}
+		} else if matchResponses[i].Status == "fail" {
+			t.Logf("%s User match failed due to timeout", userIDs[i])
 		}
 	}
 

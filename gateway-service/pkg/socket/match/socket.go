@@ -57,6 +57,7 @@ const (
 // Match Type (Push)
 const (
 	PushMessageStatusMatchSuccess = "success"
+	PushMessageStatusMatchFailure = "fail"
 )
 
 // Game Type (Push)

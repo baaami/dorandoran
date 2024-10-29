@@ -22,8 +22,8 @@ import (
 
 // WebSocket 연결 처리
 func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
-	// 컨텍스트 생성 및 취소 함수 정의
-	ctx, cancel := context.WithCancel(context.Background())
+	// 30초 타임아웃 설정
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	var upgrader = websocket.Upgrader{
@@ -73,7 +73,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	// 메시지 처리 고루틴
 	go func() {
 		defer wg.Done()
-		app.listenMatchEvent(ctx, conn)
+		app.listenMatchEvent(ctx, conn, userID)
 	}()
 
 	// // Ping 메시지 전송 고루틴
@@ -86,11 +86,15 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	wg.Wait()
 }
 
-func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn) {
+func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, userID string) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			// 30초 타임아웃 시 매칭 실패 메시지 전송
+			if ctx.Err() == context.DeadlineExceeded {
+				log.Printf("Matching timed out for user %s", userID)
+				app.sendMatchFailureMessage(conn)
+			}
 		default:
 			_, _, err := conn.ReadMessage()
 			if err != nil {
@@ -140,8 +144,8 @@ func (app *Config) MonitorQueue(coupleCnt int, maxRetry int) {
 
 		// 빠르게 ±3년 범위로 매칭할 사용자 검색
 		for year := youngYear; year <= oldYear; year++ {
-			minYear := year - 5
-			maxYear := year + 5
+			minYear := year - 3
+			maxYear := year + 3
 
 			maleMatchIDList, err := app.RedisClient.PopNUsersByYearRange(maleQueueName, coupleCnt, minYear, maxYear)
 			if err != nil || len(maleMatchIDList) < coupleCnt {
@@ -174,7 +178,7 @@ func (app *Config) MonitorQueue(coupleCnt int, maxRetry int) {
 					log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
 				}
 
-				app.notifyUsers(matchIDList, roomID)
+				app.sendMatchSuccessMessage(matchIDList, roomID)
 				break // 매칭이 성공했으면 현재 루프 종료
 			}
 		}
@@ -184,7 +188,7 @@ func (app *Config) MonitorQueue(coupleCnt int, maxRetry int) {
 	}
 }
 
-func (app *Config) notifyUsers(matchList []string, roomID string) {
+func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 	matchMsg := MatchResponse{
 		RoomID: roomID,
 	}
@@ -219,6 +223,19 @@ func (app *Config) notifyUsers(matchList []string, roomID string) {
 	}
 
 	log.Printf("Match Notify End!!!")
+}
+
+// 매칭 실패 메시지 전송 함수
+func (app *Config) sendMatchFailureMessage(conn *websocket.Conn) {
+	failureMsg := WebSocketMessage{
+		Type:    MessageTypeMatch,
+		Status:  PushMessageStatusMatchFailure,
+		Payload: nil,
+	}
+
+	if err := conn.WriteJSON(failureMsg); err != nil {
+		log.Printf("Failed to send match failure message: %v", err)
+	}
 }
 
 // [Hub Network] Chat 서비스에 API를 호출하여 방 생성
