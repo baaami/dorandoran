@@ -24,11 +24,10 @@ type User struct {
 }
 
 type MatchFilter struct {
-	UserID      int     `gorm:"primaryKey" json:"user_id"`
-	CoupleCount int     `json:"couple_count"`
-	AddressUse  bool    `json:"address_use"`
-	Address     Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
-	AgeGroupUse bool    `json:"age_group_use"`
+	UserID          int  `gorm:"primaryKey" json:"user_id"`
+	CoupleCount     int  `json:"couple_count"`
+	AddressRangeUse bool `json:"address_range_use"`
+	AgeGroupUse     bool `json:"age_group_use"`
 }
 
 // GORM 클라이언트 설정

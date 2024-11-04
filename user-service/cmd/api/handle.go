@@ -126,15 +126,10 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defaultFilter := data.MatchFilter{
-		UserID:      insertedID,
-		CoupleCount: 4,
-		AddressUse:  false,
-		Address: data.Address{
-			City:     "",
-			District: "",
-			Street:   "",
-		},
-		AgeGroupUse: false,
+		UserID:          insertedID,
+		CoupleCount:     4,
+		AddressRangeUse: false,
+		AgeGroupUse:     false,
 	}
 	_, err = app.Models.UpsertMatchFilter(defaultFilter)
 	if err != nil {
