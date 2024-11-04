@@ -11,7 +11,5 @@ type MatchFilter struct {
 	CoupleCount int     `json:"couple_count"`
 	AddressUse  bool    `json:"address_use"`
 	Address     Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
-	AgeRangeUse bool    `json:"age_range_use"`
-	AgeMin      int     `json:"age_min"`
-	AgeMax      int     `json:"age_max"`
+	AgeGroupUse bool    `json:"age_group_use"`
 }

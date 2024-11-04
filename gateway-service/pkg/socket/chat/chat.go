@@ -34,7 +34,6 @@ func (app *Config) HandleChatSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// URL에서 유저 ID 가져오기
 	userID := r.Header.Get("X-User-ID")
 	app.RegisterChatClient(conn, userID)
 	defer func() {
