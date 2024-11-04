@@ -32,7 +32,7 @@ func (app *Config) findUserList(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 조회
 func (app *Config) findUser(w http.ResponseWriter, r *http.Request) {
-	// URL에서 유저 ID 가져오기
+
 	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -126,17 +126,10 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defaultFilter := data.MatchFilter{
-		UserID:      insertedID,
-		CoupleCount: 4,
-		AddressUse:  false,
-		Address: data.Address{
-			City:     "",
-			District: "",
-			Street:   "",
-		},
-		AgeRangeUse: false,
-		AgeMin:      0,
-		AgeMax:      999,
+		UserID:          insertedID,
+		CoupleCount:     4,
+		AddressRangeUse: false,
+		AgeGroupUse:     false,
 	}
 	_, err = app.Models.UpsertMatchFilter(defaultFilter)
 	if err != nil {
@@ -152,7 +145,6 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 업데이트
 func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
-	// URL에서 유저 ID 가져오기
 	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -197,7 +189,6 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 삭제
 func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
-	// URL에서 유저 ID 가져오기
 	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -222,7 +213,6 @@ func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 // 자신의 매칭 필터 정보 조회
 func (app *Config) findMatchFilter(w http.ResponseWriter, r *http.Request) {
-	// URL에서 유저 ID 가져오기
 	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
@@ -250,7 +240,6 @@ func (app *Config) findMatchFilter(w http.ResponseWriter, r *http.Request) {
 
 // 자신의 매칭 필터 업데이트
 func (app *Config) updateMatchFilter(w http.ResponseWriter, r *http.Request) {
-	// URL에서 유저 ID 가져오기
 	userIDStr := r.Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {

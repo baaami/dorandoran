@@ -28,6 +28,11 @@ up_service: build_gateway build_user build_chat build_consumer build_auth
 	docker-compose up --build -d ${SERVICES}
 	@echo "Services have been rebuilt and started!"
 
+down_service:
+	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
+	docker-compose stop ${SERVICES}
+	docker-compose rm -f ${SERVICES}
+
 ## down: stop docker compose
 down:
 	@echo "Stopping docker compose..."
