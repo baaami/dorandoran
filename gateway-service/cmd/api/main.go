@@ -59,8 +59,7 @@ func main() {
 
 	// Redis 대기열 모니터링 고루틴 실행
 	for copuleCnt := 1; copuleCnt <= coupleMaxCount; copuleCnt++ {
-		maxRetry := 3
-		go matchWSConfig.MonitorQueue(copuleCnt, maxRetry)
+		go matchWSConfig.MonitorQueue(copuleCnt)
 	}
 
 	log.Info().Msgf("Starting Gateway service on port %d", webPort)

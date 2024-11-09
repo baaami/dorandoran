@@ -12,3 +12,14 @@ type MatchFilter struct {
 	AddressRangeUse bool `json:"address_range_use"`
 	AgeGroupUse     bool `json:"age_group_use"`
 }
+
+type WaitingUser struct {
+	ID              int     `json:"id"`
+	Name            string  `json:"name"`
+	Gender          int     `json:"gender"`
+	Birth           string  `json:"birth"`
+	Address         Address `json:"address"`
+	CoupleCount     int     `json:"couple_count"`
+	AddressRangeUse bool    `json:"address_range_use"`
+	AgeGroupUse     bool    `json:"age_group_use"`
+}

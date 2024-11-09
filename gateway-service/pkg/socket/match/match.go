@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/samber/lo"
 )
 
 // WebSocket 연결 처리
@@ -86,6 +84,7 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 	wg.Wait()
 }
 
+// 매칭 서버 메시지 처리 함수
 func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, userID string) {
 	for {
 		select {
@@ -110,84 +109,101 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, u
 	}
 }
 
-func (app *Config) MonitorQueue(coupleCnt int, maxRetry int) {
-	matchTotalNum := coupleCnt * 2 // 총 매칭 인원 수
+// Register 메시지 처리
+func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) error {
+	_, ok := app.MatchClients.Load(userID)
+	if ok {
+		log.Printf("User %s already registered match server", userID)
+		return fmt.Errorf("user %s already registered match server", userID)
+	}
+
+	// TODO: 존재하는 사람의 경우 pass, 중복 처리 필요
+	app.MatchClients.Store(userID, conn)
+	log.Printf("User %s register match server", userID)
+
+	matchFilter, err := GetMatchFilter(userID)
+	if err != nil {
+		log.Printf("Failed to get matchfilter, user: %s", userID)
+		return err
+	}
+
+	user, err := GetUserInfo(userID)
+	if err != nil {
+		log.Printf("Failed to get GetUserInfo, user: %s", userID)
+		return err
+	}
+
+	waitingUser := types.WaitingUser{
+		ID:              user.ID,
+		Gender:          user.Gender,
+		Birth:           user.Birth,
+		Address:         types.Address(user.Address),
+		AddressRangeUse: matchFilter.AddressRangeUse,
+		AgeGroupUse:     matchFilter.AgeGroupUse,
+	}
+
+	app.RedisClient.AddUserToQueue(matchFilter.CoupleCount, waitingUser)
+
+	log.Printf("User %s added to waiting queue", userID)
+
+	return nil
+}
+
+// UnRegister 메시지 처리
+func (app *Config) UnRegisterMatchClient(userID string) {
+	app.MatchClients.Delete(userID)
+
+	matchFilter, err := GetMatchFilter(userID)
+	if err != nil {
+		log.Printf("Failed to get matchfilter, user: %s", userID)
+		return
+	}
+
+	user, err := GetUserInfo(userID)
+	if err != nil {
+		log.Printf("Failed to get GetUserInfo, user: %s", userID)
+		return
+	}
+
+	// 매칭되어 종료될 경우 존재하지 않을 수도 있음
+	err = app.RedisClient.PopUserFromQueue(user.ID, matchFilter.CoupleCount)
+	if err != nil {
+		log.Printf("fail pop %s user from redis queue", userID)
+	}
+	log.Printf("User %s unregister match server", userID)
+}
+
+// 대기열 모니터링
+func (app *Config) MonitorQueue(coupleCnt int) {
+	matchTotalNum := coupleCnt * 2 // 총 매침 인원 수
 
 	for {
-		maleQueueName := fmt.Sprintf("matching_queue_0_%d", coupleCnt)
-		femaleQueueName := fmt.Sprintf("matching_queue_1_%d", coupleCnt)
-		retryCounter := 0 // 매칭 실패 횟수 초기화
-
-		// 남녀 대기열의 연도 범위 가져오기
-		maleOldYear, maleYoungYear, err := app.RedisClient.GetOldestAndYoungestYear(maleQueueName)
-		if err != nil {
+		// Redis에서 대기열 모니터링 처리
+		matchIDList, err := app.RedisClient.MonitorAndPopMatchingUsers(coupleCnt)
+		if err != nil || len(matchIDList) < matchTotalNum {
 			time.Sleep(2 * time.Second)
 			continue
 		}
 
-		femaleOldYear, femaleYoungYear, err := app.RedisClient.GetOldestAndYoungestYear(femaleQueueName)
-		if err != nil {
-			time.Sleep(2 * time.Second)
-			continue
-		}
+		// 매침 성공 시 사용자 알림 및 방 생성
+		if len(matchIDList) == matchTotalNum {
+			roomID := uuid.New().String()
+			log.Printf("Matched room %s", roomID)
 
-		// 전체 범위에서 가장 오래된 연도와 최근 연도 계산
-		oldYear := maleOldYear
-		if femaleOldYear < maleOldYear {
-			oldYear = femaleOldYear
-		}
-
-		youngYear := maleYoungYear
-		if femaleYoungYear > maleYoungYear {
-			youngYear = femaleYoungYear
-		}
-
-		// 빠르게 ±3년 범위로 매칭할 사용자 검색
-		for year := youngYear; year <= oldYear; year++ {
-			minYear := year - 3
-			maxYear := year + 3
-
-			maleMatchIDList, err := app.RedisClient.PopNUsersByYearRange(maleQueueName, coupleCnt, minYear, maxYear)
-			if err != nil || len(maleMatchIDList) < coupleCnt {
-				retryCounter++
-				if retryCounter >= maxRetry {
-					log.Println("Max retry reached for male queue, switching to next available user.")
-					retryCounter = 0 // 카운터 초기화
-				}
-				continue
+			err = app.createRoom(roomID, matchIDList)
+			if err != nil {
+				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
 			}
 
-			femaleMatchIDList, err := app.RedisClient.PopNUsersByYearRange(femaleQueueName, coupleCnt, minYear, maxYear)
-			if err != nil || len(femaleMatchIDList) < coupleCnt {
-				retryCounter++
-				if retryCounter >= maxRetry {
-					log.Println("Max retry reached for female queue, switching to next available user.")
-					retryCounter = 0 // 카운터 초기화
-				}
-				continue
-			}
-
-			// 매칭 성공 시 사용자 알림 및 방 생성
-			matchIDList := lo.Union(maleMatchIDList, femaleMatchIDList)
-			if len(matchIDList) == matchTotalNum {
-				roomID := uuid.New().String()
-				log.Printf("Matched room %s", roomID)
-
-				err = app.createRoom(roomID, matchIDList)
-				if err != nil {
-					log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
-				}
-
-				app.sendMatchSuccessMessage(matchIDList, roomID)
-				break // 매칭이 성공했으면 현재 루프 종료
-			}
+			app.sendMatchSuccessMessage(matchIDList, roomID)
 		}
 
-		// 일정 주기마다 실행
+		// 일정 주기만큼 실행
 		time.Sleep(2 * time.Second)
 	}
 }
 
+// 매칭 성공 메시지 전송 함수
 func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 	matchMsg := MatchResponse{
 		RoomID: roomID,
@@ -238,7 +254,7 @@ func (app *Config) sendMatchFailureMessage(conn *websocket.Conn) {
 	}
 }
 
-// [Hub Network] Chat 서비스에 API를 호출하여 방 생성
+// [Bridge chat] 방 생성
 func (app *Config) createRoom(roomID string, matchList []string) error {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
@@ -281,74 +297,7 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 	return nil
 }
 
-// Register 메시지 처리
-func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) error {
-	_, ok := app.MatchClients.Load(userID)
-	if ok {
-		log.Printf("User %s already registered match server", userID)
-		return fmt.Errorf("user %s already registered match server", userID)
-	}
-
-	// TODO: 존재하는 사람의 경우 pass, 중복 처리 필요
-	app.MatchClients.Store(userID, conn)
-	log.Printf("User %s register match server", userID)
-
-	matchFilter, err := GetMatchFilter(userID)
-	if err != nil {
-		log.Printf("Failed to get matchfilter, user: %s", userID)
-		return err
-	}
-
-	user, err := GetUserInfo(userID)
-	if err != nil {
-		log.Printf("Failed to get GetUserInfo, user: %s", userID)
-		return err
-	}
-
-	queueName := fmt.Sprintf("matching_queue_%d_%d", user.Gender, matchFilter.CoupleCount)
-
-	// TODO: matchFilter에 따른 처리가 필요함
-	var birth int
-	if len(user.Birth) == 8 {
-		yearStr := user.Birth[:4] // 앞의 4자리 연도 부분 추출
-		birth, err = strconv.Atoi(yearStr)
-		if err != nil {
-			return fmt.Errorf("failed to parse year: %v", err)
-		}
-	} else {
-		birth = 1996
-	}
-	app.RedisClient.AddUserToQueue(queueName, userID, birth)
-
-	log.Printf("User %s added to waiting queue", userID)
-
-	return nil
-}
-
-// UnRegister 메시지 처리
-func (app *Config) UnRegisterMatchClient(userID string) {
-	app.MatchClients.Delete(userID)
-
-	matchFilter, err := GetMatchFilter(userID)
-	if err != nil {
-		log.Printf("Failed to get matchfilter, user: %s", userID)
-		return
-	}
-
-	user, err := GetUserInfo(userID)
-	if err != nil {
-		log.Printf("Failed to get GetUserInfo, user: %s", userID)
-		return
-	}
-
-	_, err = app.RedisClient.PopUserFromQueue(userID, user.Gender, matchFilter.CoupleCount)
-	if err != nil {
-		log.Printf("fail pop %s user from redis queue", userID)
-	}
-	log.Printf("User %s unregister match server", userID)
-}
-
-// [Hub Network]
+// [Bridge user] 유저 매칭 필터 조회
 func GetMatchFilter(userID string) (*types.MatchFilter, error) {
 	var matchFilter types.MatchFilter
 
@@ -387,7 +336,7 @@ func GetMatchFilter(userID string) (*types.MatchFilter, error) {
 	return &matchFilter, nil
 }
 
-// [Hub Network]
+// [Bridge user] 유저 정보 조회
 func GetUserInfo(userID string) (*common.User, error) {
 	var user common.User
 

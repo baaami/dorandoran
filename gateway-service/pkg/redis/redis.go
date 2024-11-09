@@ -2,12 +2,15 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 
+	"github.com/baaami/dorandoran/broker/pkg/types"
 	"github.com/go-redis/redis/v8"
+	"github.com/samber/lo"
 )
 
 var ctx = context.Background()
@@ -42,113 +45,170 @@ func NewRedisClient() (*RedisClient, error) {
 }
 
 // AddUserToQueue: 성별 및 매칭 타입에 따라 대기열에 사용자 추가
-func (r *RedisClient) AddUserToQueue(queueName, userID string, birthYear int) error {
-	// 나이 순으로 ZSET에 추가
-	err := r.Client.ZAdd(ctx, queueName, &redis.Z{
-		Score:  float64(birthYear),
-		Member: userID,
-	}).Err()
+func (r *RedisClient) AddUserToQueue(coupleCnt int, waitingUser types.WaitingUser) error {
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt)
+	waitingUserData, err := json.Marshal(waitingUser)
 	if err != nil {
-		log.Printf("Failed to add user to ZSET queue: %v", err)
+		log.Printf("Failed to marshal waitingUser data for waitingUser %d: %v", waitingUser.ID, err)
 		return err
 	}
 
-	// 순서 유지를 위해 List에도 추가
-	err = r.Client.RPush(ctx, queueName+"_order", userID).Err()
+	// 대기열에 사용자 정보 추가
+	err = r.Client.RPush(ctx, queueName, waitingUserData).Err()
 	if err != nil {
-		log.Printf("Failed to add user to List queue: %v", err)
+		log.Printf("Failed to add waitingUser to queue: %v", err)
 		return err
 	}
 
-	log.Printf("User %s added to Redis matching queue %s", userID, queueName)
+	log.Printf("User %d added to Redis matching queue %s", waitingUser.ID, queueName)
 	return nil
 }
 
-func (r *RedisClient) PopNUsersByYearRange(queueName string, matchNum int, minYear, maxYear int) ([]string, error) {
-	var userIDList []string
+// MonitorAndPopMatchingUsers: 대기열을 모니터링하고 매칭된 사용자를 추출하는 함수
+func (r *RedisClient) MonitorAndPopMatchingUsers(coupleCnt int) ([]string, error) {
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt)
+	var maleMatches, femaleMatches []types.WaitingUser
 
-	// ±5년 범위 내에서 사용자 추출
-	users, err := r.Client.ZRangeByScore(ctx, queueName, &redis.ZRangeBy{
-		Min: fmt.Sprintf("%d", minYear),
-		Max: fmt.Sprintf("%d", maxYear),
-	}).Result()
-
-	// 인원이 부족한 경우 빈 배열 반환
-	if err != nil || len(users) < matchNum {
-		return []string{}, nil // 부족한 경우 빈 결과 반환
+	// Redis에서 전체 데이터를 가져옴
+	usersJson, err := r.Client.LRange(ctx, queueName, 0, -1).Result()
+	if err != nil {
+		log.Printf("Failed to retrieve users from queue %s: %v", queueName, err)
+		return nil, err
+	}
+	if len(usersJson) == 0 {
+		return nil, nil
 	}
 
-	// 필요한 인원만큼 추출하고, 나머지는 유지
-	userIDList = users[:matchNum]
-
-	// 대기열에서 매칭된 사용자 제거
-	for _, userID := range userIDList {
-		_, err := r.Client.ZRem(ctx, queueName, userID).Result()
+	for _, userJson := range usersJson {
+		var user types.WaitingUser
+		err = json.Unmarshal([]byte(userJson), &user)
 		if err != nil {
-			log.Printf("Failed to remove user %s from queue %s: %v", userID, queueName, err)
-			return []string{}, err
+			log.Printf("Failed to unmarshal user data: %v", err)
+			continue
+		}
+
+		// 성별에 따라 리스트에 추가
+		if user.Gender == 0 {
+			maleMatches = append(maleMatches, user)
+		} else if user.Gender == 1 {
+			femaleMatches = append(femaleMatches, user)
+		}
+
+		// 조건에 맞는지 확인
+		if len(maleMatches) >= coupleCnt && len(femaleMatches) >= coupleCnt {
+			matchUserIdList := []string{}
+			selectedMales := maleMatches[:coupleCnt]
+			selectedFemales := femaleMatches[:coupleCnt]
+
+			// `isMatching` 함수를 사용해 조건에 맞는지 확인
+			allMatch := true
+			for _, male := range selectedMales {
+				for _, female := range selectedFemales {
+					if !isMatching(male, female) {
+						allMatch = false
+						break
+					}
+				}
+				if !allMatch {
+					break
+				}
+			}
+
+			if allMatch {
+				// 매칭된 사용자 ID 리스트 생성
+				matchUserIdList = append(matchUserIdList, lo.Map(selectedMales, func(matchUser types.WaitingUser, index int) string {
+					return strconv.Itoa(matchUser.ID)
+				})...)
+				matchUserIdList = append(matchUserIdList, lo.Map(selectedFemales, func(matchUser types.WaitingUser, index int) string {
+					return strconv.Itoa(matchUser.ID)
+				})...)
+
+				// 매칭된 사용자를 큐에서 제거
+				for _, matchedUser := range append(selectedMales, selectedFemales...) {
+					userData, _ := json.Marshal(matchedUser)
+					r.Client.LRem(ctx, queueName, 1, userData)
+				}
+
+				log.Printf("Successfully matched users: %v from queue %s", matchUserIdList, queueName)
+				return matchUserIdList, nil
+			} else {
+				// 조건에 맞지 않으면 매칭 시도한 사용자들을 다시 큐에 추가
+				log.Printf("No matching users found that meet conditions in queue %s", queueName)
+				for _, user := range append(selectedMales, selectedFemales...) {
+					userData, _ := json.Marshal(user)
+					r.Client.RPush(ctx, queueName, userData)
+				}
+				maleMatches = maleMatches[coupleCnt:]     // 앞부분 제거하고 남은 부분 유지
+				femaleMatches = femaleMatches[coupleCnt:] // 앞부분 제거하고 남은 부분 유지
+			}
 		}
 	}
 
-	log.Printf("Popped %d users from queue %s", len(userIDList), queueName)
-	return userIDList, nil
+	log.Printf("No complete matches found in queue %s", queueName)
+	return nil, nil
 }
 
-// 특정 대기열에서 주어진 userID를 pop (매칭 중에 매칭을 종료할 경우 사용)
-func (r *RedisClient) PopUserFromQueue(userID string, gender, coupleCnt int) (bool, error) {
-	queueName := fmt.Sprintf("matching_queue_%d_%d", gender, coupleCnt) // coupleCnt에 따른 대기열 이름
-	var popped bool
+// isMatching: 두 사용자가 매칭 조건에 맞는지 검사하는 함수
+func isMatching(user1, user2 types.WaitingUser) bool {
+	birthYear1, _ := strconv.Atoi(user1.Birth[:4])
+	birthYear2, _ := strconv.Atoi(user2.Birth[:4])
+	ageDifference := birthYear1 - birthYear2
+	if ageDifference < 0 {
+		ageDifference = -ageDifference
+	}
 
-	// Redis 리스트의 길이를 먼저 구하고 대기열을 순회하면서 특정 userID를 pop
+	// 나이 조건 확인 (한 명이라도 나이 조건을 적용하지 않으면 매칭 가능)
+	if user1.AgeGroupUse || user2.AgeGroupUse {
+		if ageDifference > 3 {
+			return false
+		}
+	}
+
+	// 지역 조건 확인 (한 명이라도 지역 조건을 적용하지 않으면 매칭 가능)
+	if user1.AddressRangeUse || user2.AddressRangeUse {
+		if user1.Address.City != user2.Address.City {
+			return false
+		}
+	}
+
+	return true
+}
+
+// PopUserFromQueue: 특정 사용자를 대기열에서 제거하는 함수
+func (r *RedisClient) PopUserFromQueue(userID int, coupleCnt int) error {
+	queueName := fmt.Sprintf("matching_queue_%d", coupleCnt)
 	queueLength, err := r.Client.LLen(ctx, queueName).Result()
 	if err != nil {
-		return false, err
+		log.Printf("Failed to get queue length for %s: %v", queueName, err)
+		return err
 	}
 
 	for i := 0; i < int(queueLength); i++ {
-		user, err := r.Client.LIndex(ctx, queueName, int64(i)).Result()
-		if err == redis.Nil {
-			break
-		} else if err != nil {
-			return false, err
+		userJson, err := r.Client.LIndex(ctx, queueName, int64(i)).Result()
+		if err != nil {
+			log.Printf("Failed to get user from queue %s: %v", queueName, err)
+			continue
 		}
 
-		if user == userID {
-			// 특정 userID를 pop하기 위해 Redis 리스트에서 해당 인덱스의 값을 삭제
-			_, err = r.Client.LRem(ctx, queueName, 1, userID).Result()
+		var user types.WaitingUser
+		err = json.Unmarshal([]byte(userJson), &user)
+		if err != nil {
+			log.Printf("Failed to unmarshal user data: %v", err)
+			continue
+		}
+
+		if user.ID == userID {
+			_, err = r.Client.LRem(ctx, queueName, 1, userJson).Result()
 			if err != nil {
-				return false, err
+				log.Printf("Failed to remove user %d from queue %s: %v", userID, queueName, err)
+				return err
 			}
-			log.Printf("User %s removed from Redis matching queue %s", userID, queueName)
-			popped = true
-			break
+			log.Printf("User %d removed from Redis matching queue %s", userID, queueName)
+			return nil
 		}
 	}
 
-	if !popped {
-		log.Printf("User %s not found in Redis matching queue %s", userID, queueName)
-	}
-
-	return popped, nil
-}
-
-// ZSET 대기열에서 가장 오래된 연도와 가장 최근 연도를 반환
-func (r *RedisClient) GetOldestAndYoungestYear(queueName string) (int, int, error) {
-	// 가장 오래된 연도 가져오기
-	oldestUser, err := r.Client.ZRangeWithScores(ctx, queueName, 0, 0).Result()
-	if err != nil || len(oldestUser) == 0 {
-		return 0, 0, fmt.Errorf("no users in queue")
-	}
-	oldYear := int(oldestUser[0].Score)
-
-	// 가장 최근 연도 가져오기
-	youngestUser, err := r.Client.ZRangeWithScores(ctx, queueName, -1, -1).Result()
-	if err != nil || len(youngestUser) == 0 {
-		return 0, 0, fmt.Errorf("no users in queue")
-	}
-	youngYear := int(youngestUser[0].Score)
-
-	return oldYear, youngYear, nil
+	return nil
 }
 
 // GetSession: Redis에서 세션 조회

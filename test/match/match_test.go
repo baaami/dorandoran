@@ -117,6 +117,10 @@ func updateProfile(t *testing.T, sessionID string, userID string, gender int) er
 
 	updatedUser := User{
 		Gender: gender,
+		Birth:  "19960827",
+		Address: Address{
+			City: "Seoul",
+		},
 	}
 
 	reqBody, err := json.Marshal(updatedUser)
@@ -180,7 +184,7 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	participantCount := 10
+	participantCount := 8
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
