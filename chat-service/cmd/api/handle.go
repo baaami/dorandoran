@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,13 +11,15 @@ import (
 
 	"github.com/baaami/dorandoran/chat/pkg/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
+	common "github.com/baaami/dorandoran/common/user"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/lo"
 )
 
 type Chat struct {
+	Type      string    `bson:"type" json:"type"`
 	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  string    `bson:"sender_id" json:"sender_id"`
+	SenderID  int       `bson:"sender_id" json:"sender_id"`
 	Message   string    `bson:"message" json:"message"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
@@ -84,8 +87,8 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			RoomName:    "나는솔로 게임방", // 필요 시 채팅방 이름 필드 추가 가능
 			LastMessage: lastMessage,
 			LastRead:    lastReadTime,
-			CreatedAt:   room.CreatedAt.Format(time.RFC3339),
-			ModifiedAt:  room.ModifiedAt.Format(time.RFC3339),
+			CreatedAt:   room.CreatedAt,
+			ModifiedAt:  room.ModifiedAt,
 		}
 
 		// 배열에 추가
@@ -112,10 +115,32 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: chatRoom 내 유저 정보를 상세 정보로 포함하여 Response
+	var userList []common.User
+
+	for _, userID := range room.Users {
+		user, err := getUserByUserID(userID)
+		if err != nil {
+			log.Printf("Failed to get user, id: %s, err: %s", userID, err.Error())
+			continue
+		}
+		if user == nil {
+			log.Printf("Cannot find user in room, id: %s, room id: %s", userID, roomID)
+			continue
+		}
+
+		userList = append(userList, *user)
+	}
+
+	payload := data.ChatRoomDetailResponse{
+		ID:           room.ID,
+		Users:        userList,
+		CreatedAt:    room.CreatedAt,
+		ModifiedAt:   room.ModifiedAt,
+		UserLastRead: room.UserLastRead,
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(room)
+	json.NewEncoder(w).Encode(payload)
 }
 
 func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +262,7 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 
 	// Chat에 삽입
 	entry := data.Chat{
+		Type:     chatMsg.Type,
 		RoomID:   chatMsg.RoomID,
 		SenderID: chatMsg.SenderID,
 		Message:  chatMsg.Message,
@@ -250,7 +276,7 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Chat message inserted successfully"))
-	log.Printf("Chat message from %s in room[%s]", chatMsg.SenderID, chatMsg.RoomID)
+	log.Printf("Chat message from %d in room[%s]", chatMsg.SenderID, chatMsg.RoomID)
 }
 
 // 특정 방의 채팅 메시지 리스트 획득
@@ -271,7 +297,7 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 
 	messages, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
 	if err != nil {
-		log.Printf("Failed to GetByRoomID, err: %v", err)
+		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
 		http.Error(w, "Failed to Chat", http.StatusInternalServerError)
 		return
 	}
@@ -300,4 +326,57 @@ func (app *Config) deleteChatByRoomID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// [Bridge user] 회원 정보 획득
+func getUserByUserID(userID string) (*common.User, error) {
+	client := &http.Client{
+		Timeout: time.Second * 10, // 요청 타임아웃 설정
+	}
+
+	// 요청 URL 생성
+	url := "http://user-service/find"
+
+	// GET 요청 생성
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	// 사용자 ID를 요청의 헤더에 추가
+	req.Header.Set("X-User-ID", userID)
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 응답 처리
+	if resp.StatusCode == http.StatusNotFound {
+		// 유저가 존재하지 않는 경우
+		return nil, nil
+	} else if resp.StatusCode != http.StatusOK {
+		// 다른 에러가 발생한 경우
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// 응답 본문에서 유저 정보 디코딩
+	var user common.User
+
+	// 응답 본문 로깅 추가
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	// 본문을 다시 디코딩
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	// 유저가 존재하는 경우
+	return &user, nil
 }

@@ -3,7 +3,7 @@ module github.com/baaami/dorandoran/user
 go 1.22.5
 
 require (
-	github.com/baaami/dorandoran/common v0.0.0-20240926072007-75a6f509584f
+	github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
 	gorm.io/driver/mysql v1.5.7

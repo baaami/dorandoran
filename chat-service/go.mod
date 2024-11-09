@@ -3,7 +3,7 @@ module github.com/baaami/dorandoran/chat
 go 1.22.5
 
 require (
-	github.com/baaami/dorandoran/common v0.0.0-20240928111313-82ad7cd0f838
+	github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
 	github.com/rabbitmq/amqp091-go v1.10.0

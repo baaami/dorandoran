@@ -16,7 +16,7 @@ type ChatRoomDetailResponse struct {
 }
 
 type LastMessage struct {
-	SenderID  string    `json:"sender_id"`
+	SenderID  int       `json:"sender_id"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -26,6 +26,6 @@ type ChatRoomLatestResponse struct {
 	RoomName    string      `json:"room_name"`
 	LastMessage LastMessage `json:"last_message"`
 	LastRead    time.Time   `json:"last_read"`
-	CreatedAt   string      `json:"created_at"`
-	ModifiedAt  string      `json:"modified_at"`
+	CreatedAt   time.Time   `json:"created_at"`
+	ModifiedAt  time.Time   `json:"modified_at"`
 }

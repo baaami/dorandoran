@@ -23,3 +23,9 @@ type WaitingUser struct {
 	AddressRangeUse bool    `json:"address_range_use"`
 	AgeGroupUse     bool    `json:"age_group_use"`
 }
+
+const (
+	ChatTypeChat  = "chat"
+	ChatTypeJoin  = "join"
+	ChatTypeLeave = "leave"
+)

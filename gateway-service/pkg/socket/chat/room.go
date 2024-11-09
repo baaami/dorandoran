@@ -3,10 +3,12 @@ package chat
 import (
 	"encoding/json"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
+	"github.com/baaami/dorandoran/broker/pkg/types"
 	common "github.com/baaami/dorandoran/common/chat"
 )
 
@@ -23,14 +25,21 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		return
 	}
 
+	nUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		log.Printf("Failed to atoi, userid: %s, err: %s", userID, err.Error())
+		return
+	}
+
 	chat := Chat{
+		Type:      types.ChatTypeChat,
 		RoomID:    broadCastMsg.RoomID,
-		SenderID:  userID,
+		SenderID:  nUserID,
 		Message:   broadCastMsg.Message,
 		CreatedAt: time.Now(),
 	}
 
-	err := app.BroadcastToRoom(chat)
+	err = app.BroadcastToRoom(chat)
 	if err != nil {
 		log.Printf("Failed to BroadcastToRoom, err: %s", err.Error())
 	}

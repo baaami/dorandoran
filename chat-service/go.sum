@@ -1,5 +1,7 @@
 github.com/baaami/dorandoran/common v0.0.0-20240928111313-82ad7cd0f838 h1:yblGEGfwAzpr0WDOu3gJ7oiRUdu/tgKqLl5W8ncnORM=
 github.com/baaami/dorandoran/common v0.0.0-20240928111313-82ad7cd0f838/go.mod h1:aZ4BbhnbF95ZbZqT8ri3LsHbS0I1F8NniUZ4SQsh09Q=
+github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88 h1:6BX2qEYypx8K3Gxq0dV/AzIlHUdsspFv+aRgJ1wr0CA=
+github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88/go.mod h1:aZ4BbhnbF95ZbZqT8ri3LsHbS0I1F8NniUZ4SQsh09Q=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-chi/chi/v5 v5.1.0 h1:acVI1TYaD+hhedDJ3r54HyA6sExp3HfXq7QWEEY/xMw=
