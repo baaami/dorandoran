@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -87,6 +88,12 @@ func (app *Config) HandleMatchSocket(w http.ResponseWriter, r *http.Request) {
 // 매칭 서버 메시지 처리 함수
 func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, userID string) {
 	for {
+		// 컨텍스트의 타임아웃을 웹소켓 연결에 적용
+		deadline, ok := ctx.Deadline()
+		if ok {
+			conn.SetReadDeadline(deadline)
+		}
+
 		select {
 		case <-ctx.Done():
 			// 30초 타임아웃 시 매칭 실패 메시지 전송
@@ -97,9 +104,11 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, u
 		default:
 			_, _, err := conn.ReadMessage()
 			if err != nil {
-				// 클라이언트가 정상적으로 연결을 끊었을 경우 처리
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 					log.Printf("Unexpected WebSocket close error: %v", err)
+				} else if ctx.Err() == context.DeadlineExceeded || isTimeoutError(err) {
+					log.Printf("WebSocket read timeout for user %s", userID)
+					app.sendMatchFailureMessage(conn)
 				} else {
 					log.Println("WebSocket connection closed by client")
 				}
@@ -107,6 +116,12 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, u
 			}
 		}
 	}
+}
+
+// 타임아웃 에러 확인 함수
+func isTimeoutError(err error) bool {
+	netErr, ok := err.(net.Error)
+	return ok && netErr.Timeout()
 }
 
 // Register 메시지 처리

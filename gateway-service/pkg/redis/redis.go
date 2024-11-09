@@ -96,12 +96,11 @@ func (r *RedisClient) MonitorAndPopMatchingUsers(coupleCnt int) ([]string, error
 
 		// 조건에 맞는지 확인
 		if len(maleMatches) >= coupleCnt && len(femaleMatches) >= coupleCnt {
-			matchUserIdList := []string{}
 			selectedMales := maleMatches[:coupleCnt]
 			selectedFemales := femaleMatches[:coupleCnt]
-
-			// `isMatching` 함수를 사용해 조건에 맞는지 확인
 			allMatch := true
+
+			// 모든 남성-여성 조합에 대해 `isMatching` 검사
 			for _, male := range selectedMales {
 				for _, female := range selectedFemales {
 					if !isMatching(male, female) {
@@ -115,7 +114,7 @@ func (r *RedisClient) MonitorAndPopMatchingUsers(coupleCnt int) ([]string, error
 			}
 
 			if allMatch {
-				// 매칭된 사용자 ID 리스트 생성
+				matchUserIdList := []string{}
 				matchUserIdList = append(matchUserIdList, lo.Map(selectedMales, func(matchUser types.WaitingUser, index int) string {
 					return strconv.Itoa(matchUser.ID)
 				})...)
@@ -132,8 +131,8 @@ func (r *RedisClient) MonitorAndPopMatchingUsers(coupleCnt int) ([]string, error
 				log.Printf("Successfully matched users: %v from queue %s", matchUserIdList, queueName)
 				return matchUserIdList, nil
 			} else {
-				// 조건에 맞지 않으면 매칭 시도한 사용자들을 다시 큐에 추가
-				log.Printf("No matching users found that meet conditions in queue %s", queueName)
+				// 조건을 만족하지 않는 경우 매칭된 사용자들을 다시 큐에 추가
+				log.Printf("No complete matching users found in queue %s that meet all conditions", queueName)
 				for _, user := range append(selectedMales, selectedFemales...) {
 					userData, _ := json.Marshal(user)
 					r.Client.RPush(ctx, queueName, userData)

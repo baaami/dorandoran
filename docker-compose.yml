@@ -62,8 +62,8 @@ services:
       MYSQL_ROOT_PASSWORD: sample
     ports:
       - "3306:3306"
-    volumes:
-      - ./db-data/mysql:/var/lib/mysql
+    # volumes:
+    #   - ./db-data/mysql:/var/lib/mysql
     deploy:
       mode: replicated
       replicas: 1
@@ -76,8 +76,8 @@ services:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: sample
-    volumes:
-      - ./db-data/mongo/:/data/db
+    # volumes:
+    #   - ./db-data/mongo/:/data/db
 
   rabbitmq:
     image: "rabbitmq:3.9-alpine"
@@ -96,6 +96,14 @@ services:
       REDIS_PASSWORD: admin # Redis 비밀번호 설정
     ports:
       - "6379:6379"
-    command: ["redis-server", "--requirepass", "admin"] # Redis 비밀번호 설정 명령어
-    volumes:
-      - ./db-data/redis:/data # Redis 데이터 저장소 마운트
+    command: [
+        "redis-server",
+        "--requirepass",
+        "admin",
+        "--save",
+        "", # RDB 영속성 비활성화
+        "--appendonly",
+        "no", # AOF 영속성 비활성화
+      ]
+    # volumes:
+    #   - ./db-data/redis:/data # Redis 데이터 저장소 마운트
