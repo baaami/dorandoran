@@ -101,6 +101,7 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, u
 				log.Printf("Matching timed out for user %s", userID)
 				app.sendMatchFailureMessage(conn)
 			}
+			return
 		default:
 			_, _, err := conn.ReadMessage()
 			if err != nil {
