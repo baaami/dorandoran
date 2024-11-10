@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/json"
 	"time"
+
+	common "github.com/baaami/dorandoran/common/user"
 )
 
 // Request
@@ -56,9 +58,9 @@ type PushMatchSuccessMessage struct {
 }
 
 type PushRoomInfoMessage struct {
-	ID        string    `bson:"id" json:"id"` // UUID 사용
-	Users     []User    `bson:"users" json:"users"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	ID        string        `bson:"id" json:"id"` // UUID 사용
+	Users     []common.User `bson:"users" json:"users"`
+	CreatedAt time.Time     `bson:"created_at" json:"created_at"`
 }
 
 const (
