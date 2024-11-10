@@ -1,11 +1,5 @@
 package common
 
-type Address struct {
-	City     string `gorm:"size:100" json:"city"`
-	District string `gorm:"size:100" json:"district"`
-	Street   string `gorm:"size:100" json:"street"`
-}
-
 type User struct {
 	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType int     `gorm:"index" json:"sns_type"`
