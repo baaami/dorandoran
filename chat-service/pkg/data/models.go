@@ -268,33 +268,20 @@ func (c *ChatRoom) GetRoomsByUserID(userID string) ([]ChatRoom, error) {
 	return rooms, nil
 }
 
-// 마지막 채팅 데이터 조회
+// 최신 채팅 데이터 조회
 func (c *Chat) GetLastMessageByRoomID(roomID string) (*Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("messages")
 
-	opts := options.Find()
-	opts.SetSort(bson.D{{Key: "created_at", Value: -1}})
-	opts.SetLimit(1) // 페이지당 메시지 수 제한
-
-	cursor, err := collection.Find(context.TODO(), bson.M{"room_id": roomID}, opts)
+	// 최신 메시지를 가져오기 위해 내림차순 정렬
+	var lastMessage Chat
+	err := collection.FindOne(ctx, bson.M{"room_id": roomID}, options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})).Decode(&lastMessage)
 	if err != nil {
-		log.Println("Finding chat messages error:", err)
+		log.Println("Finding last chat message error:", err)
 		return nil, err
 	}
-	defer cursor.Close(ctx)
 
-	var messages Chat
-
-	for cursor.Next(ctx) {
-		err := cursor.Decode(&messages)
-		if err != nil {
-			log.Print("Error decoding chat message:", err)
-			return nil, err
-		}
-	}
-
-	return &messages, nil
+	return &lastMessage, nil
 }

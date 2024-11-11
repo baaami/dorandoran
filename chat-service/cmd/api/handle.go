@@ -143,6 +143,42 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(payload)
 }
 
+// 특정 방의 채팅 메시지 리스트 획득
+func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
+	// URL에서 room ID 가져오기
+	roomID := chi.URLParam(r, "id")
+
+	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
+	page := r.URL.Query().Get("page")
+
+	// 기본값 설정: 페이지 번호는 1, limit는 50으로 설정
+	pageNumber := 1
+	pageSize := 50
+
+	if page != "" {
+		pageNumber, _ = strconv.Atoi(page)
+	}
+
+	messages, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
+	if err != nil {
+		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
+		http.Error(w, "Failed to Chat", http.StatusInternalServerError)
+		return
+	}
+
+	if messages == nil {
+		messages = []*data.Chat{}
+	}
+
+	// 결과를 JSON으로 변환하여 반환
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(messages); err != nil {
+		log.Printf("Failed to encode messages, msg: %v, err: %v", messages, err)
+		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
+		return
+	}
+}
+
 func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "room_id")
 	userID := chi.URLParam(r, "user_id")
@@ -277,42 +313,6 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Chat message inserted successfully"))
 	log.Printf("Chat message from %d in room[%s]", chatMsg.SenderID, chatMsg.RoomID)
-}
-
-// 특정 방의 채팅 메시지 리스트 획득
-func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
-	// URL에서 room ID 가져오기
-	roomID := chi.URLParam(r, "id")
-
-	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
-	page := r.URL.Query().Get("page")
-
-	// 기본값 설정: 페이지 번호는 1, limit는 50으로 설정
-	pageNumber := 1
-	pageSize := 50
-
-	if page != "" {
-		pageNumber, _ = strconv.Atoi(page)
-	}
-
-	messages, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
-	if err != nil {
-		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
-		http.Error(w, "Failed to Chat", http.StatusInternalServerError)
-		return
-	}
-
-	if messages == nil {
-		messages = []*data.Chat{}
-	}
-
-	// 결과를 JSON으로 변환하여 반환
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(messages); err != nil {
-		log.Printf("Failed to encode messages, msg: %v, err: %v", messages, err)
-		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
-		return
-	}
 }
 
 func (app *Config) deleteChatByRoomID(w http.ResponseWriter, r *http.Request) {
