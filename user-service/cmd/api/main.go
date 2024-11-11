@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -19,6 +20,8 @@ type Config struct {
 }
 
 func main() {
+	timeInit() // KST 설정
+
 	mysqlClient, err := connectToMySQL()
 	if err != nil {
 		log.Panic(err)
@@ -63,4 +66,13 @@ func connectToMySQL() (*gorm.DB, error) {
 	log.Println("Connected to MySQL!")
 
 	return db, nil
+}
+
+func timeInit() {
+	// 서비스 초기화 시 KST를 전역 로케일로 설정
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to load KST location: %v", err))
+	}
+	time.Local = loc
 }

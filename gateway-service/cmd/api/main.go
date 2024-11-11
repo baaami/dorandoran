@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
@@ -22,6 +23,8 @@ const coupleMaxCount = 4
 type Config struct{}
 
 func main() {
+	timeInit() // KST 설정
+
 	// RabbitMQ 연결
 	rabbitConn, err := connect()
 	if err != nil {
@@ -76,4 +79,13 @@ func main() {
 
 func connect() (*amqp.Connection, error) {
 	return amqp.Dial("amqp://guest:guest@rabbitmq")
+}
+
+func timeInit() { // KST 설정
+	// 서비스 초기화 시 KST를 전역 로케일로 설정
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to load KST location: %v", err))
+	}
+	time.Local = loc
 }

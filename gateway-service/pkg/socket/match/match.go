@@ -101,6 +101,7 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, u
 				log.Printf("Matching timed out for user %s", userID)
 				app.sendMatchFailureMessage(conn)
 			}
+			return
 		default:
 			_, _, err := conn.ReadMessage()
 			if err != nil {
@@ -109,6 +110,7 @@ func (app *Config) listenMatchEvent(ctx context.Context, conn *websocket.Conn, u
 				} else if ctx.Err() == context.DeadlineExceeded || isTimeoutError(err) {
 					log.Printf("WebSocket read timeout for user %s", userID)
 					app.sendMatchFailureMessage(conn)
+					continue
 				} else {
 					log.Println("WebSocket connection closed by client")
 				}
