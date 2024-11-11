@@ -298,10 +298,11 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 
 	// Chat에 삽입
 	entry := data.Chat{
-		Type:     chatMsg.Type,
-		RoomID:   chatMsg.RoomID,
-		SenderID: chatMsg.SenderID,
-		Message:  chatMsg.Message,
+		Type:      chatMsg.Type,
+		RoomID:    chatMsg.RoomID,
+		SenderID:  chatMsg.SenderID,
+		Message:   chatMsg.Message,
+		CreatedAt: chatMsg.CreatedAt,
 	}
 
 	err = app.Models.Chat.Insert(entry)
