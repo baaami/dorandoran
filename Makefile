@@ -42,30 +42,30 @@ down:
 ## build_gateway: builds the gateway biary as a linux executable
 build_gateway:
 	@echo "Building gateway binary..."
-	cd gateway-service && go get -u github.com/baaami/dorandoran/common && env GOOS=linux CGO_ENABLED=0 go build -o ${GATEWAY_BINARY} ./cmd/api
+	cd gateway-service && env GOOS=linux CGO_ENABLED=0 go build -o ${GATEWAY_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_user: builds the user binary as a linux executable
 build_user:
 	@echo "Building user binary..."
-	cd user-service && go get -u github.com/baaami/dorandoran/common && env GOOS=linux CGO_ENABLED=0 go build -o ${USER_BINARY} ./cmd/api
+	cd user-service && env GOOS=linux CGO_ENABLED=0 go build -o ${USER_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_chat: builds the chat binary as a linux executable
 build_chat:
 	@echo "Building chat binary..."
-	cd chat-service && go get -u github.com/baaami/dorandoran/common && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_BINARY} ./cmd/api
+	cd chat-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_auth: builds the auth binary as a linux executable
 build_auth:
 	@echo "Building auth binary..."
-	cd auth-service && go get -u github.com/baaami/dorandoran/common && env GOOS=linux CGO_ENABLED=0 go build -o ${AUTH_BINARY} ./cmd/api
+	cd auth-service && env GOOS=linux CGO_ENABLED=0 go build -o ${AUTH_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_consumer: builds the consumer binary as a linux executable
 build_consumer:
 	@echo "Building consumer binary..."
-	cd consumer-service && go get -u github.com/baaami/dorandoran/common && env GOOS=linux CGO_ENABLED=0 go build -o ${CONSUMER_BINARY} .
+	cd consumer-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CONSUMER_BINARY} .
 	@echo "Done!"
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/auth/pkg/types"
+	"github.com/labstack/echo/v4"
 )
 
 type Address struct {
@@ -37,87 +38,64 @@ const (
 	NAVER_API_USER_INFO_URL = "https://openapi.naver.com/v1/nid/me"
 )
 
-// 클라이언트로부터 받은 access token을 검증하는 함수
-func (app *Config) KakaoLoginHandler(w http.ResponseWriter, r *http.Request) {
+// Kakao 로그인 핸들러
+func (app *Config) KakaoLoginHandler(c echo.Context) error {
 	var requestData struct {
 		AccessToken string `json:"accessToken"`
 	}
 
-	// 클라이언트로부터 받은 access token 파싱
-	err := json.NewDecoder(r.Body).Decode(&requestData)
-	if err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.Bind(&requestData); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 	}
 
 	var snsID string
 
 	if strings.HasPrefix(requestData.AccessToken, "masterkey-") {
-		// 구분자 뒤의 숫자를 추출하여 snsID 사용
 		parts := strings.Split(requestData.AccessToken, "-")
 		if len(parts) == 2 {
 			snsID = parts[1]
 		} else {
-			http.Error(w, "Invalid masterkey format", http.StatusBadRequest)
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid masterkey format"})
 		}
 	} else {
-		// [Network] 카카오 API 호출을 통해 access token 검증
 		kakaoResponse, err := GetKaKaoUserInfoByAccessToken(requestData.AccessToken)
 		if err != nil {
-			http.Error(w, "Invalid Kakao token", http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid Kakao token"})
 		}
 
-		// 사용자 정보에서 카카오 사용자 ID 추출
 		idValue, ok := kakaoResponse["id"].(float64)
 		if !ok {
-			log.Printf("Invalid Kakao Id: %s", kakaoResponse["id"])
-			http.Error(w, fmt.Sprintf("Invalid Kakao Id: %s", kakaoResponse["id"]), http.StatusUnauthorized)
-			return
+			log.Printf("Invalid Kakao Id: %v", kakaoResponse["id"])
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid Kakao Id"})
 		}
 		snsID = strconv.FormatInt(int64(idValue), 10)
 	}
 
-	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
 	loginUser, err := GetExistUserByUserSrv(types.KAKAO, snsID)
 	if err != nil {
-		log.Printf("Error occurred while checking user existence: %v\n", err)
-		return
+		log.Printf("Error checking user existence: %v\n", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
 	var sessionID string
 
-	if (loginUser == User{}) {
-		// 유저가 존재하지 않는 경우 -> 회원가입 진행
+	if loginUser == (User{}) {
 		loginUser, err = RegisterNewUser(types.KAKAO, snsID)
 		if err != nil {
 			log.Printf("Failed to register new user")
-			http.Error(w, "Failed to register new user", http.StatusInternalServerError)
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register new user"})
 		}
-
-		// 생성된 user ID로 세션 생성
 		sessionID = app.RedisClient.CreateSession(loginUser.ID)
-
 	} else {
-		// 유저가 존재하는 경우 -> 세션 존재 여부 확인
 		sessionID, err = app.RedisClient.GetSessionByUserID(loginUser.ID)
-		if err == nil && sessionID != "" {
-			// 기존 세션이 존재하는 경우 -> 그대로 사용
-			log.Printf("session already exist, ID: %s", sessionID)
-		} else {
-			// 기존 세션이 존재하지 않는 경우 -> 새 세션 생성
+		if err != nil || sessionID == "" {
 			sessionID = app.RedisClient.CreateSession(loginUser.ID)
 		}
 	}
 
-	SetSessionCookie(&w, sessionID)
+	SetSessionCookie(c, sessionID)
 
-	// 클라이언트에게 로그인 성
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(loginUser)
+	return c.JSON(http.StatusOK, loginUser)
 }
 
 // [Network] 카카오 API 호출을 통해 access token 검증
@@ -150,95 +128,70 @@ func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 	return kakaoResponse, nil
 }
 
-// 클라이언트로부터 받은 access token을 검증하는 함수 (네이버)
-func (app *Config) NaverLoginHandler(w http.ResponseWriter, r *http.Request) {
+// Naver 로그인 핸들러
+func (app *Config) NaverLoginHandler(c echo.Context) error {
 	var requestData struct {
 		AccessToken string `json:"accessToken"`
 	}
 
-	// 클라이언트로부터 받은 access token 파싱
-	err := json.NewDecoder(r.Body).Decode(&requestData)
-	if err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
-		return
+	if err := c.Bind(&requestData); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 	}
 
 	var snsID string
 
 	if strings.HasPrefix(requestData.AccessToken, "masterkey-") {
-		// 구분자 뒤의 숫자를 추출하여 snsID 사용
 		parts := strings.Split(requestData.AccessToken, "-")
 		if len(parts) == 2 {
 			snsID = parts[1]
 		} else {
-			http.Error(w, "Invalid masterkey format", http.StatusBadRequest)
-			return
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid masterkey format"})
 		}
 	} else {
-		// [Network] 네이버 API 호출을 통해 access token 검증
 		naverResponse, err := GetNaverUserInfoByAccessToken(requestData.AccessToken)
 		if err != nil {
-			http.Error(w, "Invalid Naver token", http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid Naver token"})
 		}
 
-		// 사용자 정보에서 네이버 사용자 ID 추출
 		responseData, ok := naverResponse["response"].(map[string]interface{})
 		if !ok {
 			log.Printf("Invalid Naver response: %v", naverResponse)
-			http.Error(w, "Invalid Naver response", http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid Naver response"})
 		}
 
 		idValue, ok := responseData["id"].(string)
 		if !ok {
 			log.Printf("Invalid Naver Id: %v", responseData["id"])
-			http.Error(w, fmt.Sprintf("Invalid Naver Id: %v", responseData["id"]), http.StatusUnauthorized)
-			return
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Invalid Naver Id"})
 		}
-
 		snsID = idValue
 	}
 
-	// [Hub Network] User 서비스에 API를 호출하여 존재하는 회원인지 확인
 	loginUser, err := GetExistUserByUserSrv(types.NAVER, snsID)
 	if err != nil {
-		log.Printf("Error occurred while checking user existence: %v\n", err)
-		return
+		log.Printf("Error checking user existence: %v\n", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
 	var sessionID string
 
-	if (loginUser == User{}) {
-		// 유저가 존재하지 않는 경우 -> 회원가입 진행
+	if loginUser == (User{}) {
 		loginUser, err = RegisterNewUser(types.NAVER, snsID)
 		if err != nil {
 			log.Printf("Failed to register new user")
-			http.Error(w, "Failed to register new user", http.StatusInternalServerError)
-			return
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register new user"})
 		}
-
-		// 생성된 user ID로 세션 생성
 		sessionID = app.RedisClient.CreateSession(loginUser.ID)
-
 	} else {
-		// 유저가 존재하는 경우 -> 세션 존재 여부 확인
 		sessionID, err = app.RedisClient.GetSessionByUserID(loginUser.ID)
-		if err == nil && sessionID != "" {
-			// 기존 세션이 존재하는 경우 -> 그대로 사용
-			log.Printf("session already exist, ID: %s", sessionID)
-		} else {
-			// 기존 세션이 존재하지 않는 경우 -> 새 세션 생성
+		if err != nil || sessionID == "" {
 			sessionID = app.RedisClient.CreateSession(loginUser.ID)
 		}
 	}
 
-	SetSessionCookie(&w, sessionID)
+	SetSessionCookie(c, sessionID)
 
-	// 클라이언트에게 로그인 성공
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(loginUser)
+	return c.JSON(http.StatusOK, loginUser)
 }
 
 // [Network] 네이버 API 호출을 통해 access token 검증
@@ -364,13 +317,13 @@ func RegisterNewUser(snsType int, snsID string) (User, error) {
 	return createdUser, nil
 }
 
-func SetSessionCookie(w *http.ResponseWriter, sessionID string) {
-	cookie := &http.Cookie{
-		Name:     "session_id",
-		Value:    sessionID,
-		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-	}
-	http.SetCookie(*w, cookie)
+// 세션 쿠키 설정
+func SetSessionCookie(c echo.Context, sessionID string) {
+	cookie := new(http.Cookie)
+	cookie.Name = "session_id"
+	cookie.Value = sessionID
+	cookie.HttpOnly = true
+	cookie.Secure = true
+	cookie.Path = "/"
+	c.SetCookie(cookie)
 }

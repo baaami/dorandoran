@@ -3,28 +3,28 @@ package main
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 func (app *Config) routes() http.Handler {
-	mux := chi.NewRouter()
+	e := echo.New()
 
 	// CORS 설정
-	mux.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"https://*", "http://*"},
+		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.PATCH, echo.DELETE, echo.OPTIONS},
+		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposeHeaders:    []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
 	// 카카오 로그인 API 라우팅
-	mux.Post("/kakao", app.KakaoLoginHandler)
+	e.POST("/kakao", app.KakaoLoginHandler)
 
 	// 네이버 로그인 API 라우팅
-	mux.Post("/naver", app.NaverLoginHandler)
+	e.POST("/naver", app.NaverLoginHandler)
 
-	return mux
+	return e
 }
