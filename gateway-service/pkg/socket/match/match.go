@@ -223,6 +223,7 @@ func (app *Config) MonitorQueue(coupleCnt int) {
 // 매칭 성공 메시지 전송 함수
 func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 	matchMsg := MatchResponse{
+		Type:   PushMessageStatusMatchSuccess,
 		RoomID: roomID,
 	}
 
@@ -233,8 +234,7 @@ func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 	}
 
 	webSocketMsg := WebSocketMessage{
-		Type:    MessageTypeMatch,
-		Status:  PushMessageStatusMatchSuccess,
+		Kind:    MessageTypeMatch,
 		Payload: json.RawMessage(payload),
 	}
 
@@ -260,13 +260,23 @@ func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 
 // 매칭 실패 메시지 전송 함수
 func (app *Config) sendMatchFailureMessage(conn *websocket.Conn) {
-	failureMsg := WebSocketMessage{
-		Type:    MessageTypeMatch,
-		Status:  PushMessageStatusMatchFailure,
-		Payload: nil,
+	matchMsg := MatchResponse{
+		Type:   PushMessageStatusMatchFailure,
+		RoomID: "",
 	}
 
-	if err := conn.WriteJSON(failureMsg); err != nil {
+	payload, err := json.Marshal(matchMsg)
+	if err != nil {
+		log.Printf("Failed to marshal match response: %v", err)
+		return
+	}
+
+	webSocketMsg := WebSocketMessage{
+		Kind:    MessageTypeMatch,
+		Payload: json.RawMessage(payload),
+	}
+
+	if err := conn.WriteJSON(webSocketMsg); err != nil {
 		log.Printf("Failed to send match failure message: %v", err)
 	}
 }

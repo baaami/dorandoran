@@ -24,8 +24,7 @@ const (
 )
 
 type WebSocketMessage struct {
-	Type    string          `json:"type"`
-	Status  string          `json:"status"`
+	Kind    string          `json:"kind"`
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -140,8 +139,7 @@ func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message strin
 	}
 
 	wsMessage := WebSocketMessage{
-		Type:    "chat",
-		Status:  "broadcast",
+		Kind:    "message",
 		Payload: toJSONRawMessage(Chat),
 	}
 
@@ -266,8 +264,7 @@ func TestChatAmongFiveClients(t *testing.T) {
 // 참가자가 방에 참여하는 함수
 func joinRoom(t *testing.T, conn *websocket.Conn, userID string) {
 	joinMsg := WebSocketMessage{
-		Type:   "room",
-		Status: "join",
+		Kind: "join",
 		Payload: toJSONRawMessage(map[string]string{
 			"room_id": RoomID,
 		}),
@@ -284,8 +281,7 @@ func joinRoom(t *testing.T, conn *websocket.Conn, userID string) {
 // 참가자가 방을 떠나는 함수
 func leaveRoom(t *testing.T, conn *websocket.Conn, userID string) {
 	leaveMsg := WebSocketMessage{
-		Type:   "room",
-		Status: "leave",
+		Kind: "leave",
 		Payload: toJSONRawMessage(map[string]string{
 			"room_id": RoomID,
 		}),

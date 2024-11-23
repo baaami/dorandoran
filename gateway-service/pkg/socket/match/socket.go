@@ -10,8 +10,7 @@ import (
 )
 
 type WebSocketMessage struct {
-	Type    string          `json:"type"`
-	Status  string          `json:"status"`
+	Kind    string          `json:"kind"`
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -89,5 +88,6 @@ type Config struct {
 }
 
 type MatchResponse struct {
+	Type   string `json:"type"`
 	RoomID string `json:"room_id"`
 }

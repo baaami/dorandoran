@@ -38,6 +38,8 @@ func (app *Config) routes() http.Handler {
 
 	// 채팅
 	mux.Post("/msg", app.addChatMsg)
+
+	// 채팅 내역 조회
 	mux.Get("/list/{id}", app.getChatMsgListByRoomID) // by roomid
 	mux.Delete("/all/{id}", app.deleteChatByRoomID)   // by roomid
 

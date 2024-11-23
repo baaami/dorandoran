@@ -11,8 +11,7 @@ import (
 )
 
 type WebSocketMessage struct {
-	Type    string          `json:"type"`
-	Status  string          `json:"status"`
+	Kind    string          `json:"kind"`
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -39,10 +38,11 @@ type ChatRoom struct {
 }
 
 const (
-	MessageTypeChat  = "chat"
-	MessageTypeMatch = "match"
-	MessageTypeRoom  = "room"
-	MessageTypeGame  = "game"
+	MessageKindMessage = "message"
+	MessageKindJoin    = "join"
+	MessageKindLeave   = "leave"
+	MessageTypeMatch   = "match"
+	MessageTypeGame    = "game"
 )
 
 // Chat Type (Receive)

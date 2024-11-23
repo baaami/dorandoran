@@ -54,8 +54,7 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) error {
 	}
 
 	webSocketMsg := WebSocketMessage{
-		Type:    MessageTypeChat,
-		Status:  MessageStatusChatBroadCast,
+		Kind:    MessageKindMessage,
 		Payload: json.RawMessage(payload),
 	}
 

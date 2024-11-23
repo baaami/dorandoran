@@ -86,32 +86,31 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				continue
 			}
 
-			switch wsMsg.Type {
-			case MessageTypeChat:
-				app.handleChatType(wsMsg.Status, userID, wsMsg.Payload)
-			case MessageTypeRoom:
-				app.handleRoomType(wsMsg.Status, userID, wsMsg.Payload)
+			switch wsMsg.Kind {
+			case MessageKindMessage:
+				app.handleMessageType(userID, wsMsg.Payload)
+			case MessageKindJoin:
+				app.handleJoinType(userID, wsMsg.Payload)
+			case MessageKindLeave:
+				app.handleLeaveType(userID, wsMsg.Payload)
 			}
 		}
 	}
 }
 
-// chat type 메시지 처리
-func (app *Config) handleChatType(status, userID string, payload json.RawMessage) {
-	switch status {
-	case MessageStatusChatBroadCast:
-		app.handleBroadCastMessage(payload, userID)
-	}
+// message kind 메시지 처리
+func (app *Config) handleMessageType(userID string, payload json.RawMessage) {
+	app.handleBroadCastMessage(payload, userID)
 }
 
-// room type 메시지 처리
-func (app *Config) handleRoomType(status, userID string, payload json.RawMessage) {
-	switch status {
-	case MessageStatusRoomJoin:
-		app.handleJoinMessage(payload, userID)
-	case MessageStatusRoomLeave:
-		app.handleLeaveMessage(payload, userID)
-	}
+// join kind 메시지 처리
+func (app *Config) handleJoinType(userID string, payload json.RawMessage) {
+	app.handleJoinMessage(payload, userID)
+}
+
+// leave kind 메시지 처리
+func (app *Config) handleLeaveType(userID string, payload json.RawMessage) {
+	app.handleLeaveMessage(payload, userID)
 }
 
 // Register

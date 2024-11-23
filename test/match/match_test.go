@@ -38,13 +38,13 @@ type User struct {
 
 // WebSocketMessage 구조체 정의
 type WebSocketMessage struct {
-	Type    string          `json:"type"`
-	Status  string          `json:"status"`
+	Kind    string          `json:"kind"`
 	Payload json.RawMessage `json:"payload"`
 }
 
 // MatchResponse 구조체 정의
 type MatchResponse struct {
+	Type   string `json:"type"`
 	RoomID string `json:"room_id"`
 }
 
@@ -166,7 +166,13 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
 		t.Fatalf("Failed to receive match response: %v", err)
 	}
 
-	if webSocketMsg.Status == "fail" {
+	var matchResp MatchResponse
+	err = json.Unmarshal(webSocketMsg.Payload, &matchResp)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal MatchResponse: %v", err)
+	}
+
+	if matchResp.Type == "fail" {
 		t.Logf("Received match failure message: %v", webSocketMsg)
 	}
 
@@ -247,15 +253,16 @@ func TestMatchWebSocketAPI(t *testing.T) {
 			Birth:  birth,
 		}
 
-		if matchResponses[i].Status == "success" {
-			var matchResp MatchResponse
-			err := json.Unmarshal(matchResponses[i].Payload, &matchResp)
-			assert.NoError(t, err)
+		var matchResp MatchResponse
+		err := json.Unmarshal(matchResponses[i].Payload, &matchResp)
+		assert.NoError(t, err)
+
+		if matchResp.Type == "success" {
 			if matchResp.RoomID != "" {
 				t.Logf("%s User allocated room %s", userIDs[i], matchResp.RoomID)
 				matchedUsers[matchResp.RoomID] = append(matchedUsers[matchResp.RoomID], userInfo)
 			}
-		} else if matchResponses[i].Status == "fail" {
+		} else if matchResp.Type == "fail" {
 			t.Logf("%s User match failed due to timeout", userIDs[i])
 			unmatchedUsers = append(unmatchedUsers, userInfo)
 		}
