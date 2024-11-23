@@ -150,7 +150,6 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 	}
 
 	// room에 join한 사용자에게 채팅방 정보 전송
-
 }
 
 // Room에서 사용자 제거하기

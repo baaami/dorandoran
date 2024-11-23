@@ -25,7 +25,7 @@ type ChatRoomLatestResponse struct {
 	ID          string      `json:"id"`
 	RoomName    string      `json:"room_name"`
 	LastMessage LastMessage `json:"last_message"`
-	LastRead    time.Time   `json:"last_read"`
+	UnreadCount int         `json:"unread_count"`
 	CreatedAt   time.Time   `json:"created_at"`
 	ModifiedAt  time.Time   `json:"modified_at"`
 }

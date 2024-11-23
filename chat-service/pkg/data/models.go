@@ -268,6 +268,29 @@ func (c *ChatRoom) GetRoomsByUserID(userID string) ([]ChatRoom, error) {
 	return rooms, nil
 }
 
+// 특정 유저가 특정 채팅방 내에서 읽지 않은 메시지 개수 반환
+func (c *Chat) GetUnreadMessageCount(roomID string, userID string, lastReadTime time.Time) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	// Filter messages created after the user's last read time
+	filter := bson.M{
+		"room_id":    roomID,
+		"created_at": bson.M{"$gt": lastReadTime},
+	}
+
+	// Count the documents matching the filter
+	count, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		log.Printf("Error counting unread messages for room %s and user %s: %v", roomID, userID, err)
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
 // 최신 채팅 데이터 조회
 func (c *Chat) GetLastMessageByRoomID(roomID string) (*Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

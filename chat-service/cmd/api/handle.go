@@ -48,7 +48,6 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 
 // 특정 유저의 채팅방 목록 조회
 func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
-	// 사용자 ID를 가져옵니다. (예: 헤더에서 "X-User-ID"로 전달된다고 가정)
 	userID := r.Header.Get("X-User-ID")
 	if userID == "" {
 		http.Error(w, "User ID is required", http.StatusUnauthorized)
@@ -65,11 +64,24 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	// ChatRoomLatestResponse 배열을 생성
 	var response []data.ChatRoomLatestResponse
 	for _, room := range rooms {
-
+		// 채팅방의 마지막 메시지 조회
 		findLastMessage, err := app.Models.Chat.GetLastMessageByRoomID(room.ID)
 		if err != nil {
-			fmt.Printf("GetLastMessageByRoomID fail(), err: %s", err.Error())
+			log.Printf("Failed to retrieve last message for room %s: %v", room.ID, err)
 			continue
+		}
+
+		// 사용자의 마지막 읽은 시간 가져오기
+		lastReadTime, ok := room.UserLastRead[userID]
+		if !ok {
+			lastReadTime = time.Time{} // Default to zero time if no last read time is found
+		}
+
+		// 읽지 않은 메시지 수 계산
+		unreadCount, err := app.Models.Chat.GetUnreadMessageCount(room.ID, userID, lastReadTime)
+		if err != nil {
+			log.Printf("Failed to calculate unread count for room %s: %v", room.ID, err)
+			unreadCount = 0
 		}
 
 		lastMessage := data.LastMessage{
@@ -78,15 +90,12 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: findLastMessage.CreatedAt,
 		}
 
-		// 유저의 마지막 읽은 시간 가져오기
-		lastReadTime := room.UserLastRead[userID]
-
 		// ChatRoomLatestResponse 생성
 		chatRoomResponse := data.ChatRoomLatestResponse{
 			ID:          room.ID,
-			RoomName:    "나는솔로 게임방", // 필요 시 채팅방 이름 필드 추가 가능
+			RoomName:    "채팅방 이름", // 필요시 동적으로 추가
 			LastMessage: lastMessage,
-			LastRead:    lastReadTime,
+			UnreadCount: unreadCount,
 			CreatedAt:   room.CreatedAt,
 			ModifiedAt:  room.ModifiedAt,
 		}
@@ -95,6 +104,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 		response = append(response, chatRoomResponse)
 	}
 
+	// 결과 반환
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 	w.WriteHeader(http.StatusOK)
