@@ -20,7 +20,7 @@ import (
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
-	RoomID          = "36368b80-229b-43aa-af57-67c844dceb5b" // 테스트용 RoomID
+	RoomID          = "d361a857-8951-403a-a9b8-810267f53927" // 테스트용 RoomID
 )
 
 type WebSocketMessage struct {
@@ -153,7 +153,6 @@ func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message strin
 func receiveChats(t *testing.T, conn *websocket.Conn, userID string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
-
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("[INFO] User %s disconnected: %v", userID, err)

@@ -13,8 +13,14 @@ import (
 )
 
 type RoomJoinEvent struct {
-	RoomID string `bson:"room_id" json:"room_id"`
-	UserID string `bson:"user_id" json:"user_id"`
+	RoomID string    `bson:"room_id" json:"room_id"`
+	UserID string    `bson:"user_id" json:"user_id"`
+	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
+type CheckReadEvent struct {
+	RoomID       string            `json:"room_id"`
+	UserLastRead map[string]string `json:"user_last_read"` // UserID와 시간 정보
 }
 
 // BroadCast 메시지 처리
@@ -41,8 +47,11 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 
 	err = app.BroadcastToRoom(chat)
 	if err != nil {
-		log.Printf("Failed to BroadcastToRoom, err: %s", err.Error())
+		log.Printf("Failed to broadcast message: %v", err)
+	} else {
+		app.UpdateUserLastReadAndNotify(chat.RoomID, strconv.Itoa(chat.SenderID), chat.CreatedAt)
 	}
+
 }
 
 // Room에 있는 모든 사용자에게 브로드캐스트
@@ -90,7 +99,7 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) error {
 		log.Printf("Room %s not found", roomID)
 	}
 
-	log.Printf("[INFO] Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
+	log.Printf("Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
 
 	err = app.ChatEmitter.PushChatToQueue(event.Chat(chatMsg))
 	if err != nil {
@@ -98,6 +107,85 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) error {
 	}
 
 	return nil
+}
+
+func (app *Config) UpdateUserLastReadAndNotify(roomID string, senderID string, timestamp time.Time) {
+	room, ok := app.Rooms.Load(roomID)
+	if !ok {
+		log.Printf("Room %s not found for UpdateUserLastReadAndNotify", roomID)
+		return
+	}
+
+	roomMap := room.(*sync.Map)
+
+	userLastRead := make(map[string]time.Time)
+	roomMap.Range(func(userID, _ interface{}) bool {
+		userLastRead[userID.(string)] = timestamp
+		return true
+	})
+
+	// RabbitMQ를 통해 비동기로 DB 업데이트
+	err := app.ChatEmitter.PushUserLastReadToQueue(event.UserLastReadUpdateEvent{
+		RoomID:       roomID,
+		UserLastRead: userLastRead,
+	})
+	if err != nil {
+		log.Printf("Failed to push UserLastReadUpdateEvent to RabbitMQ: %v", err)
+	}
+
+	// WebSocket으로 check_read 이벤트 전송
+	app.BroadcastCheckRead(roomID, userLastRead)
+}
+
+func (app *Config) BroadcastCheckRead(roomID string, userLastRead map[string]time.Time) {
+	room, ok := app.Rooms.Load(roomID)
+	if !ok {
+		log.Printf("Room %s not found for BroadcastCheckRead", roomID)
+		return
+	}
+
+	// user_last_read 값을 string으로 변환
+	formattedLastRead := make(map[string]string)
+	for userID, readTime := range userLastRead {
+		formattedLastRead[userID] = readTime.Format(time.RFC3339)
+	}
+
+	payload := CheckReadEvent{
+		RoomID:       roomID,
+		UserLastRead: formattedLastRead,
+	}
+
+	message := WebSocketMessage{
+		Kind:    "check_read",
+		Payload: mustMarshalJSON(payload),
+	}
+
+	roomMap := room.(*sync.Map)
+	roomMap.Range(func(userID, clientInterface interface{}) bool {
+		client, ok := clientInterface.(*Client)
+		if !ok || client == nil {
+			log.Printf("Invalid client for user %v in room %s", userID, roomID)
+			roomMap.Delete(userID)
+			return true
+		}
+
+		// 메시지 전송
+		select {
+		case client.Send <- message:
+		default:
+			log.Printf("Failed to send check_read message to user %v in room %s", userID, roomID)
+			roomMap.Delete(userID)
+		}
+		return true
+	})
+}
+
+func mustMarshalJSON(v interface{}) json.RawMessage {
+	data, err := json.Marshal(v)
+	if err != nil {
+		log.Fatalf("[ERROR] Failed to marshal JSON: %v", err)
+	}
+	return data
 }
 
 // Join 메시지 처리
@@ -140,9 +228,13 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 	roomJoinMsg := RoomJoinEvent{
 		RoomID: roomID,
 		UserID: userID,
+		JoinAt: time.Now(),
 	}
 
-	log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s", roomJoinMsg.RoomID, roomJoinMsg.UserID)
+	// TODO: join time을 해당 user의 update last read 시간을 업데이트 (With. Rabbit MQ)
+	// TODO: join time을 통해 room에 입장한 user들에게 check_read 소켓 이벤트를 송신 (With. WebSocket)
+
+	log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s, time: %v", roomJoinMsg.RoomID, roomJoinMsg.UserID, roomJoinMsg.JoinAt)
 
 	err := app.ChatEmitter.PushRoomJoinToQueue(event.RoomJoinEvent(roomJoinMsg))
 	if err != nil {

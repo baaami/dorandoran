@@ -27,7 +27,6 @@ const (
 	MessageTypeChat  = "chat"
 	MessageTypeMatch = "match"
 	MessageTypeRoom  = "room"
-	MessageTypeGame  = "game"
 )
 
 // Chat Type (Receive)

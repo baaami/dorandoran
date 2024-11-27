@@ -15,8 +15,9 @@ type EventPayload struct {
 }
 
 type RoomJoinEvent struct {
-	RoomID string `bson:"room_id" json:"room_id"`
-	UserID string `bson:"user_id" json:"user_id"`
+	RoomID string    `bson:"room_id" json:"room_id"`
+	UserID string    `bson:"user_id" json:"user_id"`
+	JoinAt time.Time `bson:"join_at" json:"join_at"`
 }
 
 type Chat struct {
@@ -25,6 +26,11 @@ type Chat struct {
 	SenderID  int       `bson:"sender_id" json:"sender_id"`
 	Message   string    `bson:"message" json:"message"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+}
+
+type UserLastReadUpdateEvent struct {
+	RoomID       string               `bson:"room_id" json:"room_id"`
+	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
 type Emitter struct {
@@ -115,6 +121,42 @@ func (e *Emitter) PushChatToQueue(chatMsg Chat) error {
 	}
 
 	log.Printf("Chat message successfully pushed to RabbitMQ")
+	return nil
+}
+
+func (e *Emitter) PushUserLastReadToQueue(userLastRead UserLastReadUpdateEvent) error {
+	if e.connection == nil {
+		log.Println("RabbitMQ connection is nil")
+		return fmt.Errorf("RabbitMQ connection is nil")
+	}
+
+	// 채팅 메시지 데이터를 JSON으로 변환
+	chatData, err := json.Marshal(userLastRead)
+	if err != nil {
+		log.Printf("Failed to marshal chat message: %v", err)
+		return err
+	}
+
+	// EventPayload에 맞게 데이터를 래핑
+	payload := EventPayload{
+		EventType: "chat.update_last_read",
+		Data:      chatData,
+	}
+
+	// EventPayload를 JSON으로 변환 (문자열로 변환하지 않음)
+	eventJSON, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal event payload: %v", err)
+		return err
+	}
+
+	err = e.PushBytes(eventJSON, "chat.update_last_read")
+	if err != nil {
+		log.Printf("Failed to push message to queue: %v", err)
+		return err
+	}
+
+	log.Printf("LastRead Event Message successfully pushed to RabbitMQ")
 	return nil
 }
 

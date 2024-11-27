@@ -38,16 +38,10 @@ type ChatRoom struct {
 }
 
 const (
-	MessageKindMessage = "message"
-	MessageKindJoin    = "join"
-	MessageKindLeave   = "leave"
-	MessageTypeMatch   = "match"
-	MessageTypeGame    = "game"
-)
-
-// Chat Type (Receive)
-const (
-	MessageStatusChatBroadCast = "broadcast"
+	MessageKindMessage   = "message"
+	MessageKindJoin      = "join"
+	MessageKindLeave     = "leave"
+	MessageKindCheckRead = "check_read"
 )
 
 // Room Type (Receive)

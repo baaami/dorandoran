@@ -24,6 +24,12 @@ type Chat struct {
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
+type RoomJoinEvent struct {
+	RoomID string    `bson:"room_id" json:"room_id"`
+	UserID string    `bson:"user_id" json:"user_id"`
+	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
 // 채팅방 생성
 func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 	var room data.ChatRoom
@@ -189,9 +195,17 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// TODO: 함수명 변경 필요
 func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "room_id")
 	userID := chi.URLParam(r, "user_id")
+
+	var roomJoinEvent RoomJoinEvent
+	if err := json.NewDecoder(r.Body).Decode(&roomJoinEvent); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		log.Printf("Failed to decode room join event: %v", err)
+		return
+	}
 
 	// 채팅방이 존재하는지 확인
 	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
@@ -213,7 +227,7 @@ func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 채팅방의 UserLastRead 필드를 업데이트
-	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID)
+	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID, roomJoinEvent.JoinAt)
 	if err != nil {
 		http.Error(w, "Failed to confirm chat room", http.StatusInternalServerError)
 		return
@@ -254,7 +268,7 @@ func (app *Config) confirmChatRoomByUser(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 채팅방의 UserLastRead 필드를 업데이트
-	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID)
+	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID, time.Now())
 	if err != nil {
 		http.Error(w, "Failed to confirm chat room", http.StatusInternalServerError)
 		return
@@ -262,6 +276,53 @@ func (app *Config) confirmChatRoomByUser(w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusOK)
 	log.Printf("Chat room confirmed, roomID: %s, userID: %s", roomID, userID)
+}
+
+func (app *Config) updateLastReadChatRoom(w http.ResponseWriter, r *http.Request) {
+	// Room ID 가져오기
+	roomID := chi.URLParam(r, "room_id")
+	if roomID == "" {
+		http.Error(w, "Room ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 요청 본문 읽기
+	var updateData map[string]string // {userID: lastReadTime (RFC3339 string)}
+	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		log.Printf("Failed to decode update data: %v", err)
+		return
+	}
+
+	// 유효성 검사
+	if len(updateData) == 0 {
+		http.Error(w, "Empty update data", http.StatusBadRequest)
+		return
+	}
+
+	// 타임스탬프 파싱 및 업데이트 데이터 생성
+	userLastRead := make(map[string]time.Time)
+	for userID, timeStr := range updateData {
+		parsedTime, err := time.Parse(time.RFC3339, timeStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid time format for user %s", userID), http.StatusBadRequest)
+			log.Printf("Failed to parse time for user %s: %v", userID, err)
+			return
+		}
+		userLastRead[userID] = parsedTime
+	}
+
+	// MongoDB에서 RoomID로 채팅방 업데이트
+	err := app.Models.ChatRoom.UpdateUserLastReadBatch(roomID, userLastRead)
+	if err != nil {
+		http.Error(w, "Failed to update user last read", http.StatusInternalServerError)
+		log.Printf("Failed to update UserLastRead for room %s: %v", roomID, err)
+		return
+	}
+
+	// 성공 응답
+	w.WriteHeader(http.StatusOK)
+	log.Printf("Successfully updated UserLastRead for room %s", roomID)
 }
 
 // 특정 Room ID로 채팅방 삭제
@@ -288,7 +349,7 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[INFO] Pushing Room Delete Event to RabbitMQ, room: %s", roomID)
 		emitter.PushRoomToQueue(*room)
 	} else {
-		log.Printf("[ERROR] Failed to create event emitter: %v", err)
+		log.Printf("Failed to create event emitter: %v", err)
 	}
 
 	w.WriteHeader(http.StatusOK)

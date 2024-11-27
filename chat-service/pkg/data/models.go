@@ -176,13 +176,11 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 }
 
 // 채팅방 정보 업데이트
-func (c *ChatRoom) ConfirmRoom(roomID string, userID string) error {
+func (c *ChatRoom) ConfirmRoom(roomID string, userID string, currentTime time.Time) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("rooms")
-
-	currentTime := time.Now()
 
 	// 필터: 해당 Room ID를 가진 문서
 	filter := bson.M{"id": roomID}
@@ -202,6 +200,33 @@ func (c *ChatRoom) ConfirmRoom(roomID string, userID string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (c *ChatRoom) UpdateUserLastReadBatch(roomID string, userLastRead map[string]time.Time) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("rooms")
+
+	// Update 문서 생성
+	updateFields := bson.M{}
+	for userID, lastReadTime := range userLastRead {
+		updateFields[fmt.Sprintf("user_last_read.%s", userID)] = lastReadTime
+	}
+
+	update := bson.M{
+		"$set": updateFields,
+	}
+
+	// MongoDB UpdateOne 실행
+	_, err := collection.UpdateOne(ctx, bson.M{"id": roomID}, update)
+	if err != nil {
+		log.Printf("Failed to update UserLastRead for room %s: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("UserLastRead updated for room %s: %+v", roomID, userLastRead)
 	return nil
 }
 

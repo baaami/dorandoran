@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -13,8 +14,9 @@ import (
 )
 
 type RoomJoinEvent struct {
-	RoomID string `bson:"room_id" json:"room_id"`
-	UserID string `bson:"user_id" json:"user_id"`
+	RoomID string    `bson:"room_id" json:"room_id"`
+	UserID string    `bson:"user_id" json:"user_id"`
+	JoinAt time.Time `bson:"join_at" json:"join_at"`
 }
 
 // Chat 구조체 정의
@@ -24,6 +26,11 @@ type Chat struct {
 	SenderID  int       `bson:"sender_id" json:"sender_id"`
 	Message   string    `bson:"message" json:"message"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+}
+
+type UserLastReadUpdateEvent struct {
+	RoomID       string               `bson:"room_id" json:"room_id"`
+	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
 // User 구조체 정의
@@ -144,6 +151,16 @@ func (consumer *Consumer) Listen(topics []string) error {
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
 				handleChatAddPayload(chatMsg)
 
+			case "chat.update_last_read":
+				var userLastRead UserLastReadUpdateEvent
+				// eventPayload.Data는 json.RawMessage이므로 다시 언마샬링
+				if err := json.Unmarshal(eventPayload.Data, &userLastRead); err != nil {
+					log.Printf("Failed to unmarshal chat message: %v", err)
+					continue
+				}
+				log.Printf("userLastRead Message Unmarshaled: %+v", userLastRead)
+				handleChatRoomUpdateLastRead(userLastRead)
+
 			case "user.created":
 				var user User
 				if err := json.Unmarshal(eventPayload.Data, &user); err != nil {
@@ -159,8 +176,8 @@ func (consumer *Consumer) Listen(topics []string) error {
 					log.Printf("Failed to unmarshal room join event: %v", err)
 					continue
 				}
-				// TODO: room join event 발생 시점에 아직 room이 동기적으로 생성되지 않음
-				// handleRoomJoinEvent(roomJoin)
+
+				handleRoomJoinEvent(roomJoin)
 
 			case "room.deleted":
 				var room common.ChatRoom
@@ -207,6 +224,41 @@ func handleChatAddPayload(chatMsg Chat) error {
 	if response.StatusCode != http.StatusCreated {
 		log.Printf("Failed to send chat message: %v", err)
 		return err
+	}
+
+	return nil
+}
+
+func handleChatRoomUpdateLastRead(userLastRead UserLastReadUpdateEvent) error {
+	jsonData, _ := json.MarshalIndent(&userLastRead.UserLastRead, "", "\t")
+
+	const chatServiceBaseURL = "http://chat-service"
+
+	chatServiceURL := fmt.Sprintf("%s/room/last/%s", chatServiceBaseURL, userLastRead.RoomID)
+
+	request, err := http.NewRequest(http.MethodPut, chatServiceURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Failed to create request: %v", err)
+		return err
+	}
+
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		log.Printf("Failed to send request: %v", err)
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(response.Body) // 응답 본문을 읽음
+		log.Printf("Failed to update last read. Status: %d, Body: %s", response.StatusCode, string(body))
+		return fmt.Errorf("failed to update last read: status code %d", response.StatusCode)
 	}
 
 	return nil
