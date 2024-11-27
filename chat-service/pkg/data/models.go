@@ -97,40 +97,45 @@ func (c *Chat) GetByRoomID(roomID string) ([]*Chat, error) {
 	return messages, nil
 }
 
-// 채팅 목록 조회 (페이지네이션 포함)
-func (c *Chat) GetByRoomIDWithPagination(roomID string, pageNumber int, pageSize int) ([]*Chat, error) {
+// 채팅 목록 조회
+func (c *Chat) GetByRoomIDWithPagination(roomID string, pageNumber int, pageSize int) ([]*Chat, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("messages")
 
+	// 총 메시지 수 계산
+	totalCount, err := collection.CountDocuments(ctx, bson.M{"room_id": roomID})
+	if err != nil {
+		log.Printf("Error counting messages in room %s: %v", roomID, err)
+		return nil, 0, err
+	}
+
+	// 메시지 조회
 	opts := options.Find()
 	opts.SetSort(bson.D{{"created_at", -1}})         // 최신 순으로 정렬
 	opts.SetSkip(int64((pageNumber - 1) * pageSize)) // 페이지에 맞는 메시지 건너뛰기
 	opts.SetLimit(int64(pageSize))                   // 페이지당 메시지 수 제한
 
-	cursor, err := collection.Find(context.TODO(), bson.M{"room_id": roomID}, opts)
+	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID}, opts)
 	if err != nil {
 		log.Println("Finding chat messages error:", err)
-		return nil, err
+		return nil, 0, err
 	}
 	defer cursor.Close(ctx)
 
 	var messages []*Chat
-
 	for cursor.Next(ctx) {
 		var item Chat
-
 		err := cursor.Decode(&item)
 		if err != nil {
-			log.Print("Error decoding chat message:", err)
-			return nil, err
-		} else {
-			messages = append(messages, &item)
+			log.Printf("Error decoding chat message: %v", err)
+			return nil, 0, err
 		}
+		messages = append(messages, &item)
 	}
 
-	return messages, nil
+	return messages, totalCount, nil
 }
 
 // 채팅 목록 삭제 (by ChatRoom ID)

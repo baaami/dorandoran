@@ -24,6 +24,14 @@ type Chat struct {
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
 }
 
+type ChatListResponse struct {
+	Data        []*data.Chat `json:"data"`
+	CurrentPage int          `json:"currentPage"`
+	NextPage    int          `json:"nextPage,omitempty"`
+	HasNextPage bool         `json:"hasNextPage"`
+	TotalPages  int          `json:"totalPages"`
+}
+
 type RoomJoinEvent struct {
 	RoomID string    `bson:"room_id" json:"room_id"`
 	UserID string    `bson:"user_id" json:"user_id"`
@@ -163,33 +171,47 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")
-
-	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
-	page := r.URL.Query().Get("page")
-
-	// 기본값 설정: 페이지 번호는 1, limit는 50으로 설정
-	pageNumber := 1
-	pageSize := 50
-
-	if page != "" {
-		pageNumber, _ = strconv.Atoi(page)
-	}
-
-	messages, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
-	if err != nil {
-		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
-		http.Error(w, "Failed to Chat", http.StatusInternalServerError)
+	if roomID == "" {
+		http.Error(w, "Room ID is required", http.StatusBadRequest)
 		return
 	}
 
-	if messages == nil {
-		messages = []*data.Chat{}
+	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
+	page := r.URL.Query().Get("page")
+	pageNumber := 1
+	pageSize := 50 // 기본값
+
+	if page != "" {
+		if parsedPage, err := strconv.Atoi(page); err == nil {
+			pageNumber = parsedPage
+		}
 	}
 
-	// 결과를 JSON으로 변환하여 반환
+	// MongoDB에서 데이터 가져오기
+	messages, totalCount, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
+	if err != nil {
+		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
+		http.Error(w, "Failed to fetch chat messages", http.StatusInternalServerError)
+		return
+	}
+
+	// 총 페이지 수 및 hasNextPage 계산
+	totalPages := int((totalCount + int64(pageSize) - 1) / int64(pageSize)) // 올림 계산
+	hasNextPage := pageNumber < totalPages
+
+	// 응답 생성
+	response := ChatListResponse{
+		Data:        messages,
+		CurrentPage: pageNumber,
+		NextPage:    pageNumber + 1,
+		HasNextPage: hasNextPage,
+		TotalPages:  totalPages,
+	}
+
+	// JSON 응답 전송
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(messages); err != nil {
-		log.Printf("Failed to encode messages, msg: %v, err: %v", messages, err)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode response: %v", err)
 		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
 		return
 	}
