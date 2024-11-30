@@ -19,8 +19,8 @@ type RoomJoinEvent struct {
 }
 
 type CheckReadEvent struct {
-	RoomID       string            `json:"room_id"`
-	UserLastRead map[string]string `json:"user_last_read"` // UserID와 시간 정보
+	RoomID       string               `json:"room_id"`
+	UserLastRead map[string]time.Time `json:"user_last_read"` // UserID와 시간 정보
 }
 
 // BroadCast 메시지 처리
@@ -37,21 +37,21 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		return
 	}
 
+	now := time.Now()
 	chat := Chat{
 		Type:      types.ChatTypeChat,
 		RoomID:    broadCastMsg.RoomID,
 		SenderID:  nUserID,
 		Message:   broadCastMsg.Message,
-		CreatedAt: time.Now(),
+		CreatedAt: now,
 	}
 
 	err = app.BroadcastToRoom(chat)
 	if err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	} else {
-		app.UpdateUserLastReadAndNotify(chat.RoomID, strconv.Itoa(chat.SenderID), chat.CreatedAt)
+		app.UpdateUserLastReadAndNotify(chat.RoomID, strconv.Itoa(chat.SenderID), now)
 	}
-
 }
 
 // Room에 있는 모든 사용자에게 브로드캐스트
@@ -84,7 +84,6 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) error {
 				return true
 			}
 
-			// 메시지를 Send 채널에 보냅니다.
 			select {
 			case client.Send <- webSocketMsg:
 				// 메시지 전송 성공
@@ -144,15 +143,9 @@ func (app *Config) BroadcastCheckRead(roomID string, userLastRead map[string]tim
 		return
 	}
 
-	// user_last_read 값을 string으로 변환
-	formattedLastRead := make(map[string]string)
-	for userID, readTime := range userLastRead {
-		formattedLastRead[userID] = readTime.Format(time.RFC3339)
-	}
-
 	payload := CheckReadEvent{
 		RoomID:       roomID,
-		UserLastRead: formattedLastRead,
+		UserLastRead: userLastRead,
 	}
 
 	message := WebSocketMessage{
@@ -169,7 +162,6 @@ func (app *Config) BroadcastCheckRead(roomID string, userLastRead map[string]tim
 			return true
 		}
 
-		// 메시지 전송
 		select {
 		case client.Send <- message:
 		default:
@@ -210,11 +202,9 @@ func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 	app.LeaveRoom(leaveMsg.RoomID, userID)
 }
 
-// Room에 사용자 추가하기
 func (app *Config) JoinRoom(roomID string, userID string) {
-	room, _ := app.Rooms.LoadOrStore(roomID, &sync.Map{}) // 각 roomID에 대해 새로운 sync.Map 생성
+	room, _ := app.Rooms.LoadOrStore(roomID, &sync.Map{})
 
-	// 클라이언트 가져오기
 	clientInterface, ok := app.ChatClients.Load(userID)
 	if !ok {
 		log.Printf("[ERROR] Client not found for user %s", userID)
@@ -222,7 +212,7 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 	}
 	client := clientInterface.(*Client)
 
-	room.(*sync.Map).Store(userID, client) // roomID에 해당하는 클라이언트 저장
+	room.(*sync.Map).Store(userID, client)
 	log.Printf("User %s joined room %s", userID, roomID)
 
 	roomJoinMsg := RoomJoinEvent{

@@ -167,7 +167,7 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(payload)
 }
 
-// 특정 방의 채팅 메시지 리스트 획득
+// 특정 방의 채팅 목록 조회
 func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")
@@ -308,30 +308,18 @@ func (app *Config) updateLastReadChatRoom(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 요청 본문 읽기
-	var updateData map[string]string // {userID: lastReadTime (RFC3339 string)}
-	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
+	// 요청 본문 읽기 및 디코딩
+	var userLastRead map[string]time.Time
+	if err := json.NewDecoder(r.Body).Decode(&userLastRead); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		log.Printf("Failed to decode update data: %v", err)
 		return
 	}
 
 	// 유효성 검사
-	if len(updateData) == 0 {
+	if len(userLastRead) == 0 {
 		http.Error(w, "Empty update data", http.StatusBadRequest)
 		return
-	}
-
-	// 타임스탬프 파싱 및 업데이트 데이터 생성
-	userLastRead := make(map[string]time.Time)
-	for userID, timeStr := range updateData {
-		parsedTime, err := time.Parse(time.RFC3339, timeStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Invalid time format for user %s", userID), http.StatusBadRequest)
-			log.Printf("Failed to parse time for user %s: %v", userID, err)
-			return
-		}
-		userLastRead[userID] = parsedTime
 	}
 
 	// MongoDB에서 RoomID로 채팅방 업데이트
