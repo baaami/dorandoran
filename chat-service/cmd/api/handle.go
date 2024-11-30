@@ -179,7 +179,6 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
 	page := r.URL.Query().Get("page")
 	pageNumber := 1
-	pageSize := 50 // 기본값
 
 	if page != "" {
 		if parsedPage, err := strconv.Atoi(page); err == nil {
@@ -188,7 +187,7 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 	}
 
 	// MongoDB에서 데이터 가져오기
-	messages, totalCount, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
+	messages, totalCount, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, data.PAGE_DEFAULT_SIZE)
 	if err != nil {
 		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
 		http.Error(w, "Failed to fetch chat messages", http.StatusInternalServerError)
@@ -196,7 +195,7 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 	}
 
 	// 총 페이지 수 및 hasNextPage 계산
-	totalPages := int((totalCount + int64(pageSize) - 1) / int64(pageSize)) // 올림 계산
+	totalPages := int((totalCount + int64(data.PAGE_DEFAULT_SIZE) - 1) / int64(data.PAGE_DEFAULT_SIZE)) // 올림 계산
 	hasNextPage := pageNumber < totalPages
 
 	// 응답 생성
