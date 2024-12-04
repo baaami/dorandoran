@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"time"
@@ -26,11 +25,6 @@ type Chat struct {
 	SenderID  int       `bson:"sender_id" json:"sender_id"`
 	Message   string    `bson:"message" json:"message"`
 	CreatedAt time.Time `bson:"created_at" json:"created_at"`
-}
-
-type UserLastReadUpdateEvent struct {
-	RoomID       string               `bson:"room_id" json:"room_id"`
-	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
 // User 구조체 정의
@@ -151,16 +145,6 @@ func (consumer *Consumer) Listen(topics []string) error {
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
 				handleChatAddPayload(chatMsg)
 
-			case "chat.update_last_read":
-				var userLastRead UserLastReadUpdateEvent
-				// eventPayload.Data는 json.RawMessage이므로 다시 언마샬링
-				if err := json.Unmarshal(eventPayload.Data, &userLastRead); err != nil {
-					log.Printf("Failed to unmarshal chat message: %v", err)
-					continue
-				}
-				log.Printf("userLastRead Message Unmarshaled: %+v", userLastRead)
-				handleChatRoomUpdateLastRead(userLastRead)
-
 			case "user.created":
 				var user User
 				if err := json.Unmarshal(eventPayload.Data, &user); err != nil {
@@ -229,41 +213,6 @@ func handleChatAddPayload(chatMsg Chat) error {
 	return nil
 }
 
-func handleChatRoomUpdateLastRead(userLastRead UserLastReadUpdateEvent) error {
-	jsonData, _ := json.MarshalIndent(&userLastRead.UserLastRead, "", "\t")
-
-	const chatServiceBaseURL = "http://chat-service"
-
-	chatServiceURL := fmt.Sprintf("%s/room/last/%s", chatServiceBaseURL, userLastRead.RoomID)
-
-	request, err := http.NewRequest(http.MethodPut, chatServiceURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Printf("Failed to create request: %v", err)
-		return err
-	}
-
-	request.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	response, err := client.Do(request)
-	if err != nil {
-		log.Printf("Failed to send request: %v", err)
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(response.Body) // 응답 본문을 읽음
-		log.Printf("Failed to update last read. Status: %d, Body: %s", response.StatusCode, string(body))
-		return fmt.Errorf("failed to update last read: status code %d", response.StatusCode)
-	}
-
-	return nil
-}
-
 // handleUserPayload는 유저 생성 이벤트를 처리하는 함수
 func handleUserCreatedEvent(user User) error {
 	jsonData, _ := json.MarshalIndent(&user, "", "\t")
@@ -299,6 +248,7 @@ func handleUserCreatedEvent(user User) error {
 // 채팅방 참가 시 이벤트 발생 동작
 func handleRoomJoinEvent(roomJoin RoomJoinEvent) error {
 	// 채팅방에서 유저가 마지막으로 확인한 시간 업데이트
+	// TODO: /room/confirm 이벤트 없어졌으니 확인 필요
 	url := fmt.Sprintf("http://chat-service/room/confirm/%s/%s", roomJoin.RoomID, roomJoin.UserID)
 
 	request, err := http.NewRequest(http.MethodPut, url, nil)

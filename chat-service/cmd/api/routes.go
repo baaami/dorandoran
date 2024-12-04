@@ -30,11 +30,6 @@ func (app *Config) routes() http.Handler {
 
 	mux.Post("/room/create", app.createChatRoom)
 
-	mux.Patch("/room/confirm/{room_id}/{user_id}", app.confirmChatRoom)
-	mux.Patch("/room/confirm/{room_id}", app.confirmChatRoomByUser)
-
-	mux.Put("/room/last/{room_id}", app.updateLastReadChatRoom)
-
 	// TODO: Timeout된 채팅방들은 삭제해주는 고루틴이 필요함
 	mux.Delete("/room/delete/{id}", app.deleteChatRoom)
 

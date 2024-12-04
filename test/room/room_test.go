@@ -20,7 +20,7 @@ import (
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
-	RoomID          = "d361a857-8951-403a-a9b8-810267f53927" // 테스트용 RoomID
+	RoomID          = "0be07736-b1f8-43cf-94d2-574d216e3444" // 테스트용 RoomID
 )
 
 type WebSocketMessage struct {
@@ -183,14 +183,14 @@ func toJSONRawMessage(v interface{}) json.RawMessage {
 	return json.RawMessage(data)
 }
 
-// 5명의 참가자가 채팅을 테스트하는 함수
+// 8명의 참가자가 채팅을 테스트하는 함수
 func TestChatAmongFiveClients(t *testing.T) {
 	participantCount := 8
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
 
-	// 1. 5명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
+	// 1. 8명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
 	for i := 0; i < participantCount; i++ {
 		accessToken := fmt.Sprintf("masterkey-%d", i+1)
 		sessionID, userID, err := loginAndGetSessionIDAndUserID(accessToken)
@@ -199,7 +199,7 @@ func TestChatAmongFiveClients(t *testing.T) {
 		userIDs[i] = userID
 	}
 
-	// 2. 5명의 참가자가 WebSocket으로 접속
+	// 2. 8명의 참가자가 WebSocket으로 접속
 	for i := 0; i < participantCount; i++ {
 		conn, err := connectWebSocket(t, sessionIDs[i], userIDs[i])
 		assert.NoError(t, err)

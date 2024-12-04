@@ -13,7 +13,6 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	common "github.com/baaami/dorandoran/common/user"
 	"github.com/go-chi/chi/v5"
-	"github.com/samber/lo"
 )
 
 type Chat struct {
@@ -85,31 +84,18 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// 사용자의 마지막 읽은 시간 가져오기
-		lastReadTime, ok := room.UserLastRead[userID]
-		if !ok {
-			lastReadTime = time.Time{} // Default to zero time if no last read time is found
-		}
-
-		// 읽지 않은 메시지 수 계산
-		unreadCount, err := app.Models.Chat.GetUnreadMessageCount(room.ID, userID, lastReadTime)
-		if err != nil {
-			log.Printf("Failed to calculate unread count for room %s: %v", room.ID, err)
-			unreadCount = 0
-		}
-
 		lastMessage := data.LastMessage{
 			SenderID:  findLastMessage.SenderID,
 			Message:   findLastMessage.Message,
 			CreatedAt: findLastMessage.CreatedAt,
 		}
 
-		// ChatRoomLatestResponse 생성
+		// TODO: UnreadCount 전달 필요
 		chatRoomResponse := data.ChatRoomLatestResponse{
 			ID:          room.ID,
 			RoomName:    "채팅방 이름", // 필요시 동적으로 추가
 			LastMessage: lastMessage,
-			UnreadCount: unreadCount,
+			UnreadCount: 1,
 			CreatedAt:   room.CreatedAt,
 			ModifiedAt:  room.ModifiedAt,
 		}
@@ -155,12 +141,12 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		userList = append(userList, *user)
 	}
 
+	// TODO: 읽지 않은 메시지가 존재하는지 여부 전달 필요
 	payload := data.ChatRoomDetailResponse{
-		ID:           room.ID,
-		Users:        userList,
-		CreatedAt:    room.CreatedAt,
-		ModifiedAt:   room.ModifiedAt,
-		UserLastRead: room.UserLastRead,
+		ID:         room.ID,
+		Users:      userList,
+		CreatedAt:  room.CreatedAt,
+		ModifiedAt: room.ModifiedAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -214,124 +200,6 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
 		return
 	}
-}
-
-// TODO: 함수명 변경 필요
-func (app *Config) confirmChatRoom(w http.ResponseWriter, r *http.Request) {
-	roomID := chi.URLParam(r, "room_id")
-	userID := chi.URLParam(r, "user_id")
-
-	var roomJoinEvent RoomJoinEvent
-	if err := json.NewDecoder(r.Body).Decode(&roomJoinEvent); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		log.Printf("Failed to decode room join event: %v", err)
-		return
-	}
-
-	// 채팅방이 존재하는지 확인
-	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
-	if err != nil {
-		log.Printf("Failed to find chat room, roomID: %s", roomID)
-		http.Error(w, "Failed to find chat room", http.StatusInternalServerError)
-		return
-	}
-	if room == nil {
-		log.Printf("Failed to find chat room, roomID: %s", roomID)
-		http.Error(w, "Chat room not found", http.StatusNotFound)
-		return
-	}
-
-	if !lo.Contains(room.Users, userID) {
-		log.Printf("User is not a member of the chat room, roomID: %s, userID: %s", roomID, userID)
-		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
-		return
-	}
-
-	// 채팅방의 UserLastRead 필드를 업데이트
-	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID, roomJoinEvent.JoinAt)
-	if err != nil {
-		http.Error(w, "Failed to confirm chat room", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	log.Printf("Chat room confirmed, roomID: %s, userID: %s", roomID, userID)
-}
-
-func (app *Config) confirmChatRoomByUser(w http.ResponseWriter, r *http.Request) {
-	roomID := chi.URLParam(r, "room_id")
-
-	// 사용자 ID를 가져옵니다. (예: 헤더에서 "X-User-ID"로 전달된다고 가정)
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
-		http.Error(w, "User ID is required", http.StatusUnauthorized)
-		return
-	}
-
-	// 채팅방이 존재하는지 확인
-	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
-	if err != nil {
-		log.Printf("Failed to find chat room, roomID: %s", roomID)
-		http.Error(w, "Failed to find chat room", http.StatusInternalServerError)
-		return
-	}
-	if room == nil {
-		log.Printf("Failed to find chat room, roomID: %s", roomID)
-		http.Error(w, "Chat room not found", http.StatusNotFound)
-		return
-	}
-
-	// 사용자가 해당 채팅방의 멤버인지 확인
-	if !lo.Contains(room.Users, userID) {
-		log.Printf("User is not a member of the chat room, roomID: %s, userID: %s", roomID, userID)
-		http.Error(w, "User is not a member of the chat room", http.StatusForbidden)
-		return
-	}
-
-	// 채팅방의 UserLastRead 필드를 업데이트
-	err = app.Models.ChatRoom.ConfirmRoom(roomID, userID, time.Now())
-	if err != nil {
-		http.Error(w, "Failed to confirm chat room", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	log.Printf("Chat room confirmed, roomID: %s, userID: %s", roomID, userID)
-}
-
-func (app *Config) updateLastReadChatRoom(w http.ResponseWriter, r *http.Request) {
-	// Room ID 가져오기
-	roomID := chi.URLParam(r, "room_id")
-	if roomID == "" {
-		http.Error(w, "Room ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// 요청 본문 읽기 및 디코딩
-	var userLastRead map[string]time.Time
-	if err := json.NewDecoder(r.Body).Decode(&userLastRead); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		log.Printf("Failed to decode update data: %v", err)
-		return
-	}
-
-	// 유효성 검사
-	if len(userLastRead) == 0 {
-		http.Error(w, "Empty update data", http.StatusBadRequest)
-		return
-	}
-
-	// MongoDB에서 RoomID로 채팅방 업데이트
-	err := app.Models.ChatRoom.UpdateUserLastReadBatch(roomID, userLastRead)
-	if err != nil {
-		http.Error(w, "Failed to update user last read", http.StatusInternalServerError)
-		log.Printf("Failed to update UserLastRead for room %s: %v", roomID, err)
-		return
-	}
-
-	// 성공 응답
-	w.WriteHeader(http.StatusOK)
-	log.Printf("Successfully updated UserLastRead for room %s", roomID)
 }
 
 // 특정 Room ID로 채팅방 삭제
@@ -396,6 +264,7 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Chat message from %d in room[%s]", chatMsg.SenderID, chatMsg.RoomID)
 }
 
+// 채팅 메시지 삭제 (by ChatRoom)
 func (app *Config) deleteChatByRoomID(w http.ResponseWriter, r *http.Request) {
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")

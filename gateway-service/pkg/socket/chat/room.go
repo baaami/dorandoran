@@ -18,11 +18,6 @@ type RoomJoinEvent struct {
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
 }
 
-type CheckReadEvent struct {
-	RoomID       string               `json:"room_id"`
-	UserLastRead map[string]time.Time `json:"user_last_read"` // UserID와 시간 정보
-}
-
 // BroadCast 메시지 처리
 func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
 	var broadCastMsg ChatMessage
@@ -49,8 +44,6 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 	err = app.BroadcastToRoom(chat)
 	if err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
-	} else {
-		app.UpdateUserLastReadAndNotify(chat.RoomID, strconv.Itoa(chat.SenderID), now)
 	}
 }
 
@@ -106,70 +99,6 @@ func (app *Config) BroadcastToRoom(chatMsg Chat) error {
 	}
 
 	return nil
-}
-
-func (app *Config) UpdateUserLastReadAndNotify(roomID string, senderID string, timestamp time.Time) {
-	room, ok := app.Rooms.Load(roomID)
-	if !ok {
-		log.Printf("Room %s not found for UpdateUserLastReadAndNotify", roomID)
-		return
-	}
-
-	roomMap := room.(*sync.Map)
-
-	userLastRead := make(map[string]time.Time)
-	roomMap.Range(func(userID, _ interface{}) bool {
-		userLastRead[userID.(string)] = timestamp
-		return true
-	})
-
-	// RabbitMQ를 통해 비동기로 DB 업데이트
-	err := app.ChatEmitter.PushUserLastReadToQueue(event.UserLastReadUpdateEvent{
-		RoomID:       roomID,
-		UserLastRead: userLastRead,
-	})
-	if err != nil {
-		log.Printf("Failed to push UserLastReadUpdateEvent to RabbitMQ: %v", err)
-	}
-
-	// WebSocket으로 check_read 이벤트 전송
-	app.BroadcastCheckRead(roomID, userLastRead)
-}
-
-func (app *Config) BroadcastCheckRead(roomID string, userLastRead map[string]time.Time) {
-	room, ok := app.Rooms.Load(roomID)
-	if !ok {
-		log.Printf("Room %s not found for BroadcastCheckRead", roomID)
-		return
-	}
-
-	payload := CheckReadEvent{
-		RoomID:       roomID,
-		UserLastRead: userLastRead,
-	}
-
-	message := WebSocketMessage{
-		Kind:    "check_read",
-		Payload: mustMarshalJSON(payload),
-	}
-
-	roomMap := room.(*sync.Map)
-	roomMap.Range(func(userID, clientInterface interface{}) bool {
-		client, ok := clientInterface.(*Client)
-		if !ok || client == nil {
-			log.Printf("Invalid client for user %v in room %s", userID, roomID)
-			roomMap.Delete(userID)
-			return true
-		}
-
-		select {
-		case client.Send <- message:
-		default:
-			log.Printf("Failed to send check_read message to user %v in room %s", userID, roomID)
-			roomMap.Delete(userID)
-		}
-		return true
-	})
 }
 
 func mustMarshalJSON(v interface{}) json.RawMessage {
