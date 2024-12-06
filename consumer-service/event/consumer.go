@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
 
 	common "github.com/baaami/dorandoran/common/chat"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type RoomJoinEvent struct {
@@ -20,11 +22,13 @@ type RoomJoinEvent struct {
 
 // Chat 구조체 정의
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
 // User 구조체 정의
@@ -42,6 +46,20 @@ type User struct {
 	Gender  int     `json:"gender"`
 	Birth   string  `gorm:"size:20" json:"birth"`
 	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+}
+
+type ChatReader struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserId    int                `bson:"user_id" json:"user_id"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
+}
+
+type ChatReadersEvent struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserIds   []string           `bson:"user_ids" json:"user_ids"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
 }
 
 type Consumer struct {
@@ -145,6 +163,17 @@ func (consumer *Consumer) Listen(topics []string) error {
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
 				handleChatAddPayload(chatMsg)
 
+			case "chat.read":
+				var readEvent ChatReadersEvent
+				if err := json.Unmarshal(eventPayload.Data, &readEvent); err != nil {
+					log.Printf("Failed to unmarshal chat read event: %v", err)
+					continue
+				}
+				log.Printf("Chat Read Event Unmarshaled: %+v", readEvent)
+				if err := handleChatReadPayload(readEvent); err != nil {
+					log.Printf("Failed to handle chat read event: %v", err)
+				}
+
 			case "user.created":
 				var user User
 				if err := json.Unmarshal(eventPayload.Data, &user); err != nil {
@@ -210,6 +239,47 @@ func handleChatAddPayload(chatMsg Chat) error {
 		return err
 	}
 
+	return nil
+}
+
+func handleChatReadPayload(readEvent ChatReadersEvent) error {
+	log.Printf("Processing chat read event for MessageId: %s", readEvent.MessageId.Hex())
+
+	// ChatReadersEvent 데이터를 JSON으로 변환
+	jsonData, err := json.Marshal(readEvent)
+	if err != nil {
+		log.Printf("Failed to marshal chat read event: %v", err)
+		return err
+	}
+
+	// Chat-service URL
+	chatServiceURL := "http://chat-service/msg/read"
+
+	// HTTP POST 요청 생성
+	request, err := http.NewRequest(http.MethodPost, chatServiceURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Failed to create request: %v", err)
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+
+	// HTTP 클라이언트로 요청 전송
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		log.Printf("Failed to send request: %v", err)
+		return err
+	}
+	defer response.Body.Close()
+
+	// 응답 상태 코드 확인
+	if response.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(response.Body)
+		log.Printf("Chat-service returned an error: %s (status: %d)", string(body), response.StatusCode)
+		return fmt.Errorf("chat-service returned status %d", response.StatusCode)
+	}
+
+	log.Printf("Successfully sent chat read event for MessageId: %s", readEvent.MessageId.Hex())
 	return nil
 }
 

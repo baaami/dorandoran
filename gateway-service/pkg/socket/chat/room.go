@@ -2,6 +2,7 @@ package chat
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/types"
 	common "github.com/baaami/dorandoran/common/chat"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type RoomJoinEvent struct {
@@ -32,81 +34,117 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		return
 	}
 
-	now := time.Now()
-	chat := Chat{
-		Type:      types.ChatTypeChat,
-		RoomID:    broadCastMsg.RoomID,
-		SenderID:  nUserID,
-		Message:   broadCastMsg.Message,
-		CreatedAt: now,
+	// 활성 사용자 ID 리스트 가져오기
+	activeUserIDs, err := app.getActiveUserIDs(broadCastMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to get active users for room %s: %v", broadCastMsg.RoomID, err)
+		return
 	}
 
-	err = app.BroadcastToRoom(chat)
-	if err != nil {
+	now := time.Now()
+	chat := Chat{
+		MessageId:   primitive.NewObjectID(),
+		Type:        types.ChatTypeChat,
+		RoomID:      broadCastMsg.RoomID,
+		SenderID:    nUserID,
+		Message:     broadCastMsg.Message,
+		UnreadCount: broadCastMsg.HeadCnt - len(activeUserIDs), // 활성 사용자 수를 이용해 UnreadCount 계산
+		CreatedAt:   now,
+	}
+
+	// Broadcast to the room
+	if err := app.BroadcastToRoom(&chat, activeUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
 }
 
-// Room에 있는 모든 사용자에게 브로드캐스트
-func (app *Config) BroadcastToRoom(chatMsg Chat) error {
+// BroadcastToRoom handles broadcasting messages to a specific room
+func (app *Config) BroadcastToRoom(chatMsg *Chat, activeUserIds []string) error {
+	// WebSocket 메시지 생성
 	payload, err := json.Marshal(chatMsg)
 	if err != nil {
 		log.Printf("Failed to marshal chatMsg: %v", err)
 		return err
 	}
-
 	webSocketMsg := WebSocketMessage{
 		Kind:    MessageKindMessage,
 		Payload: json.RawMessage(payload),
 	}
 
-	roomID := chatMsg.RoomID
-	if room, ok := app.Rooms.Load(roomID); ok {
-		roomMap := room.(*sync.Map)
-		roomMap.Range(func(userID, clientInterface interface{}) bool {
-			if clientInterface == nil {
-				log.Printf("Client for user %v in room %s is nil", userID, roomID)
-				roomMap.Delete(userID)
-				return true
-			}
-
-			client, ok := clientInterface.(*Client)
-			if !ok || client == nil {
-				log.Printf("Invalid client for user %v in room %s", userID, roomID)
-				roomMap.Delete(userID)
-				return true
-			}
-
-			select {
-			case client.Send <- webSocketMsg:
-				// 메시지 전송 성공
-			case <-time.After(time.Second * 1):
-				log.Printf("Time out send message to user %v in room %s", userID, roomID)
-				// Optionally remove client or handle the timeout
-				roomMap.Delete(userID)
-			}
-			return true
-		})
-	} else {
-		log.Printf("Room %s not found", roomID)
+	// Room에 Websocket 메시지 전송
+	if err := app.sendMessageToRoom(chatMsg.RoomID, webSocketMsg); err != nil {
+		log.Printf("Failed to send message to room %s: %v", chatMsg.RoomID, err)
 	}
 
+	// RabbitMQ에 메시지 푸시
 	log.Printf("Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
-
-	err = app.ChatEmitter.PushChatToQueue(event.Chat(chatMsg))
-	if err != nil {
+	if err := app.ChatEmitter.PushChatToQueue(event.Chat(*chatMsg)); err != nil {
 		log.Printf("Failed to push chat event to queue, chatMsg: %v, err: %v", chatMsg, err)
+		return err
+	}
+
+	// RabbitMQ에 활성 사용자 ID 리스트와 함께 읽음 이벤트 푸시
+	readersEvent := event.ChatReadersEvent{
+		MessageId: chatMsg.MessageId,
+		RoomID:    chatMsg.RoomID,
+		UserIds:   activeUserIds,
+		ReadAt:    time.Now(),
+	}
+	if err := app.ChatEmitter.PushChatReadersToQueue(readersEvent); err != nil {
+		log.Printf("Failed to push chat readers event: %v", err)
+		return err
 	}
 
 	return nil
 }
 
-func mustMarshalJSON(v interface{}) json.RawMessage {
-	data, err := json.Marshal(v)
-	if err != nil {
-		log.Fatalf("[ERROR] Failed to marshal JSON: %v", err)
+// 해당 room의 활성 사용자 수 계산
+func (app *Config) getActiveUserIDs(roomID string) ([]string, error) {
+	if room, ok := app.Rooms.Load(roomID); ok {
+		roomMap := room.(*sync.Map)
+		activeUsers := []string{}
+
+		roomMap.Range(func(userID, clientInterface interface{}) bool {
+			if client, ok := clientInterface.(*Client); ok && client != nil {
+				activeUsers = append(activeUsers, userID.(string))
+			}
+			return true
+		})
+		return activeUsers, nil
 	}
-	return data
+	return nil, fmt.Errorf("room %s not found", roomID)
+}
+
+// 해당 room에 채팅 송신
+func (app *Config) sendMessageToRoom(roomID string, message WebSocketMessage) error {
+	if room, ok := app.Rooms.Load(roomID); ok {
+		roomMap := room.(*sync.Map)
+		roomMap.Range(func(userID, clientInterface interface{}) bool {
+			if client, ok := clientInterface.(*Client); ok && client != nil {
+				if !app.sendMessageToClient(client, message) {
+					log.Printf("Failed to send message to user %v in room %s", userID, roomID)
+					roomMap.Delete(userID)
+				}
+			} else {
+				log.Printf("Invalid client for user %v in room %s", userID, roomID)
+				roomMap.Delete(userID)
+			}
+			return true
+		})
+		return nil
+	}
+	return fmt.Errorf("room %s not found", roomID)
+}
+
+// 해당 client에 채팅 송신
+func (app *Config) sendMessageToClient(client *Client, message WebSocketMessage) bool {
+	select {
+	case client.Send <- message:
+		return true // 메시지 전송 성공
+	case <-time.After(time.Second * 1):
+		log.Printf("Timeout while sending message")
+		return false // 메시지 전송 실패
+	}
 }
 
 // Join 메시지 처리
@@ -150,17 +188,12 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 		JoinAt: time.Now(),
 	}
 
-	// TODO: join time을 해당 user의 update last read 시간을 업데이트 (With. Rabbit MQ)
-	// TODO: join time을 통해 room에 입장한 user들에게 check_read 소켓 이벤트를 송신 (With. WebSocket)
-
 	log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s, time: %v", roomJoinMsg.RoomID, roomJoinMsg.UserID, roomJoinMsg.JoinAt)
 
 	err := app.ChatEmitter.PushRoomJoinToQueue(event.RoomJoinEvent(roomJoinMsg))
 	if err != nil {
 		log.Printf("Failed to push room join to queue, roomJoinMsg: %v, err: %v", roomJoinMsg, err)
 	}
-
-	// room에 join한 사용자에게 채팅방 정보 전송
 }
 
 // Room에서 사용자 제거하기

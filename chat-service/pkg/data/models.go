@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -22,16 +23,26 @@ func New(mongo *mongo.Client) Models {
 }
 
 type Models struct {
-	Chat     Chat
-	ChatRoom ChatRoom
+	Chat       Chat
+	ChatRoom   ChatRoom
+	ChatReader ChatReader
 }
 
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
+
+type ChatReader struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserId    int                `bson:"user_id" json:"user_id"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
 }
 
 type ChatRoom struct {
@@ -58,6 +69,52 @@ func (c *Chat) Insert(entry Chat) error {
 	}
 
 	return nil
+}
+
+// 채팅 메시지 읽은 사용자 삽입
+func (cr *ChatReader) Insert(reader ChatReader) error {
+	collection := client.Database("chat_db").Collection("message_readers")
+
+	_, err := collection.InsertOne(context.TODO(), reader)
+	if err != nil {
+		log.Println("Error inserting chat reader:", err)
+		return err
+	}
+
+	return nil
+}
+
+// 해당 room에서 before 시간 이전에 존재한 메시지 리스트
+func (c *Chat) GetMessagesBefore(roomID string, before time.Time) ([]Chat, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	// 필터 조건: 특정 RoomID 및 CreatedAt < before
+	filter := bson.M{
+		"room_id":    roomID,
+		"created_at": bson.M{"$lt": before},
+	}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error finding messages for RoomID %s: %v", roomID, err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var messages []Chat
+	for cursor.Next(ctx) {
+		var message Chat
+		if err := cursor.Decode(&message); err != nil {
+			log.Printf("Error decoding message: %v", err)
+			continue
+		}
+		messages = append(messages, message)
+	}
+
+	return messages, nil
 }
 
 // 채팅 목록 조회 (by ChatRoom ID)

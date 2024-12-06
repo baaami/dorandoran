@@ -13,14 +13,17 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	common "github.com/baaami/dorandoran/common/user"
 	"github.com/go-chi/chi/v5"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
 type ChatListResponse struct {
@@ -31,10 +34,24 @@ type ChatListResponse struct {
 	TotalPages  int          `json:"totalPages"`
 }
 
+type ChatReadersEvent struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserIds   []string           `bson:"user_ids" json:"user_ids"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
+}
+
 type RoomJoinEvent struct {
 	RoomID string    `bson:"room_id" json:"room_id"`
 	UserID string    `bson:"user_id" json:"user_id"`
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
+type ChatReader struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserId    int                `bson:"user_id" json:"user_id"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
 }
 
 // 채팅방 생성
@@ -246,11 +263,12 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 
 	// Chat에 삽입
 	entry := data.Chat{
-		Type:      chatMsg.Type,
-		RoomID:    chatMsg.RoomID,
-		SenderID:  chatMsg.SenderID,
-		Message:   chatMsg.Message,
-		CreatedAt: chatMsg.CreatedAt,
+		Type:        chatMsg.Type,
+		RoomID:      chatMsg.RoomID,
+		SenderID:    chatMsg.SenderID,
+		Message:     chatMsg.Message,
+		UnreadCount: chatMsg.UnreadCount,
+		CreatedAt:   chatMsg.CreatedAt,
 	}
 
 	err = app.Models.Chat.Insert(entry)
@@ -262,6 +280,102 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Chat message inserted successfully"))
 	log.Printf("Chat message from %d in room[%s]", chatMsg.SenderID, chatMsg.RoomID)
+}
+
+// 채팅 메시지 읽음 처리
+func (app *Config) handleChatRead(w http.ResponseWriter, r *http.Request) {
+	// 요청 바디 파싱
+	var readersEvent ChatReadersEvent
+	err := json.NewDecoder(r.Body).Decode(&readersEvent)
+	if err != nil {
+		log.Printf("Failed to decode request payload: %v", err)
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Received ChatReadersEvent: %+v", readersEvent)
+
+	// 각 사용자에 대해 ChatReader를 생성 및 삽입
+	for _, userID := range readersEvent.UserIds {
+		userIDInt, err := strconv.Atoi(userID)
+		if err != nil {
+			log.Printf("Invalid user ID %s: %v", userID, err)
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
+
+		// ChatReader 데이터 생성
+		reader := data.ChatReader{
+			MessageId: readersEvent.MessageId,
+			RoomID:    readersEvent.RoomID,
+			UserId:    userIDInt,
+			ReadAt:    readersEvent.ReadAt,
+		}
+
+		// 데이터베이스에 삽입
+		err = app.Models.ChatReader.Insert(reader)
+		if err != nil {
+			log.Printf("Failed to insert ChatReader for user %d: %v", userIDInt, err)
+			http.Error(w, "Failed to process chat.read event", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 성공 응답
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Chat read event processed successfully"))
+	log.Printf("Successfully processed chat.read event for MessageId: %s", readersEvent.MessageId.Hex())
+}
+
+// handleRoomJoin processes a room.join event and inserts read data for messages created before JoinAt
+func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
+	// 요청 바디 파싱
+	var roomJoinEvent RoomJoinEvent
+	err := json.NewDecoder(r.Body).Decode(&roomJoinEvent)
+	if err != nil {
+		log.Printf("Failed to decode room join event: %v", err)
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Processing RoomJoinEvent: %+v", roomJoinEvent)
+
+	// UserID를 숫자로 변환
+	userID, err := strconv.Atoi(roomJoinEvent.UserID)
+	if err != nil {
+		log.Printf("Invalid user ID %s: %v", roomJoinEvent.UserID, err)
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// JoinAt 이전의 메시지 가져오기
+	messages, err := app.Models.Chat.GetMessagesBefore(roomJoinEvent.RoomID, roomJoinEvent.JoinAt)
+	if err != nil {
+		log.Printf("Failed to get messages for RoomID %s: %v", roomJoinEvent.RoomID, err)
+		http.Error(w, "Failed to get messages", http.StatusInternalServerError)
+		return
+	}
+
+	// 읽음 처리
+	for _, message := range messages {
+		reader := data.ChatReader{
+			MessageId: message.MessageId,
+			RoomID:    roomJoinEvent.RoomID,
+			UserId:    userID,
+			ReadAt:    roomJoinEvent.JoinAt,
+		}
+
+		err := app.Models.ChatReader.Insert(reader)
+		if err != nil {
+			log.Printf("Failed to insert ChatReader for MessageId %s: %v", message.MessageId.Hex(), err)
+			http.Error(w, "Failed to process room join event", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	log.Printf("Successfully processed RoomJoinEvent for RoomID: %s, UserID: %d", roomJoinEvent.RoomID, userID)
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Room join event processed successfully"))
 }
 
 // 채팅 메시지 삭제 (by ChatRoom)

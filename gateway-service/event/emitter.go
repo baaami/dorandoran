@@ -7,6 +7,7 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EventPayload struct {
@@ -20,12 +21,28 @@ type RoomJoinEvent struct {
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
 }
 
+type ChatReadersEvent struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserIds   []string           `bson:"user_ids" json:"user_ids"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
+}
+
+type ChatReader struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserId    int                `bson:"user_id" json:"user_id"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
+}
+
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
 type Emitter struct {
@@ -116,6 +133,43 @@ func (e *Emitter) PushChatToQueue(chatMsg Chat) error {
 	}
 
 	log.Printf("Chat message successfully pushed to RabbitMQ")
+	return nil
+}
+
+func (e *Emitter) PushChatReadersToQueue(readersEvent ChatReadersEvent) error {
+	if e.connection == nil {
+		log.Println("RabbitMQ connection is nil")
+		return fmt.Errorf("RabbitMQ connection is nil")
+	}
+
+	// ChatReadersEvent 데이터를 JSON으로 변환
+	readersData, err := json.Marshal(readersEvent)
+	if err != nil {
+		log.Printf("Failed to marshal chat readers event: %v", err)
+		return err
+	}
+
+	// EventPayload에 맞게 데이터를 래핑
+	payload := EventPayload{
+		EventType: "chat.read",
+		Data:      readersData,
+	}
+
+	// EventPayload를 JSON으로 변환
+	eventJSON, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal event payload: %v", err)
+		return err
+	}
+
+	// 메시지 발행
+	err = e.PushBytes(eventJSON, "chat.reader")
+	if err != nil {
+		log.Printf("Failed to push chat readers event to queue: %v", err)
+		return err
+	}
+
+	log.Printf("Chat readers event successfully pushed to RabbitMQ")
 	return nil
 }
 
