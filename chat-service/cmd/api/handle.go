@@ -126,7 +126,6 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: findLastMessage.CreatedAt,
 		}
 
-		// TODO: UnreadCount 전달 필요
 		chatRoomResponse := data.ChatRoomLatestResponse{
 			ID:          room.ID,
 			RoomName:    "채팅방 이름", // 필요시 동적으로 추가
@@ -177,7 +176,6 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		userList = append(userList, *user)
 	}
 
-	// TODO: 읽지 않은 메시지가 존재하는지 여부 전달 필요
 	payload := data.ChatRoomDetailResponse{
 		ID:         room.ID,
 		Users:      userList,
@@ -242,28 +240,21 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "id")
 
-	room, err := app.Models.ChatRoom.GetRoomByID(roomID)
-	if err != nil {
-		log.Printf("Failed to get chat room, id: %s, err: %s", roomID, err.Error())
-		http.Error(w, "Failed to get chat room", http.StatusInternalServerError)
-		return
-	}
+	// room, err := app.Models.ChatRoom.GetRoomByID(roomID)
+	// if err != nil {
+	// 	log.Printf("Failed to get chat room, id: %s, err: %s", roomID, err.Error())
+	// 	http.Error(w, "Failed to get chat room", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	// MongoDB에서 Room ID로 채팅방 삭제
-	err = app.Models.ChatRoom.DeleteRoom(roomID)
+	err := app.Models.ChatRoom.DeleteRoom(roomID)
 	if err != nil {
 		http.Error(w, "Failed to delete chat room", http.StatusInternalServerError)
 		return
 	}
 
-	// 채팅방 삭제 이벤트 발행
-	emitter, err := event.NewEventEmitter(app.Rabbit)
-	if err == nil {
-		log.Printf("[INFO] Pushing Room Delete Event to RabbitMQ, room: %s", roomID)
-		emitter.PushRoomToQueue(*room)
-	} else {
-		log.Printf("Failed to create event emitter: %v", err)
-	}
+	// TODO: 채팅방 삭제 이벤트 발행
 
 	w.WriteHeader(http.StatusOK)
 	log.Printf("Chat room deleted, roomID: %s", roomID)
@@ -411,6 +402,7 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: 메시지를 가져오지 않고 바로 작업을 할 수 있지 않을까??
 	// JoinAt 이전의 메시지 가져오기
 	messages, err := app.Models.Chat.GetMessagesBefore(roomJoinEvent.RoomID, roomJoinEvent.JoinAt)
 	if err != nil {
@@ -420,7 +412,9 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 읽음 처리
+	var messageIDs []primitive.ObjectID
 	for _, message := range messages {
+		// 읽음 처리
 		reader := data.ChatReader{
 			MessageId: message.MessageId,
 			RoomID:    roomJoinEvent.RoomID,
@@ -431,10 +425,23 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 		err := app.Models.ChatReader.Insert(reader)
 		if err != nil {
 			log.Printf("Failed to insert ChatReader for MessageId %s: %v", message.MessageId.Hex(), err)
-			http.Error(w, "Failed to process room join event", http.StatusInternalServerError)
-			return
+			continue
 		}
+
+		messageIDs = append(messageIDs, message.MessageId)
 	}
+
+	// unread_count 업데이트
+	err = app.Models.Chat.UpdateUnreadCounts(messageIDs)
+	if err != nil {
+		log.Printf("Failed to update unread counts for RoomID %s: %v", roomJoinEvent.RoomID, err)
+		http.Error(w, "Failed to update unread counts", http.StatusInternalServerError)
+		return
+	}
+
+	app.Emitter.PushChatLatestEvent(event.ChatLatestEvent{
+		RoomID: roomJoinEvent.RoomID,
+	})
 
 	log.Printf("Successfully processed RoomJoinEvent for RoomID: %s, UserID: %d", roomJoinEvent.RoomID, userID)
 	w.WriteHeader(http.StatusCreated)

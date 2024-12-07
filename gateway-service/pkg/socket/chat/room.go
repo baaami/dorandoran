@@ -146,6 +146,31 @@ func (app *Config) sendMessageToClient(client *Client, message WebSocketMessage)
 	}
 }
 
+func (app *Config) ProcessChatEvents() {
+	for event := range app.EventChannel {
+		log.Printf("Send chat.latest event for RoomID: %s", event.RoomID)
+
+		// WebSocket 메시지 생성
+		payload, err := json.Marshal(map[string]string{
+			"room_id": event.RoomID,
+		})
+		if err != nil {
+			log.Printf("Failed to marshal payload for chat.latest event: %v", err)
+			continue
+		}
+
+		wsMessage := WebSocketMessage{
+			Kind:    "chat_latest",
+			Payload: json.RawMessage(payload),
+		}
+
+		// Room에 메시지 브로드캐스트
+		if err := app.sendMessageToRoom(event.RoomID, wsMessage); err != nil {
+			log.Printf("Failed to broadcast chat.latest event to RoomID %s: %v", event.RoomID, err)
+		}
+	}
+}
+
 // Join 메시지 처리
 func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
 	var joinMsg common.JoinRoomMessage

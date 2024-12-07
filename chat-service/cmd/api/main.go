@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/chat/pkg/data"
+	"github.com/baaami/dorandoran/chat/pkg/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -23,8 +24,9 @@ const (
 var client *mongo.Client
 
 type Config struct {
-	Models data.Models
-	Rabbit *amqp.Connection
+	Models  data.Models
+	Rabbit  *amqp.Connection
+	Emitter *event.Emitter
 }
 
 func main() {
@@ -54,10 +56,17 @@ func main() {
 		}
 	}()
 
+	emitter, err := event.NewEmitter(rabbitConn)
+	if err != nil {
+		log.Printf("Failed to make new event emitter: %v", err)
+		os.Exit(1)
+	}
+
 	// Config 구조체 초기화
 	app := Config{
-		Models: data.New(client),
-		Rabbit: rabbitConn,
+		Models:  data.New(client),
+		Rabbit:  rabbitConn,
+		Emitter: emitter,
 	}
 
 	// 웹 서버 시작

@@ -329,10 +329,9 @@ func handleUserCreatedEvent(user User) error {
 // 채팅방 참가 시 이벤트 발생 동작
 func handleRoomJoinEvent(roomJoin RoomJoinEvent) error {
 	// 채팅방에서 유저가 마지막으로 확인한 시간 업데이트
-	// TODO: /room/confirm 이벤트 없어졌으니 확인 필요
-	url := fmt.Sprintf("http://chat-service/room/confirm/%s/%s", roomJoin.RoomID, roomJoin.UserID)
+	url := "http://chat-service/room/join"
 
-	request, err := http.NewRequest(http.MethodPut, url, nil)
+	request, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		log.Printf("Failed to create request: %v", err)
 		return err

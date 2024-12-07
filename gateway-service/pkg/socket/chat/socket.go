@@ -39,11 +39,16 @@ type ChatRoom struct {
 	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
 }
 
+type ChatLastest struct {
+	RoomID string `bson:"room_id" json:"room_id"`
+}
+
 const (
-	MessageKindMessage   = "message"
-	MessageKindJoin      = "join"
-	MessageKindLeave     = "leave"
-	MessageKindCheckRead = "check_read"
+	MessageKindMessage     = "message"
+	MessageKindJoin        = "join"
+	MessageKindLeave       = "leave"
+	MessageKindCheckRead   = "check_read"
+	MessageKindChatLastest = "chat_latest"
 )
 
 // Room Type (Receive)
@@ -93,8 +98,9 @@ type Client struct {
 }
 
 type Config struct {
-	Rooms       sync.Map // key: roomID, value: *sync.Map (key: userID, value: *Client)
-	ChatClients sync.Map // key: userID, value: *Client
-	ChatEmitter *event.Emitter
-	RedisClient *redis.RedisClient
+	Rooms        sync.Map // key: roomID, value: *sync.Map (key: userID, value: *Client)
+	ChatClients  sync.Map // key: userID, value: *Client
+	ChatEmitter  *event.Emitter
+	RedisClient  *redis.RedisClient
+	EventChannel chan event.ChatLatestEvent // RabbitMQ 이벤트를 수신할 채널
 }

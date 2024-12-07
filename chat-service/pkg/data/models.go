@@ -134,6 +134,27 @@ func (c *Chat) GetMessagesBefore(roomID string, before time.Time) ([]Chat, error
 	return messages, nil
 }
 
+// 메시지의 unread_count를 일괄적으로 감소시키는 함수
+func (c *Chat) UpdateUnreadCounts(messageIDs []primitive.ObjectID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	// UpdateMany를 사용하여 일괄 감소
+	filter := bson.M{"_id": bson.M{"$in": messageIDs}}
+	update := bson.M{"$inc": bson.M{"unread_count": -1}}
+
+	result, err := collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		log.Printf("Failed to update unread_count for messages: %v", err)
+		return err
+	}
+
+	log.Printf("Updated unread_count for %d messages", result.ModifiedCount)
+	return nil
+}
+
 // 읽지 않은 메시지 개수 획득
 func (c *ChatReader) GetUnreadCountByUserAndRoom(userID int, roomID string) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
