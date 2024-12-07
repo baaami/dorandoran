@@ -62,6 +62,17 @@ type ChatReadersEvent struct {
 	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
 }
 
+type ChatEvent struct {
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	ReaderIds   []string           `bson:"reader_ids" json:"reader_ids"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
+
 type Consumer struct {
 	conn      *amqp.Connection
 	queueName string
@@ -154,7 +165,7 @@ func (consumer *Consumer) Listen(topics []string) error {
 
 			switch eventPayload.EventType {
 			case "chat":
-				var chatMsg Chat
+				var chatMsg ChatEvent
 				// eventPayload.Data는 json.RawMessage이므로 다시 언마샬링
 				if err := json.Unmarshal(eventPayload.Data, &chatMsg); err != nil {
 					log.Printf("Failed to unmarshal chat message: %v", err)
@@ -212,8 +223,8 @@ func (consumer *Consumer) Listen(topics []string) error {
 }
 
 // handleChatPayload는 채팅 메시지를 처리하는 함수
-func handleChatAddPayload(chatMsg Chat) error {
-	jsonData, _ := json.MarshalIndent(&chatMsg, "", "\t")
+func handleChatAddPayload(chatEventMsg ChatEvent) error {
+	jsonData, _ := json.MarshalIndent(&chatEventMsg, "", "\t")
 
 	chatServiceURL := "http://chat-service/msg"
 

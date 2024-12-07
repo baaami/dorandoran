@@ -76,22 +76,21 @@ func (app *Config) BroadcastToRoom(chatMsg *Chat, activeUserIds []string) error 
 		log.Printf("Failed to send message to room %s: %v", chatMsg.RoomID, err)
 	}
 
-	// RabbitMQ에 메시지 푸시
-	log.Printf("Pushing chat message to RabbitMQ, room: %s", chatMsg.RoomID)
-	if err := app.ChatEmitter.PushChatToQueue(event.Chat(*chatMsg)); err != nil {
-		log.Printf("Failed to push chat event to queue, chatMsg: %v, err: %v", chatMsg, err)
-		return err
+	chatEvent := event.ChatEvent{
+		MessageId:   chatMsg.MessageId,
+		Type:        chatMsg.Type,
+		RoomID:      chatMsg.RoomID,
+		SenderID:    chatMsg.SenderID,
+		Message:     chatMsg.Message,
+		UnreadCount: chatMsg.UnreadCount,
+		ReaderIds:   activeUserIds,
+		CreatedAt:   chatMsg.CreatedAt,
 	}
 
-	// RabbitMQ에 활성 사용자 ID 리스트와 함께 읽음 이벤트 푸시
-	readersEvent := event.ChatReadersEvent{
-		MessageId: chatMsg.MessageId,
-		RoomID:    chatMsg.RoomID,
-		UserIds:   activeUserIds,
-		ReadAt:    time.Now(),
-	}
-	if err := app.ChatEmitter.PushChatReadersToQueue(readersEvent); err != nil {
-		log.Printf("Failed to push chat readers event: %v", err)
+	// RabbitMQ에 메시지 푸시
+	log.Printf("Pushing chat message to RabbitMQ, room: %s, active: %v", chatMsg.RoomID, activeUserIds)
+	if err := app.ChatEmitter.PushChatToQueue(chatEvent); err != nil {
+		log.Printf("Failed to push chat event to queue, chatMsg: %v, err: %v", chatMsg, err)
 		return err
 	}
 

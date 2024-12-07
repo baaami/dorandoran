@@ -45,6 +45,16 @@ type Chat struct {
 	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
+type ChatEvent struct {
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	ReaderIds   []string           `bson:"reader_ids" json:"reader_ids"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
 type Emitter struct {
 	connection *amqp.Connection
 }
@@ -99,14 +109,14 @@ func NewEventEmitter(conn *amqp.Connection) (Emitter, error) {
 	return emitter, nil
 }
 
-func (e *Emitter) PushChatToQueue(chatMsg Chat) error {
+func (e *Emitter) PushChatToQueue(chatEventMsg ChatEvent) error {
 	if e.connection == nil {
 		log.Println("RabbitMQ connection is nil")
 		return fmt.Errorf("RabbitMQ connection is nil")
 	}
 
 	// 채팅 메시지 데이터를 JSON으로 변환
-	chatData, err := json.Marshal(chatMsg)
+	chatData, err := json.Marshal(chatEventMsg)
 	if err != nil {
 		log.Printf("Failed to marshal chat message: %v", err)
 		return err

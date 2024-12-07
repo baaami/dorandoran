@@ -21,7 +21,7 @@ import (
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
-	RoomID          = "0be07736-b1f8-43cf-94d2-574d216e3444" // 테스트용 RoomID
+	RoomID          = "882215d4-839b-4360-b5ac-585bf7c0a873" // 테스트용 RoomID
 )
 
 type WebSocketMessage struct {
@@ -37,6 +37,12 @@ type Chat struct {
 	Message     string             `bson:"message" json:"message"`
 	UnreadCount int                `bson:"unread_count" json:"unread_count"`
 	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
+
+type ChatMessage struct {
+	HeadCnt int    `json:"head_cnt"`
+	RoomID  string `json:"room_id"`
+	Message string `json:"message"`
 }
 
 type Address struct {
@@ -133,12 +139,12 @@ func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket
 
 // WebSocket으로 메시지를 보내는 함수
 func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message string) {
-	nSenderID, _ := strconv.Atoi(senderID)
+	// nSenderID, _ := strconv.Atoi(senderID)
 
-	Chat := Chat{
-		RoomID:   RoomID,
-		SenderID: nSenderID,
-		Message:  message,
+	Chat := ChatMessage{
+		HeadCnt: 8,
+		RoomID:  RoomID,
+		Message: message,
 	}
 
 	wsMessage := WebSocketMessage{

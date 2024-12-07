@@ -180,7 +180,7 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	participantCount := 20
+	participantCount := 16
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)

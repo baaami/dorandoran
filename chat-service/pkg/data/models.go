@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -29,7 +30,7 @@ type Models struct {
 }
 
 type Chat struct {
-	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	MessageId   primitive.ObjectID `bson:"_id" json:"message_id"`
 	Type        string             `bson:"type" json:"type"`
 	RoomID      string             `bson:"room_id" json:"room_id"`
 	SenderID    int                `bson:"sender_id" json:"sender_id"`
@@ -53,22 +54,38 @@ type ChatRoom struct {
 }
 
 // 채팅 메시지 삽입
-func (c *Chat) Insert(entry Chat) error {
+func (c *Chat) Insert(entry Chat) (primitive.ObjectID, error) {
 	collection := client.Database("chat_db").Collection("messages")
 
-	_, err := collection.InsertOne(context.TODO(), Chat{
-		Type:      entry.Type,
-		RoomID:    entry.RoomID,
-		SenderID:  entry.SenderID,
-		Message:   entry.Message,
-		CreatedAt: entry.CreatedAt,
+	// Insert the chat message into the collection
+	result, err := collection.InsertOne(context.TODO(), Chat{
+		MessageId:   entry.MessageId,
+		Type:        entry.Type,
+		RoomID:      entry.RoomID,
+		SenderID:    entry.SenderID,
+		Message:     entry.Message,
+		UnreadCount: entry.UnreadCount,
+		CreatedAt:   entry.CreatedAt,
 	})
 	if err != nil {
 		log.Println("Error inserting chat message:", err)
-		return err
+		return primitive.NilObjectID, err
 	}
 
-	return nil
+	// Convert the inserted ID to primitive.ObjectID
+	messageID, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		log.Println("Failed to convert InsertedID to ObjectID")
+		return primitive.NilObjectID, fmt.Errorf("failed to convert InsertedID to ObjectID")
+	}
+
+	if messageID != entry.MessageId {
+		log.Printf("insertedId and MesaageId is different!!!!!!, %v, %v", messageID, entry.MessageId)
+	} else {
+		log.Printf("insertedId and MesaageId is same!!!!!!, %v, %v", messageID, entry.MessageId)
+	}
+
+	return messageID, nil
 }
 
 // 채팅 메시지 읽은 사용자 삽입
@@ -115,6 +132,55 @@ func (c *Chat) GetMessagesBefore(roomID string, before time.Time) ([]Chat, error
 	}
 
 	return messages, nil
+}
+
+// 읽지 않은 메시지 개수 획득
+func (c *ChatReader) GetUnreadCountByUserAndRoom(userID int, roomID string) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	messagesCollection := client.Database("chat_db").Collection("messages")
+
+	// Step 1: 찾을 메시지들의 `_id` 추출
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{"room_id": roomID}}},
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from":         "message_readers",
+			"localField":   "_id",
+			"foreignField": "message_id",
+			"as":           "readers",
+		}}},
+		bson.D{{Key: "$match", Value: bson.M{
+			"$expr": bson.M{
+				"$not": bson.M{
+					"$in": bson.A{userID, "$readers.user_id"},
+				},
+			},
+		}}},
+		bson.D{{Key: "$count", Value: "unread_count"}},
+	}
+
+	cursor, err := messagesCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Printf("Error retrieving unread count for user %d in room %s: %v", userID, roomID, err)
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	// Step 2: 결과 처리
+	var result struct {
+		UnreadCount int `bson:"unread_count"`
+	}
+
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(&result); err != nil {
+			log.Printf("Error decoding unread count result: %v", err)
+			return 0, err
+		}
+		return result.UnreadCount, nil
+	}
+
+	return 0, nil // 읽지 않은 메시지가 없는 경우 0 반환
 }
 
 // 채팅 목록 조회 (by ChatRoom ID)
