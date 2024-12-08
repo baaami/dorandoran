@@ -3,7 +3,6 @@ package match
 import (
 	"encoding/json"
 	"sync"
-	"time"
 
 	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/gorilla/websocket"
@@ -12,13 +11,6 @@ import (
 type WebSocketMessage struct {
 	Kind    string          `json:"kind"`
 	Payload json.RawMessage `json:"payload"`
-}
-
-type ChatRoom struct {
-	ID         string    `bson:"id" json:"id"` // UUID 사용
-	Users      []string  `bson:"users" json:"users"`
-	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
-	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
 }
 
 const (

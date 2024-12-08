@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -15,55 +15,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
-type Chat struct {
-	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
-	Type        string             `bson:"type" json:"type"`
-	RoomID      string             `bson:"room_id" json:"room_id"`
-	SenderID    int                `bson:"sender_id" json:"sender_id"`
-	Message     string             `bson:"message" json:"message"`
-	UnreadCount int                `bson:"unread_count" json:"unread_count"`
-	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
-}
-
-type ChatListResponse struct {
-	Data        []*data.Chat `json:"data"`
-	CurrentPage int          `json:"currentPage"`
-	NextPage    int          `json:"nextPage,omitempty"`
-	HasNextPage bool         `json:"hasNextPage"`
-	TotalPages  int          `json:"totalPages"`
-}
-
-type ChatReadersEvent struct {
-	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
-	RoomID    string             `bson:"room_id" json:"room_id"`
-	UserIds   []string           `bson:"user_ids" json:"user_ids"`
-	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
-}
-
-type RoomJoinEvent struct {
-	RoomID string    `bson:"room_id" json:"room_id"`
-	UserID string    `bson:"user_id" json:"user_id"`
-	JoinAt time.Time `bson:"join_at" json:"join_at"`
-}
-
-type ChatReader struct {
-	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
-	RoomID    string             `bson:"room_id" json:"room_id"`
-	UserId    int                `bson:"user_id" json:"user_id"`
-	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
-}
-
-type ChatEvent struct {
-	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
-	Type        string             `bson:"type" json:"type"`
-	RoomID      string             `bson:"room_id" json:"room_id"`
-	SenderID    int                `bson:"sender_id" json:"sender_id"`
-	Message     string             `bson:"message" json:"message"`
-	UnreadCount int                `bson:"unread_count" json:"unread_count"`
-	ReaderIds   []string           `bson:"reader_ids" json:"reader_ids"`
-	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
-}
 
 // 채팅방 생성
 func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +67,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 		// 읽지 않은 메시지 개수 조회
 		unreadCount, err := app.Models.ChatReader.GetUnreadCountByUserAndRoom(nUserID, room.ID)
 		if err != nil {
-			log.Printf("Failed to retrieve unread count for user %d in room %s: %v", userID, room.ID, err)
+			log.Printf("Failed to retrieve unread count for user %s in room %s: %v", userID, room.ID, err)
 			continue
 		}
 
@@ -219,7 +170,7 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 	hasNextPage := pageNumber < totalPages
 
 	// 응답 생성
-	response := ChatListResponse{
+	response := data.ChatListResponse{
 		Data:        messages,
 		CurrentPage: pageNumber,
 		NextPage:    pageNumber + 1,
@@ -262,7 +213,7 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 
 // 채팅 메시지 추가
 func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
-	var chatEventMsg ChatEvent
+	var chatEventMsg data.ChatEvent
 	err := json.NewDecoder(r.Body).Decode(&chatEventMsg)
 	if err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
@@ -337,7 +288,7 @@ func (app *Config) addChatReaders(messageID primitive.ObjectID, roomID string, r
 // 채팅 메시지 읽음 처리
 func (app *Config) handleChatRead(w http.ResponseWriter, r *http.Request) {
 	// 요청 바디 파싱
-	var readersEvent ChatReadersEvent
+	var readersEvent data.ChatReadersEvent
 	err := json.NewDecoder(r.Body).Decode(&readersEvent)
 	if err != nil {
 		log.Printf("Failed to decode request payload: %v", err)
@@ -382,7 +333,7 @@ func (app *Config) handleChatRead(w http.ResponseWriter, r *http.Request) {
 // handleRoomJoin processes a room.join event and inserts read data for messages created before JoinAt
 func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 	// 요청 바디 파싱
-	var roomJoinEvent RoomJoinEvent
+	var roomJoinEvent data.RoomJoinEvent
 	err := json.NewDecoder(r.Body).Decode(&roomJoinEvent)
 	if err != nil {
 		log.Printf("Failed to decode room join event: %v", err)
@@ -498,7 +449,7 @@ func getUserByUserID(userID string) (*common.User, error) {
 	var user common.User
 
 	// 응답 본문 로깅 추가
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}

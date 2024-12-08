@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/baaami/dorandoran/broker/pkg/data"
 	"github.com/baaami/dorandoran/broker/pkg/types"
 	common "github.com/baaami/dorandoran/common/user"
 
@@ -287,7 +288,7 @@ func (app *Config) createRoom(roomID string, matchList []string) error {
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
 
-	chatRoom := ChatRoom{
+	chatRoom := data.ChatRoom{
 		ID:    roomID,
 		Users: matchList,
 	}

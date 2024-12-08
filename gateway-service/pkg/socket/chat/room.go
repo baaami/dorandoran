@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/baaami/dorandoran/broker/event"
+	"github.com/baaami/dorandoran/broker/pkg/data"
 	"github.com/baaami/dorandoran/broker/pkg/types"
 	common "github.com/baaami/dorandoran/common/chat"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,7 +23,7 @@ type RoomJoinEvent struct {
 
 // BroadCast 메시지 처리
 func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
-	var broadCastMsg ChatMessage
+	var broadCastMsg data.ChatMessage
 	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
 		log.Printf("Failed to unmarshal broadcast message: %v", err)
 		return
@@ -42,7 +43,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 	}
 
 	now := time.Now()
-	chat := Chat{
+	chat := data.Chat{
 		MessageId:   primitive.NewObjectID(),
 		Type:        types.ChatTypeChat,
 		RoomID:      broadCastMsg.RoomID,
@@ -59,7 +60,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 }
 
 // BroadcastToRoom handles broadcasting messages to a specific room
-func (app *Config) BroadcastToRoom(chatMsg *Chat, activeUserIds []string) error {
+func (app *Config) BroadcastToRoom(chatMsg *data.Chat, activeUserIds []string) error {
 	// WebSocket 메시지 생성
 	payload, err := json.Marshal(chatMsg)
 	if err != nil {
@@ -151,8 +152,8 @@ func (app *Config) ProcessChatEvents() {
 		log.Printf("Send chat.latest event for RoomID: %s", event.RoomID)
 
 		// WebSocket 메시지 생성
-		payload, err := json.Marshal(map[string]string{
-			"room_id": event.RoomID,
+		payload, err := json.Marshal(RoomJoinEvent{
+			RoomID: event.RoomID,
 		})
 		if err != nil {
 			log.Printf("Failed to marshal payload for chat.latest event: %v", err)
@@ -160,7 +161,7 @@ func (app *Config) ProcessChatEvents() {
 		}
 
 		wsMessage := WebSocketMessage{
-			Kind:    "chat_latest",
+			Kind:    MessageKindChatLastest,
 			Payload: json.RawMessage(payload),
 		}
 
