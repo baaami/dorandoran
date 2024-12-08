@@ -5,6 +5,7 @@ import (
 	"time"
 
 	common "github.com/baaami/dorandoran/common/user"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // Request
@@ -35,11 +36,13 @@ type MatchMessage struct {
 }
 
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
 type ChatRoom struct {
@@ -47,8 +50,6 @@ type ChatRoom struct {
 	Users      []string  `bson:"users" json:"users"`
 	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
 	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
-	// 추가적으로 각 사용자의 마지막 확인 메시지 ID를 추적하기 위한 필드를 고려할 수 있음
-	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
 // Push Message

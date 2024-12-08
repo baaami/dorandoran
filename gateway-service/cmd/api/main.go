@@ -44,18 +44,40 @@ func main() {
 		os.Exit(1)
 	}
 
+	// RabbitMQ Consumer
+	chatConsumer, err := event.NewConsumer(rabbitConn)
+	if err != nil {
+		log.Error().Msgf("Failed to make new event consumer: %v", err)
+		os.Exit(1)
+	}
+
+	// 채널 생성: 이벤트 전달용
+	chatEventChannel := make(chan event.ChatLatestEvent, 100)
+
 	// WebSocket 설정
 	chatWSConfig := &chat.Config{
-		Rooms:       sync.Map{},
-		ChatClients: sync.Map{},
-		ChatEmitter: &chatEmitter,
-		RedisClient: redisClient,
+		Rooms:        sync.Map{},
+		ChatClients:  sync.Map{},
+		ChatEmitter:  &chatEmitter,
+		RedisClient:  redisClient,
+		EventChannel: chatEventChannel,
 	}
 
 	matchWSConfig := &match.Config{
 		MatchClients: sync.Map{},
 		RedisClient:  redisClient,
 	}
+
+	// RabbitMQ Consumer Listen 고루틴 실행
+	go func() {
+		log.Info().Msg("Starting RabbitMQ consumer for chat.latest events")
+		if err := chatConsumer.Listen([]string{"chat.latest"}, chatEventChannel); err != nil {
+			log.Error().Msgf("Failed to start RabbitMQ consumer: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	go chatWSConfig.ProcessChatEvents()
 
 	// Redis 대기열 모니터링 고루틴 실행
 	for copuleCnt := 1; copuleCnt <= coupleMaxCount; copuleCnt++ {

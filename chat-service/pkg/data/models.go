@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -23,16 +24,26 @@ func New(mongo *mongo.Client) Models {
 }
 
 type Models struct {
-	Chat     Chat
-	ChatRoom ChatRoom
+	Chat       Chat
+	ChatRoom   ChatRoom
+	ChatReader ChatReader
 }
 
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
+
+type ChatReader struct {
+	MessageId primitive.ObjectID `bson:"message_id" json:"message_id"`
+	RoomID    string             `bson:"room_id" json:"room_id"`
+	UserId    int                `bson:"user_id" json:"user_id"`
+	ReadAt    time.Time          `bson:"read_at" json:"read_at"`
 }
 
 type ChatRoom struct {
@@ -40,27 +51,151 @@ type ChatRoom struct {
 	Users      []string  `bson:"users" json:"users"`
 	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
 	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
-	// 추가적으로 각 사용자의 마지막 확인 메시지 ID를 추적하기 위한 필드를 고려할 수 있음
-	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
 }
 
 // 채팅 메시지 삽입
-func (c *Chat) Insert(entry Chat) error {
+func (c *Chat) Insert(entry Chat) (primitive.ObjectID, error) {
 	collection := client.Database("chat_db").Collection("messages")
 
-	_, err := collection.InsertOne(context.TODO(), Chat{
-		Type:      entry.Type,
-		RoomID:    entry.RoomID,
-		SenderID:  entry.SenderID,
-		Message:   entry.Message,
-		CreatedAt: entry.CreatedAt,
+	// Insert the chat message into the collection
+	result, err := collection.InsertOne(context.TODO(), Chat{
+		MessageId:   entry.MessageId,
+		Type:        entry.Type,
+		RoomID:      entry.RoomID,
+		SenderID:    entry.SenderID,
+		Message:     entry.Message,
+		UnreadCount: entry.UnreadCount,
+		CreatedAt:   entry.CreatedAt,
 	})
 	if err != nil {
 		log.Println("Error inserting chat message:", err)
+		return primitive.NilObjectID, err
+	}
+
+	// Convert the inserted ID to primitive.ObjectID
+	messageID, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		log.Println("Failed to convert InsertedID to ObjectID")
+		return primitive.NilObjectID, fmt.Errorf("failed to convert InsertedID to ObjectID")
+	}
+
+	return messageID, nil
+}
+
+// 채팅 메시지 읽은 사용자 삽입
+func (cr *ChatReader) Insert(reader ChatReader) error {
+	collection := client.Database("chat_db").Collection("message_readers")
+
+	_, err := collection.InsertOne(context.TODO(), reader)
+	if err != nil {
+		log.Println("Error inserting chat reader:", err)
 		return err
 	}
 
 	return nil
+}
+
+// 해당 room에서 before 시간 이전에 존재한 메시지 리스트
+func (c *Chat) GetMessagesBefore(roomID string, before time.Time) ([]Chat, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	// 필터 조건: 특정 RoomID 및 CreatedAt < before
+	filter := bson.M{
+		"room_id":    roomID,
+		"created_at": bson.M{"$lt": before},
+	}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error finding messages for RoomID %s: %v", roomID, err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var messages []Chat
+	for cursor.Next(ctx) {
+		var message Chat
+		if err := cursor.Decode(&message); err != nil {
+			log.Printf("Error decoding message: %v", err)
+			continue
+		}
+		messages = append(messages, message)
+	}
+
+	return messages, nil
+}
+
+// 메시지의 unread_count를 일괄적으로 감소시키는 함수
+func (c *Chat) UpdateUnreadCounts(messageIDs []primitive.ObjectID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("messages")
+
+	// UpdateMany를 사용하여 일괄 감소
+	filter := bson.M{"_id": bson.M{"$in": messageIDs}}
+	update := bson.M{"$inc": bson.M{"unread_count": -1}}
+
+	result, err := collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		log.Printf("Failed to update unread_count for messages: %v", err)
+		return err
+	}
+
+	log.Printf("Updated unread_count for %d messages", result.ModifiedCount)
+	return nil
+}
+
+// 읽지 않은 메시지 개수 획득
+func (c *ChatReader) GetUnreadCountByUserAndRoom(userID int, roomID string) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	messagesCollection := client.Database("chat_db").Collection("messages")
+
+	// Step 1: 찾을 메시지들의 `_id` 추출
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{"room_id": roomID}}},
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from":         "message_readers",
+			"localField":   "_id",
+			"foreignField": "message_id",
+			"as":           "readers",
+		}}},
+		bson.D{{Key: "$match", Value: bson.M{
+			"$expr": bson.M{
+				"$not": bson.M{
+					"$in": bson.A{userID, "$readers.user_id"},
+				},
+			},
+		}}},
+		bson.D{{Key: "$count", Value: "unread_count"}},
+	}
+
+	cursor, err := messagesCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Printf("Error retrieving unread count for user %d in room %s: %v", userID, roomID, err)
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	// Step 2: 결과 처리
+	var result struct {
+		UnreadCount int `bson:"unread_count"`
+	}
+
+	if cursor.Next(ctx) {
+		if err := cursor.Decode(&result); err != nil {
+			log.Printf("Error decoding unread count result: %v", err)
+			return 0, err
+		}
+		return result.UnreadCount, nil
+	}
+
+	return 0, nil // 읽지 않은 메시지가 없는 경우 0 반환
 }
 
 // 채팅 목록 조회 (by ChatRoom ID)
@@ -169,7 +304,6 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 
 	room.CreatedAt = time.Now()
 	room.ModifiedAt = time.Now()
-	room.UserLastRead = make(map[string]time.Time) // 각 사용자의 마지막 읽은 메시지 ID를 저장하기 위한 맵 (필요 시)
 
 	_, err := collection.InsertOne(ctx, room)
 	if err != nil {
@@ -190,11 +324,9 @@ func (c *ChatRoom) ConfirmRoom(roomID string, userID string, currentTime time.Ti
 	// 필터: 해당 Room ID를 가진 문서
 	filter := bson.M{"id": roomID}
 
-	// 업데이트 내용: UserLastRead 맵의 해당 사용자에 대한 시간 업데이트
 	update := bson.M{
 		"$set": bson.M{
-			fmt.Sprintf("user_last_read.%s", userID): currentTime,
-			"modified_at":                            currentTime,
+			"modified_at": currentTime,
 		},
 	}
 
@@ -205,33 +337,6 @@ func (c *ChatRoom) ConfirmRoom(roomID string, userID string, currentTime time.Ti
 		return err
 	}
 
-	return nil
-}
-
-func (c *ChatRoom) UpdateUserLastReadBatch(roomID string, userLastRead map[string]time.Time) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	collection := client.Database("chat_db").Collection("rooms")
-
-	// Update 문서 생성
-	updateFields := bson.M{}
-	for userID, lastReadTime := range userLastRead {
-		updateFields[fmt.Sprintf("user_last_read.%s", userID)] = lastReadTime
-	}
-
-	update := bson.M{
-		"$set": updateFields,
-	}
-
-	// MongoDB UpdateOne 실행
-	_, err := collection.UpdateOne(ctx, bson.M{"id": roomID}, update)
-	if err != nil {
-		log.Printf("Failed to update UserLastRead for room %s: %v", roomID, err)
-		return err
-	}
-
-	log.Printf("UserLastRead updated for room %s: %+v", roomID, userLastRead)
 	return nil
 }
 
@@ -296,29 +401,6 @@ func (c *ChatRoom) GetRoomsByUserID(userID string) ([]ChatRoom, error) {
 	}
 
 	return rooms, nil
-}
-
-// 특정 유저가 특정 채팅방 내에서 읽지 않은 메시지 개수 반환
-func (c *Chat) GetUnreadMessageCount(roomID string, userID string, lastReadTime time.Time) (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	collection := client.Database("chat_db").Collection("messages")
-
-	// Filter messages created after the user's last read time
-	filter := bson.M{
-		"room_id":    roomID,
-		"created_at": bson.M{"$gt": lastReadTime},
-	}
-
-	// Count the documents matching the filter
-	count, err := collection.CountDocuments(ctx, filter)
-	if err != nil {
-		log.Printf("Error counting unread messages for room %s and user %s: %v", roomID, userID, err)
-		return 0, err
-	}
-
-	return int(count), nil
 }
 
 // 최신 채팅 데이터 조회

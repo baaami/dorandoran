@@ -15,12 +15,13 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
-	RoomID          = "d361a857-8951-403a-a9b8-810267f53927" // 테스트용 RoomID
+	RoomID          = "605686a0-38df-455d-b313-4a49328adbd6" // 테스트용 RoomID
 )
 
 type WebSocketMessage struct {
@@ -29,11 +30,19 @@ type WebSocketMessage struct {
 }
 
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
+}
+
+type ChatMessage struct {
+	HeadCnt int    `json:"head_cnt"`
+	RoomID  string `json:"room_id"`
+	Message string `json:"message"`
 }
 
 type Address struct {
@@ -130,12 +139,12 @@ func connectWebSocket(t *testing.T, sessionID string, userID string) (*websocket
 
 // WebSocket으로 메시지를 보내는 함수
 func sendChat(t *testing.T, conn *websocket.Conn, senderID string, message string) {
-	nSenderID, _ := strconv.Atoi(senderID)
+	// nSenderID, _ := strconv.Atoi(senderID)
 
-	Chat := Chat{
-		RoomID:   RoomID,
-		SenderID: nSenderID,
-		Message:  message,
+	Chat := ChatMessage{
+		HeadCnt: 8,
+		RoomID:  RoomID,
+		Message: message,
 	}
 
 	wsMessage := WebSocketMessage{
@@ -183,14 +192,14 @@ func toJSONRawMessage(v interface{}) json.RawMessage {
 	return json.RawMessage(data)
 }
 
-// 5명의 참가자가 채팅을 테스트하는 함수
+// 8명의 참가자가 채팅을 테스트하는 함수
 func TestChatAmongFiveClients(t *testing.T) {
 	participantCount := 8
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
 
-	// 1. 5명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
+	// 1. 8명의 참가자가 로그인하여 세션 ID와 유저 ID 발급
 	for i := 0; i < participantCount; i++ {
 		accessToken := fmt.Sprintf("masterkey-%d", i+1)
 		sessionID, userID, err := loginAndGetSessionIDAndUserID(accessToken)
@@ -199,7 +208,7 @@ func TestChatAmongFiveClients(t *testing.T) {
 		userIDs[i] = userID
 	}
 
-	// 2. 5명의 참가자가 WebSocket으로 접속
+	// 2. 8명의 참가자가 WebSocket으로 접속
 	for i := 0; i < participantCount; i++ {
 		conn, err := connectWebSocket(t, sessionIDs[i], userIDs[i])
 		assert.NoError(t, err)

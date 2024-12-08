@@ -8,6 +8,7 @@ import (
 	"github.com/baaami/dorandoran/broker/event"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type WebSocketMessage struct {
@@ -16,14 +17,17 @@ type WebSocketMessage struct {
 }
 
 type Chat struct {
-	Type      string    `bson:"type" json:"type"`
-	RoomID    string    `bson:"room_id" json:"room_id"`
-	SenderID  int       `bson:"sender_id" json:"sender_id"`
-	Message   string    `bson:"message" json:"message"`
-	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type        string             `bson:"type" json:"type"`
+	RoomID      string             `bson:"room_id" json:"room_id"`
+	SenderID    int                `bson:"sender_id" json:"sender_id"`
+	Message     string             `bson:"message" json:"message"`
+	UnreadCount int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
 type ChatMessage struct {
+	HeadCnt int    `json:"head_cnt"`
 	RoomID  string `json:"room_id"`
 	Message string `json:"message"`
 }
@@ -33,15 +37,18 @@ type ChatRoom struct {
 	Users      []string  `bson:"users" json:"users"`
 	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
 	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
-	// 추가적으로 각 사용자의 마지막 확인 메시지 ID를 추적하기 위한 필드를 고려할 수 있음
-	UserLastRead map[string]time.Time `bson:"user_last_read" json:"user_last_read"`
+}
+
+type ChatLastest struct {
+	RoomID string `bson:"room_id" json:"room_id"`
 }
 
 const (
-	MessageKindMessage   = "message"
-	MessageKindJoin      = "join"
-	MessageKindLeave     = "leave"
-	MessageKindCheckRead = "check_read"
+	MessageKindMessage     = "message"
+	MessageKindJoin        = "join"
+	MessageKindLeave       = "leave"
+	MessageKindCheckRead   = "check_read"
+	MessageKindChatLastest = "chat_latest"
 )
 
 // Room Type (Receive)
@@ -91,8 +98,9 @@ type Client struct {
 }
 
 type Config struct {
-	Rooms       sync.Map // key: roomID, value: *sync.Map (key: userID, value: *Client)
-	ChatClients sync.Map // key: userID, value: *Client
-	ChatEmitter *event.Emitter
-	RedisClient *redis.RedisClient
+	Rooms        sync.Map // key: roomID, value: *sync.Map (key: userID, value: *Client)
+	ChatClients  sync.Map // key: userID, value: *Client
+	ChatEmitter  *event.Emitter
+	RedisClient  *redis.RedisClient
+	EventChannel chan event.ChatLatestEvent // RabbitMQ 이벤트를 수신할 채널
 }

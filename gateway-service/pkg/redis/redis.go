@@ -143,7 +143,6 @@ func (r *RedisClient) MonitorAndPopMatchingUsers(coupleCnt int) ([]string, error
 		}
 	}
 
-	log.Printf("No complete matches found in queue %s", queueName)
 	return nil, nil
 }
 
