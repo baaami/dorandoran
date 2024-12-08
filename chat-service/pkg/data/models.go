@@ -79,12 +79,6 @@ func (c *Chat) Insert(entry Chat) (primitive.ObjectID, error) {
 		return primitive.NilObjectID, fmt.Errorf("failed to convert InsertedID to ObjectID")
 	}
 
-	if messageID != entry.MessageId {
-		log.Printf("insertedId and MesaageId is different!!!!!!, %v, %v", messageID, entry.MessageId)
-	} else {
-		log.Printf("insertedId and MesaageId is same!!!!!!, %v, %v", messageID, entry.MessageId)
-	}
-
 	return messageID, nil
 }
 

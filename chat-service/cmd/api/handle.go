@@ -322,8 +322,6 @@ func (app *Config) addChatReaders(messageID primitive.ObjectID, roomID string, r
 			ReadAt:    readAt,
 		}
 
-		log.Printf("Insert ChatReader: %v", reader)
-
 		// 데이터베이스에 삽입
 		err = app.Models.ChatReader.Insert(reader)
 		if err != nil {

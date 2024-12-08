@@ -328,10 +328,12 @@ func handleUserCreatedEvent(user User) error {
 
 // 채팅방 참가 시 이벤트 발생 동작
 func handleRoomJoinEvent(roomJoin RoomJoinEvent) error {
+	jsonData, _ := json.MarshalIndent(&roomJoin, "", "\t")
+
 	// 채팅방에서 유저가 마지막으로 확인한 시간 업데이트
 	url := "http://chat-service/room/join"
 
-	request, err := http.NewRequest(http.MethodPost, url, nil)
+	request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Failed to create request: %v", err)
 		return err
@@ -348,7 +350,7 @@ func handleRoomJoinEvent(roomJoin RoomJoinEvent) error {
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusCreated {
 		log.Printf("Failed to send room confirm, status: %d, err: %v", response.StatusCode, err)
 		return err
 	}
