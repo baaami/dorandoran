@@ -18,8 +18,9 @@ func New(mongo *mongo.Client) Models {
 	client = mongo
 
 	return Models{
-		Chat:     Chat{},
-		ChatRoom: ChatRoom{},
+		Chat:       Chat{},
+		ChatRoom:   ChatRoom{},
+		ChatReader: ChatReader{},
 	}
 }
 
@@ -288,6 +289,36 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	}
 
 	return nil
+}
+
+// GetAllRoomsOfType: 특정 타입의 방 목록을 가져오는 함수
+func (c *ChatRoom) GetAllRoomsOfType(roomType int) ([]ChatRoom, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("rooms")
+
+	// 필터 조건: Room Type이 roomType에 해당하는 모든 방
+	filter := bson.M{"type": roomType}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error finding rooms of type %d: %v", roomType, err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var rooms []ChatRoom
+	for cursor.Next(ctx) {
+		var room ChatRoom
+		if err := cursor.Decode(&room); err != nil {
+			log.Printf("Error decoding room: %v", err)
+			continue
+		}
+		rooms = append(rooms, room)
+	}
+
+	return rooms, nil
 }
 
 // 채팅방 정보 업데이트

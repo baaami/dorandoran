@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/baaami/dorandoran/broker/pkg/data"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -80,7 +81,7 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				return
 			}
 
-			var wsMsg WebSocketMessage
+			var wsMsg data.WebSocketMessage
 			if err := json.Unmarshal(msg, &wsMsg); err != nil {
 				log.Printf("Failed to unmarshal message: %v", err)
 				continue

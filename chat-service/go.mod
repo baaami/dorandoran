@@ -6,15 +6,18 @@ require (
 	github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
+	github.com/go-redis/redis v6.15.9+incompatible
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/rabbitmq/amqp091-go v1.10.0
 	go.mongodb.org/mongo-driver v1.16.1
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
-	github.com/samber/lo v1.47.0 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect

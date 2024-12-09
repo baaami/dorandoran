@@ -10,6 +10,8 @@ import (
 
 	"github.com/baaami/dorandoran/chat/pkg/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
+	"github.com/baaami/dorandoran/chat/pkg/manager"
+	"github.com/baaami/dorandoran/chat/pkg/redis"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -24,9 +26,10 @@ const (
 var client *mongo.Client
 
 type Config struct {
-	Models  data.Models
-	Rabbit  *amqp.Connection
-	Emitter *event.Emitter
+	Models      data.Models
+	Rabbit      *amqp.Connection
+	Emitter     *event.Emitter
+	RoomManager *manager.RoomManager
 }
 
 func main() {
@@ -62,12 +65,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Redis 연결
+	redisClient, err := redis.NewRedisClient()
+	if err != nil {
+		log.Printf("Failed to initialize Redis client: %v", err)
+		os.Exit(1)
+	}
+	defer redisClient.Client.Close()
+
+	models := data.New(client)
+
+	// RoomManager 초기화
+	roomManager := manager.NewRoomManager(redisClient, emitter, models)
+
 	// Config 구조체 초기화
 	app := Config{
-		Models:  data.New(client),
-		Rabbit:  rabbitConn,
-		Emitter: emitter,
+		Models:      models,
+		Rabbit:      rabbitConn,
+		Emitter:     emitter,
+		RoomManager: roomManager,
 	}
+
+	// 채팅방 타이머 동기화를 위한 이벤트 발행하기 위한 루프
+	go app.RoomManager.MonitorRoomRemainingTime()
+
+	// 채팅방 타임아웃 이벤트를 발행하기 위한 루프
+	go app.RoomManager.MonitorRoomTimeouts()
 
 	// 웹 서버 시작
 	log.Println("Starting Chat Service on port", webPort)

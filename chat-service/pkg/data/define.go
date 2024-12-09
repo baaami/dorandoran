@@ -8,6 +8,11 @@ import (
 
 const PAGE_DEFAULT_SIZE = 20
 
+const (
+	MATCHING_ROOM = iota
+	DATE_ROOM
+)
+
 type Chat struct {
 	MessageId   primitive.ObjectID `bson:"_id" json:"message_id"`
 	Type        string             `bson:"type" json:"type"`
@@ -27,6 +32,7 @@ type ChatReader struct {
 
 type ChatRoom struct {
 	ID         string    `bson:"id" json:"id"` // UUID 사용
+	Type       int       `bson:"type" json:"type"`
 	Users      []string  `bson:"users" json:"users"`
 	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
 	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
@@ -62,4 +68,9 @@ type RoomJoinEvent struct {
 	RoomID string    `bson:"room_id" json:"room_id"`
 	UserID string    `bson:"user_id" json:"user_id"`
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
+type RoomRemainingEvent struct {
+	RoomID    string `json:"room_id"`
+	Remaining int    `json:"remaining"` // 남은 시간 (초)
 }

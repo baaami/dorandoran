@@ -28,6 +28,10 @@ services:
       context: ./chat-service
       dockerfile: ./chat-service.dockerfile
     restart: always
+    environment:
+      REDIS_HOST: redis # Redis 서비스 이름
+      REDIS_PORT: 6379 # Redis 기본 포트
+      REDIS_PASSWORD: admin # Redis 비밀번호
     deploy:
       mode: replicated
       replicas: 1

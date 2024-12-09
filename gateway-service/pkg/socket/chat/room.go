@@ -67,7 +67,7 @@ func (app *Config) BroadcastToRoom(chatMsg *data.Chat, activeUserIds []string) e
 		log.Printf("Failed to marshal chatMsg: %v", err)
 		return err
 	}
-	webSocketMsg := WebSocketMessage{
+	webSocketMsg := data.WebSocketMessage{
 		Kind:    MessageKindMessage,
 		Payload: json.RawMessage(payload),
 	}
@@ -116,7 +116,8 @@ func (app *Config) getActiveUserIDs(roomID string) ([]string, error) {
 }
 
 // 해당 room에 채팅 송신
-func (app *Config) sendMessageToRoom(roomID string, message WebSocketMessage) error {
+func (app *Config) sendMessageToRoom(roomID string, message data.WebSocketMessage) error {
+	// TODO: Rooms는 아무도 join 하지 않으면 존재하지 않음...
 	if room, ok := app.Rooms.Load(roomID); ok {
 		roomMap := room.(*sync.Map)
 		roomMap.Range(func(userID, clientInterface interface{}) bool {
@@ -137,7 +138,7 @@ func (app *Config) sendMessageToRoom(roomID string, message WebSocketMessage) er
 }
 
 // 해당 client에 채팅 송신
-func (app *Config) sendMessageToClient(client *Client, message WebSocketMessage) bool {
+func (app *Config) sendMessageToClient(client *Client, message data.WebSocketMessage) bool {
 	select {
 	case client.Send <- message:
 		return true // 메시지 전송 성공
@@ -147,27 +148,71 @@ func (app *Config) sendMessageToClient(client *Client, message WebSocketMessage)
 	}
 }
 
-func (app *Config) ProcessChatEvents() {
+func (app *Config) SendSocketByChatEvents() {
 	for event := range app.EventChannel {
-		log.Printf("Send chat.latest event for RoomID: %s", event.RoomID)
+		switch event.Kind {
+		case data.MessageKindChatLastest:
+			// chat.latest 이벤트 처리
+			var chatLatest data.ChatLatestEvent
+			if err := json.Unmarshal(event.Payload, &chatLatest); err != nil {
+				log.Printf("Failed to unmarshal payload for chat.latest event: %v", err)
+				continue
+			}
 
-		// WebSocket 메시지 생성
-		payload, err := json.Marshal(RoomJoinEvent{
-			RoomID: event.RoomID,
-		})
-		if err != nil {
-			log.Printf("Failed to marshal payload for chat.latest event: %v", err)
-			continue
-		}
+			log.Printf("Broadcasting chat.latest event for RoomID: %s", chatLatest.RoomID)
 
-		wsMessage := WebSocketMessage{
-			Kind:    MessageKindChatLastest,
-			Payload: json.RawMessage(payload),
-		}
+			wsMessage := data.WebSocketMessage{
+				Kind:    data.MessageKindChatLastest,
+				Payload: event.Payload,
+			}
 
-		// Room에 메시지 브로드캐스트
-		if err := app.sendMessageToRoom(event.RoomID, wsMessage); err != nil {
-			log.Printf("Failed to broadcast chat.latest event to RoomID %s: %v", event.RoomID, err)
+			// Room에 메시지 브로드캐스트
+			if err := app.sendMessageToRoom(chatLatest.RoomID, wsMessage); err != nil {
+				log.Printf("Failed to broadcast chat.latest event to RoomID %s: %v", chatLatest.RoomID, err)
+			}
+
+		case data.MessageKindRoomRemaining:
+			// room.remain.time 이벤트 처리
+			var roomRemaining data.RoomRemainingEvent
+			if err := json.Unmarshal(event.Payload, &roomRemaining); err != nil {
+				log.Printf("Failed to unmarshal payload for room.remain.time event: %v", err)
+				continue
+			}
+
+			log.Printf("Broadcasting room.remain.time event for RoomID: %s, Remaining: %d", roomRemaining.RoomID, roomRemaining.Remaining)
+
+			wsMessage := data.WebSocketMessage{
+				Kind:    data.MessageKindRoomRemaining,
+				Payload: event.Payload,
+			}
+
+			// Room에 메시지 브로드캐스트
+			if err := app.sendMessageToRoom(roomRemaining.RoomID, wsMessage); err != nil {
+				log.Printf("Failed to broadcast room.remain.time event to RoomID %s: %v", roomRemaining.RoomID, err)
+			}
+
+		case data.MessageKindRoomTimeout:
+			// room.timeout 이벤트 처리
+			var roomTimeout data.RoomTimeoutEvent
+			if err := json.Unmarshal(event.Payload, &roomTimeout); err != nil {
+				log.Printf("Failed to unmarshal payload for room.timeout event: %v", err)
+				continue
+			}
+
+			log.Printf("Broadcasting room.timeout event for RoomID: %s", roomTimeout.RoomID)
+
+			wsMessage := data.WebSocketMessage{
+				Kind:    data.MessageKindRoomTimeout,
+				Payload: event.Payload,
+			}
+
+			// Room에 메시지 브로드캐스트
+			if err := app.sendMessageToRoom(roomTimeout.RoomID, wsMessage); err != nil {
+				log.Printf("Failed to broadcast room.timeout event to RoomID %s: %v", roomTimeout.RoomID, err)
+			}
+
+		default:
+			log.Printf("Unknown WebSocket event kind: %s", event.Kind)
 		}
 	}
 }

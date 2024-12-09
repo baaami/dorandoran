@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// watch the queue and consume events
-	err = consumer.Listen([]string{"chat.#", "auth.#", "room.#"})
+	err = consumer.Listen([]string{"chat.#", "auth.#", "room.join", "room.delete"})
 	if err != nil {
 		log.Println(err)
 	}

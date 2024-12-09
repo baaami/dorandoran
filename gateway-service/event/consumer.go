@@ -4,11 +4,21 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/baaami/dorandoran/broker/pkg/data"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // ChatLatestEvent 정의
 type ChatLatestEvent struct {
+	RoomID string `json:"room_id"`
+}
+
+type RoomRemainingEvent struct {
+	RoomID    string `json:"room_id"`
+	Remaining int    `json:"remaining"` // 남은 시간 (초)
+}
+
+type RoomTimeoutEvent struct {
 	RoomID string `json:"room_id"`
 }
 
@@ -43,7 +53,7 @@ func (consumer *Consumer) setup() error {
 }
 
 // Listen 함수
-func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- ChatLatestEvent) error {
+func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- data.WebSocketMessage) error {
 	log.Println("Setting up listener for routing keys:", routingKeys)
 
 	channel, err := c.conn.Channel()
@@ -118,7 +128,70 @@ func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- ChatLatestEv
 					log.Printf("Failed to unmarshal chat.latest event: %v", err)
 					continue
 				}
-				eventChannel <- chatLatest // 채널로 이벤트 전달
+
+				log.Printf("Send chat.latest event for RoomID: %s", chatLatest.RoomID)
+
+				payload, err := json.Marshal(RoomJoinEvent{
+					RoomID: chatLatest.RoomID,
+				})
+				if err != nil {
+					log.Printf("Failed to marshal payload for chat.latest event: %v", err)
+					continue
+				}
+
+				wsMessage := data.WebSocketMessage{
+					Kind:    data.MessageKindChatLastest,
+					Payload: json.RawMessage(payload),
+				}
+
+				eventChannel <- wsMessage
+			} else if payload.EventType == "room.remain.time" {
+				var roomRemaining RoomRemainingEvent
+				if err := json.Unmarshal(payload.Data, &roomRemaining); err != nil {
+					log.Printf("Failed to unmarshal room.remain.time event: %v", err)
+					continue
+				}
+
+				log.Printf("Send room_remaining event for RoomID: %s, time %d", roomRemaining.RoomID, roomRemaining.Remaining)
+
+				payload, err := json.Marshal(RoomRemainingEvent{
+					RoomID:    roomRemaining.RoomID,
+					Remaining: roomRemaining.Remaining,
+				})
+				if err != nil {
+					log.Printf("Failed to marshal payload for chat.latest event: %v", err)
+					continue
+				}
+
+				wsMessage := data.WebSocketMessage{
+					Kind:    data.MessageKindRoomRemaining,
+					Payload: json.RawMessage(payload),
+				}
+
+				eventChannel <- wsMessage
+			} else if payload.EventType == "room.timeout" {
+				var roomTimeout RoomTimeoutEvent
+				if err := json.Unmarshal(payload.Data, &roomTimeout); err != nil {
+					log.Printf("Failed to unmarshal room.timeout event: %v", err)
+					continue
+				}
+
+				log.Printf("Send room_timeout event for RoomID: %s", roomTimeout.RoomID)
+
+				payload, err := json.Marshal(RoomTimeoutEvent{
+					RoomID: roomTimeout.RoomID,
+				})
+				if err != nil {
+					log.Printf("Failed to marshal payload for room.timeout event: %v", err)
+					continue
+				}
+
+				wsMessage := data.WebSocketMessage{
+					Kind:    data.MessageKindRoomTimeout,
+					Payload: json.RawMessage(payload),
+				}
+
+				eventChannel <- wsMessage // 채널로 이벤트 전달
 			}
 		}
 	}()

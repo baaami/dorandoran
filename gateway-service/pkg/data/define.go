@@ -1,9 +1,15 @@
 package data
 
 import (
+	"encoding/json"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+const (
+	MATCHING_ROOM = iota
+	DATE_ROOM
 )
 
 type Chat struct {
@@ -24,6 +30,7 @@ type ChatMessage struct {
 
 type ChatRoom struct {
 	ID         string    `bson:"id" json:"id"` // UUID 사용
+	Type       int       `bson:"type" json:"type"`
 	Users      []string  `bson:"users" json:"users"`
 	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
 	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
@@ -32,3 +39,31 @@ type ChatRoom struct {
 type ChatLastest struct {
 	RoomID string `bson:"room_id" json:"room_id"`
 }
+
+type ChatLatestEvent struct {
+	RoomID string `json:"room_id"`
+}
+
+type WebSocketMessage struct {
+	Kind    string          `json:"kind"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type RoomRemainingEvent struct {
+	RoomID    string `json:"room_id"`
+	Remaining int    `json:"remaining"` // 남은 시간 (초)
+}
+
+type RoomTimeoutEvent struct {
+	RoomID string `json:"room_id"`
+}
+
+const (
+	MessageKindMessage       = "message"
+	MessageKindJoin          = "join"
+	MessageKindLeave         = "leave"
+	MessageKindCheckRead     = "check_read"
+	MessageKindChatLastest   = "chat_latest"
+	MessageKindRoomRemaining = "room_remaining"
+	MessageKindRoomTimeout   = "room_timeout"
+)

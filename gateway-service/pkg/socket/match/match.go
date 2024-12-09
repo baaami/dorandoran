@@ -208,7 +208,7 @@ func (app *Config) MonitorQueue(coupleCnt int) {
 			roomID := uuid.New().String()
 			log.Printf("Matched room %s", roomID)
 
-			err = app.createRoom(roomID, matchIDList)
+			err = app.createRoom(roomID, data.MATCHING_ROOM, matchIDList)
 			if err != nil {
 				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
 			}
@@ -283,13 +283,14 @@ func (app *Config) sendMatchFailureMessage(conn *websocket.Conn) {
 }
 
 // [Bridge chat] 방 생성
-func (app *Config) createRoom(roomID string, matchList []string) error {
+func (app *Config) createRoom(roomID string, roomType int, matchList []string) error {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
 
 	chatRoom := data.ChatRoom{
 		ID:    roomID,
+		Type:  roomType,
 		Users: matchList,
 	}
 

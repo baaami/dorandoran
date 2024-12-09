@@ -1,18 +1,13 @@
 package chat
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/baaami/dorandoran/broker/event"
+	"github.com/baaami/dorandoran/broker/pkg/data"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/gorilla/websocket"
 )
-
-type WebSocketMessage struct {
-	Kind    string          `json:"kind"`
-	Payload json.RawMessage `json:"payload"`
-}
 
 const (
 	MessageKindMessage     = "message"
@@ -73,5 +68,5 @@ type Config struct {
 	ChatClients  sync.Map // key: userID, value: *Client
 	ChatEmitter  *event.Emitter
 	RedisClient  *redis.RedisClient
-	EventChannel chan event.ChatLatestEvent // RabbitMQ 이벤트를 수신할 채널
+	EventChannel chan data.WebSocketMessage // RabbitMQ 이벤트를 수신할 채널
 }

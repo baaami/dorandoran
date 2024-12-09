@@ -34,6 +34,9 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 채팅방 Timer Setup
+	app.RoomManager.SetRoomTimeout(room.ID, 1*time.Minute)
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(room)
 }
