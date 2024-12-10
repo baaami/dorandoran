@@ -109,7 +109,7 @@ type EventPayload struct {
 }
 
 // Listen 함수는 RabbitMQ에서 메시지를 수신하여 이벤트 처리
-func (consumer *Consumer) Listen(topics []string) error {
+func (consumer *Consumer) Listen(routingkeys []string) error {
 	log.Println("Setting up listener for events...")
 
 	ch, err := consumer.conn.Channel()
@@ -119,26 +119,26 @@ func (consumer *Consumer) Listen(topics []string) error {
 	}
 	defer ch.Close()
 
-	q, err := declareRandomQueue(ch)
+	q, err := declareConsumerQueue(ch)
 	if err != nil {
 		log.Printf("Failed to declare random queue: %v", err)
 		return err
 	}
 	log.Printf("Declared queue: %s", q.Name)
 
-	for _, s := range topics {
+	for _, routingKey := range routingkeys {
 		err = ch.QueueBind(
 			q.Name,
-			s,
+			routingKey,
 			"app_topic", // 이벤트를 수신할 exchange
 			false,
 			nil,
 		)
 		if err != nil {
-			log.Printf("Failed to bind queue %s to topic %s: %v", q.Name, s, err)
+			log.Printf("Failed to bind queue %s to topic %s: %v", q.Name, routingKey, err)
 			return err
 		}
-		log.Printf("Queue %s bound to topic %s", q.Name, s)
+		log.Printf("Queue %s bound to topic %s", q.Name, routingKey)
 	}
 
 	messages, err := ch.Consume(q.Name, "", true, false, false, false, nil)
