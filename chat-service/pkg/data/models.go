@@ -72,26 +72,39 @@ func (cr *ChatReader) Insert(reader ChatReader) error {
 	return nil
 }
 
-// 해당 room에서 before 시간 이전에 존재한 메시지 리스트
-func (c *Chat) GetMessagesBefore(roomID string, before time.Time) ([]Chat, error) {
+// 해당 room에서 before 시간 이전에 존재한 읽지 않은 메시지 리스트
+func (c *Chat) GetUnreadMessagesBefore(roomID string, before time.Time, userID int) ([]Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	collection := client.Database("chat_db").Collection("messages")
+	messagesCollection := client.Database("chat_db").Collection("messages")
 
-	// 필터 조건: 특정 RoomID 및 CreatedAt < before
-	filter := bson.M{
-		"room_id":    roomID,
-		"created_at": bson.M{"$lt": before},
+	// Step 1: 읽지 않은 메시지의 ID를 필터링
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{"room_id": roomID, "created_at": bson.M{"$lt": before}}}},
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from":         "message_readers",
+			"localField":   "_id",
+			"foreignField": "message_id",
+			"as":           "readers",
+		}}},
+		bson.D{{Key: "$match", Value: bson.M{
+			"$expr": bson.M{
+				"$not": bson.M{
+					"$in": bson.A{userID, "$readers.user_id"},
+				},
+			},
+		}}},
 	}
 
-	cursor, err := collection.Find(ctx, filter)
+	cursor, err := messagesCollection.Aggregate(ctx, pipeline)
 	if err != nil {
-		log.Printf("Error finding messages for RoomID %s: %v", roomID, err)
+		log.Printf("Error finding unread messages for user %d in room %s: %v", userID, roomID, err)
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
+	// Step 2: 결과 메시지 처리
 	var messages []Chat
 	for cursor.Next(ctx) {
 		var message Chat
@@ -100,6 +113,11 @@ func (c *Chat) GetMessagesBefore(roomID string, before time.Time) ([]Chat, error
 			continue
 		}
 		messages = append(messages, message)
+	}
+
+	if err := cursor.Err(); err != nil {
+		log.Printf("Cursor error: %v", err)
+		return nil, err
 	}
 
 	return messages, nil
