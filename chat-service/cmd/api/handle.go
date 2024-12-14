@@ -355,8 +355,8 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: 메시지를 가져오지 않고 바로 작업을 할 수 있지 않을까??
-	// JoinAt 이전의 메시지 가져오기
-	messages, err := app.Models.Chat.GetMessagesBefore(roomJoinEvent.RoomID, roomJoinEvent.JoinAt)
+	// 읽지 않은 JoinAt 이전의 메시지 가져오기
+	messages, err := app.Models.Chat.GetUnreadMessagesBefore(roomJoinEvent.RoomID, roomJoinEvent.JoinAt, userID)
 	if err != nil {
 		log.Printf("Failed to get messages for RoomID %s: %v", roomJoinEvent.RoomID, err)
 		http.Error(w, "Failed to get messages", http.StatusInternalServerError)
