@@ -86,9 +86,6 @@ func main() {
 		RoomManager: roomManager,
 	}
 
-	// 채팅방 타이머 동기화를 위한 이벤트 발행하기 위한 루프
-	go app.RoomManager.MonitorRoomRemainingTime()
-
 	// 채팅방 타임아웃 이벤트를 발행하기 위한 루프
 	go app.RoomManager.MonitorRoomTimeouts()
 

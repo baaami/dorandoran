@@ -280,7 +280,9 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	collection := client.Database("chat_db").Collection("rooms")
 
 	room.CreatedAt = time.Now()
-	room.ModifiedAt = time.Now()
+	room.ModifiedAt = room.CreatedAt
+
+	room.FinishChatAt = room.CreatedAt.Add(time.Hour)
 
 	_, err := collection.InsertOne(ctx, room)
 	if err != nil {

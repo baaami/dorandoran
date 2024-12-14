@@ -131,10 +131,11 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload := data.ChatRoomDetailResponse{
-		ID:         room.ID,
-		Users:      userList,
-		CreatedAt:  room.CreatedAt,
-		ModifiedAt: room.ModifiedAt,
+		ID:           room.ID,
+		Users:        userList,
+		CreatedAt:    room.CreatedAt,
+		FinishChatAt: room.FinishChatAt,
+		ModifiedAt:   room.ModifiedAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

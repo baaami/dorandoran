@@ -16,6 +16,7 @@ func (app *Config) usage(w http.ResponseWriter, r *http.Request) {
 	_ = app.writeJSON(w, http.StatusOK, payload)
 }
 
+// API를 프록시해주는 역할
 func (app *Config) proxyService() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Proxy Request URL: %s", r.URL)

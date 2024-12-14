@@ -46,11 +46,12 @@ type Chat struct {
 }
 
 type ChatRoom struct {
-	ID         string    `bson:"id" json:"id"` // UUID 사용
-	Type       int       `bson:"type" json:"type"`
-	Users      []string  `bson:"users" json:"users"`
-	CreatedAt  time.Time `bson:"created_at" json:"created_at"`
-	ModifiedAt time.Time `bson:"modified_at" json:"modified_at"`
+	ID           string    `bson:"id" json:"id"` // UUID 사용
+	Type         int       `bson:"type" json:"type"`
+	Users        []string  `bson:"users" json:"users"`
+	CreatedAt    time.Time `bson:"created_at" json:"created_at"`
+	FinishChatAt time.Time `bson:"finish_chat_at" json:"finish_chat_at"`
+	ModifiedAt   time.Time `bson:"modified_at" json:"modified_at"`
 }
 
 // Push Message

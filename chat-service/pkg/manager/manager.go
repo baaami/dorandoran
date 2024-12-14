@@ -86,50 +86,6 @@ func (rm *RoomManager) RemoveRoomFromRedis(roomID string) error {
 	return nil
 }
 
-func (rm *RoomManager) MonitorRoomRemainingTime() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	// TODO: 영속성을 지키기 위하여 DB에서 채팅방 리스트를 가져와서 timeout과 roomid를 redis에 설정해주는 작업이 필요하다
-
-	for {
-		select {
-		case <-ticker.C:
-			rm.BroadcastRoomRemainingTime()
-		}
-	}
-}
-
-// WebSocket을 통해 남은 시간을 브로드캐스트
-func (rm *RoomManager) BroadcastRoomRemainingTime() {
-	// Redis에서 방 목록 가져오기
-	roomIDs, err := rm.GetAllRoomsFromRedis()
-	if err != nil {
-		log.Printf("Failed to get room list from Redis: %v", err)
-		return
-	}
-
-	for _, roomID := range roomIDs {
-		// 남은 시간 가져오기
-		remainingTime, err := rm.GetRoomRemainingTime(roomID)
-		if err != nil {
-			log.Printf("Failed to get remaining time for RoomID %s: %v", roomID, err)
-			continue
-		}
-
-		// 남은 시간이 0 이하인 방은 스킵
-		if remainingTime <= 0 {
-			continue
-		}
-
-		// RabbitMQ로 메시지 전송
-		err = rm.Emitter.PushRoomRemainTime(roomID, remainingTime)
-		if err != nil {
-			log.Printf("Failed to push room remain time for RoomID %s: %v", roomID, err)
-		}
-	}
-}
-
 // Redis에서 모든 Room ID 가져오기
 func (rm *RoomManager) GetAllRoomsFromRedis() ([]string, error) {
 	ctx := context.Background()

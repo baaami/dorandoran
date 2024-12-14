@@ -199,30 +199,3 @@ func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- data.WebSock
 	log.Printf("Listening for messages on exchange 'app_topic' with routing keys: %v", routingKeys)
 	select {} // Block forever
 }
-
-// processEvent handles events based on their type
-func (c *Consumer) processEvent(payload EventPayload) {
-	log.Printf("Processing event: %s", payload.EventType)
-
-	switch payload.EventType {
-	case "chat.latest":
-		log.Printf("Handling chat.latest event: %s", string(payload.Data))
-		var chatLatest ChatLatestEvent
-		if err := json.Unmarshal(payload.Data, &chatLatest); err != nil {
-			log.Printf("Failed to unmarshal chat.latest event: %v", err)
-			return
-		}
-
-		handleChatLatestEvent(chatLatest)
-	default:
-		log.Printf("Unhandled event type: %s", payload.EventType)
-	}
-}
-
-// handleChatLatestEvent 함수: chat.latest 이벤트 처리
-func handleChatLatestEvent(chatLatest ChatLatestEvent) {
-	log.Printf("Handling chat.latest event for RoomID: %s", chatLatest.RoomID)
-
-	// WebSocket 클라이언트에게 알림 전송 (예: WebSocket 메시지 브로드캐스팅)
-	// WebSocket 브로드캐스팅 구현이 필요함.
-}

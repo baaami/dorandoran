@@ -7,10 +7,11 @@ import (
 )
 
 type ChatRoomDetailResponse struct {
-	ID         string        `bson:"id" json:"id"` // UUID 사용
-	Users      []common.User `bson:"users" json:"users"`
-	CreatedAt  time.Time     `bson:"created_at" json:"created_at"`
-	ModifiedAt time.Time     `bson:"modified_at" json:"modified_at"`
+	ID           string        `bson:"id" json:"id"` // UUID 사용
+	Users        []common.User `bson:"users" json:"users"`
+	CreatedAt    time.Time     `bson:"created_at" json:"created_at"`
+	FinishChatAt time.Time     `bson:"finish_chat_at" json:"finish_chat_at"`
+	ModifiedAt   time.Time     `bson:"modified_at" json:"modified_at"`
 }
 
 type LastMessage struct {

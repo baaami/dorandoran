@@ -134,6 +134,8 @@ func (app *Config) sendMessageToRoom(roomID string, message data.WebSocketMessag
 		})
 		return nil
 	}
+
+	// TODO: Rooms는 아무도 join 하지 않으면 존재하지 않음...
 	return fmt.Errorf("room %s not found", roomID)
 }
 
