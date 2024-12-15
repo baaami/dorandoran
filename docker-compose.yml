@@ -58,6 +58,32 @@ services:
       mode: replicated
       replicas: 1
 
+  match-socket-service:
+    build:
+      context: ./match-socket-service
+      dockerfile: ./match-socket-service.dockerfile
+    restart: always
+    environment:
+      REDIS_HOST: redis # Redis 서비스 이름
+      REDIS_PORT: 6379 # Redis 기본 포트
+      REDIS_PASSWORD: admin # Redis 비밀번호
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  # chat-socket-service:
+  #   build:
+  #     context: ./chat-socket-service
+  #     dockerfile: ./chat-socket-service.dockerfile
+  #   restart: always
+  #   environment:
+  #     REDIS_HOST: redis # Redis 서비스 이름
+  #     REDIS_PORT: 6379 # Redis 기본 포트
+  #     REDIS_PASSWORD: admin # Redis 비밀번호
+  #   deploy:
+  #     mode: replicated
+  #     replicas: 1
+
   mysql:
     image: mysql:8
     restart: always
