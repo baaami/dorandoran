@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/websocket"
 )
 
 func (app *Config) usage(w http.ResponseWriter, r *http.Request) {
@@ -94,4 +96,65 @@ func extractFirstPath(path string) (string, string) {
 
 	// 경로가 비었을 경우 기본값 반환
 	return "", "/"
+}
+
+func (app *Config) proxySocketServer(targetBaseURL string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// WebSocket 업그레이드 요청인지 확인
+		if !websocket.IsWebSocketUpgrade(r) {
+			http.Error(w, "Invalid WebSocket upgrade request", http.StatusBadRequest)
+			return
+		}
+
+		// WebSocket 대상 서버 주소
+		targetURL := targetBaseURL + r.URL.Path
+
+		// WebSocket Dialer 생성
+		dialer := websocket.DefaultDialer
+
+		// WebSocket 서버로 업그레이드 요청 전달
+		targetConn, _, err := dialer.Dial(targetURL, r.Header)
+		if err != nil {
+			log.Printf("Failed to connect to WebSocket server: %v", err)
+			http.Error(w, "Failed to connect to WebSocket server", http.StatusBadGateway)
+			return
+		}
+		defer targetConn.Close()
+
+		// 클라이언트 WebSocket 업그레이드
+		upgrader := websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		}
+
+		clientConn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("Failed to upgrade WebSocket connection: %v", err)
+			return
+		}
+		defer clientConn.Close()
+
+		// 메시지 중계
+		go forwardMessages(clientConn, targetConn) // 클라이언트 → 서버
+		forwardMessages(targetConn, clientConn)    // 서버 → 클라이언트
+	}
+}
+
+func forwardMessages(src, dest *websocket.Conn) {
+	for {
+		// 메시지 읽기
+		messageType, msg, err := src.ReadMessage()
+		if err != nil {
+			log.Printf("Error reading WebSocket message: %v", err)
+			break
+		}
+
+		// 메시지 쓰기
+		err = dest.WriteMessage(messageType, msg)
+		if err != nil {
+			log.Printf("Error forwarding WebSocket message: %v", err)
+			break
+		}
+	}
 }

@@ -28,8 +28,10 @@ func (app *Config) routes(chatWSConfig *chat.Config, matchWSConfig *match.Config
 	// 세션 검증 미들웨어 추가
 	mux.Use(middleware.SessionMiddleware(chatWSConfig.RedisClient))
 
-	mux.HandleFunc("/ws/match", matchWSConfig.HandleMatchSocket)
+	// WebSocket 프록시 라우팅
+	mux.Handle("/ws/match", app.proxySocketServer("ws://match-socket-service"))
 	mux.HandleFunc("/ws/chat", chatWSConfig.HandleChatSocket)
+	// mux.Handle("/ws/chat", app.proxySocketServer("ws://chat-socket-service"))
 
 	// 매칭
 	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))

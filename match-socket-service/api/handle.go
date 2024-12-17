@@ -230,17 +230,17 @@ func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 	for _, userID := range matchList {
 		log.Printf("Try to notify user, %s", userID)
 
-		conn, err := app.RedisClient.GetWebSocketConnection(userID)
-		if err != nil {
-			log.Printf("Failed to get WebSocket connection for user %s: %v", userID, err)
-			continue
+		if conn, ok := app.MatchClients.Load(userID); ok {
+			err := conn.(*websocket.Conn).WriteJSON(webSocketMsg)
+			if err != nil {
+				log.Printf("Failed to notify user %s: %v", userID, err)
+			} else {
+				log.Printf("Notified %s about match in room %s", userID, roomID)
+			}
+		} else {
+			log.Printf("User %s not connected", userID)
 		}
 
-		if err := conn.WriteJSON(webSocketMsg); err != nil {
-			log.Printf("Failed to notify user %s: %v", userID, err)
-		} else {
-			log.Printf("Notified %s about match in room %s", userID, roomID)
-		}
 	}
 
 	log.Printf("Match Notify End!!!")
