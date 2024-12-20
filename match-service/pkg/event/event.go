@@ -46,8 +46,7 @@ func NewEmitter(conn *amqp.Connection) (*Emitter, error) {
 	return emitter, nil
 }
 
-// PublishMatchEvent publishes a match event to RabbitMQ
-func (e *Emitter) PublishMatchEvent(matchID string, users []types.WaitingUser) error {
+func (e *Emitter) PublishMatchEvent(event types.MatchEvent) error {
 	channel, err := e.connection.Channel()
 	if err != nil {
 		log.Printf("Failed to open channel: %v", err)
@@ -55,10 +54,6 @@ func (e *Emitter) PublishMatchEvent(matchID string, users []types.WaitingUser) e
 	}
 	defer channel.Close()
 
-	event := map[string]interface{}{
-		"matchID": matchID,
-		"users":   users,
-	}
 	eventBody, err := json.Marshal(event)
 	if err != nil {
 		log.Printf("Failed to marshal match event: %v", err)

@@ -7,12 +7,15 @@ type Address struct {
 }
 
 type WaitingUser struct {
-	ID              int     `json:"id"`
-	Name            string  `json:"name"`
-	Gender          int     `json:"gender"`
-	Birth           string  `json:"birth"`
-	Address         Address `json:"address"`
-	CoupleCount     int     `json:"couple_count"`
-	AddressRangeUse bool    `json:"address_range_use"`
-	AgeGroupUse     bool    `json:"age_group_use"`
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Gender      int     `json:"gender"`
+	Birth       string  `json:"birth"`
+	Address     Address `json:"address"`
+	CoupleCount int     `json:"couple_count"`
+}
+
+type MatchEvent struct {
+	MatchId      string        `bson:"match_id" json:"match_id"`
+	MatchedUsers []WaitingUser `bson:"matched_users" json:"matched_users"`
 }
