@@ -112,8 +112,16 @@ func (app *Config) proxySocketServer(targetBaseURL string) http.HandlerFunc {
 		// WebSocket Dialer 생성
 		dialer := websocket.DefaultDialer
 
+		userIDStr := r.Header.Get("X-User-ID")
+
+		// WebSocket 요청에 필요한 헤더만 생성
+		requestHeaders := http.Header{}
+		requestHeaders.Set("Sec-WebSocket-Protocol", r.Header.Get("Sec-WebSocket-Protocol"))
+		requestHeaders.Set("Origin", r.Header.Get("Origin"))
+		requestHeaders.Set("X-User-ID", userIDStr)
+
 		// WebSocket 서버로 업그레이드 요청 전달
-		targetConn, _, err := dialer.Dial(targetURL, r.Header)
+		targetConn, _, err := dialer.Dial(targetURL, requestHeaders)
 		if err != nil {
 			log.Printf("Failed to connect to WebSocket server: %v", err)
 			http.Error(w, "Failed to connect to WebSocket server", http.StatusBadGateway)
