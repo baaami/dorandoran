@@ -11,6 +11,7 @@ import (
 
 	"github.com/baaami/dorandoran/chat/pkg/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
+	"github.com/baaami/dorandoran/chat/pkg/types"
 	common "github.com/baaami/dorandoran/common/user"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -39,6 +40,46 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(room)
+}
+
+// 매칭 성공 시 게임방 생성 루틴
+// createChatRoom listens for MatchEvent and creates a chatroom
+func (app *Config) createGameRoom(chatRoomCreateChan <-chan types.MatchEvent) {
+	for matchEvent := range chatRoomCreateChan {
+		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
+		chatRoomID := matchEvent.MatchId
+
+		// 채팅방 생성
+		room := data.ChatRoom{
+			ID:           chatRoomID,
+			Type:         1, // 채팅방 타입 (기본값 설정)
+			Users:        extractUserIDs(matchEvent.MatchedUsers),
+			CreatedAt:    time.Now(),
+			FinishChatAt: time.Now().Add(1 * time.Hour), // 채팅방 유효시간
+			ModifiedAt:   time.Now(),
+		}
+
+		// MongoDB에 채팅방 삽입
+		err := app.Models.ChatRoom.InsertRoom(&room)
+		if err != nil {
+			log.Printf("Failed to insert chat room to MongoDB: %v", err)
+			continue
+		}
+
+		// 채팅방 타임아웃 설정
+		app.RoomManager.SetRoomTimeout(room.ID, time.Until(room.FinishChatAt))
+
+		log.Printf("Chat room created: %s with users: %v", room.ID, room.Users)
+
+		// 채팅방 생성 이벤트 발행
+		err = app.Emitter.PublishChatRoomCreateEvent(room)
+		if err != nil {
+			log.Printf("Failed to publish chat room event: %v", err)
+			continue
+		}
+
+		log.Printf("Published chat room event for room ID: %s", room.ID)
+	}
 }
 
 // 특정 유저의 채팅방 목록 조회
@@ -466,4 +507,12 @@ func getUserByUserID(userID string) (*common.User, error) {
 
 	// 유저가 존재하는 경우
 	return &user, nil
+}
+
+func extractUserIDs(users []types.WaitingUser) []string {
+	ids := make([]string, len(users))
+	for i, user := range users {
+		ids[i] = strconv.Itoa(user.ID)
+	}
+	return ids
 }

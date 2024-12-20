@@ -15,3 +15,16 @@ func declareExchange(ch *amqp.Channel) error {
 		nil,         // arguements?
 	)
 }
+
+func declareMatchExchange(ch *amqp.Channel) error {
+	exchange := "match_events"
+	return ch.ExchangeDeclare(
+		exchange, // name
+		"fanout", // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
+	)
+}

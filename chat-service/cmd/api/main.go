@@ -12,6 +12,7 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/baaami/dorandoran/chat/pkg/manager"
 	"github.com/baaami/dorandoran/chat/pkg/redis"
+	"github.com/baaami/dorandoran/chat/pkg/types"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -78,6 +79,14 @@ func main() {
 	// RoomManager 초기화
 	roomManager := manager.NewRoomManager(redisClient, emitter, models)
 
+	matchConsumer, err := event.NewConsumer(rabbitConn)
+	if err != nil {
+		log.Printf("Failed to make new match consumer: %v", err)
+		os.Exit(1)
+	}
+
+	chatRoomChan := make(chan types.MatchEvent)
+
 	// Config 구조체 초기화
 	app := Config{
 		Models:      models,
@@ -88,6 +97,19 @@ func main() {
 
 	// 채팅방 타임아웃 이벤트를 발행하기 위한 루프
 	go app.RoomManager.MonitorRoomTimeouts()
+
+	go func() {
+		log.Println("Starting RabbitMQ consumer for matching events")
+		if err := matchConsumer.Listen(chatRoomChan); err != nil {
+			log.Printf("Failed to start RabbitMQ consumer: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	go func() {
+		log.Println("Starting ChatRoom creator routine")
+		app.createGameRoom(chatRoomChan)
+	}()
 
 	// 웹 서버 시작
 	log.Println("Starting Chat Service on port", webPort)

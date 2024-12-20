@@ -101,7 +101,6 @@ func (r *RedisClient) MonitorAndMatchUsers(coupleCount int, emitter *event.Emitt
 		}
 
 		// 매칭된 사용자들을 큐에서 제거
-		// TODO: match-socket-service에서는 매칭된 사용자는 queue에서 제거된 것을 인지해야한다
 		for _, userData := range maleUsers[:coupleCount] {
 			log.Printf("matched male: %s", userData)
 			r.Client.LPop(ctx, maleQueueKey)

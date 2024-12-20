@@ -49,6 +49,41 @@ func NewEmitter(conn *amqp.Connection) (*Emitter, error) {
 	return emitter, nil
 }
 
+// PublishChatRoomEvent publishes a chat room creation event
+func (e *Emitter) PublishChatRoomCreateEvent(chatRoom data.ChatRoom) error {
+	channel, err := e.connection.Channel()
+	if err != nil {
+		log.Printf("Failed to open channel: %v", err)
+		return err
+	}
+	defer channel.Close()
+
+	eventBody, err := json.Marshal(chatRoom)
+	if err != nil {
+		log.Printf("Failed to marshal chat room event: %v", err)
+		return err
+	}
+
+	exchange := "chat_room_create_events"
+	err = channel.Publish(
+		exchange, // exchange
+		"",       // routing key
+		false,    // mandatory
+		false,    // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        eventBody,
+		},
+	)
+	if err != nil {
+		log.Printf("Failed to publish chat room event: %v", err)
+		return err
+	}
+
+	log.Printf("Published chat room event: %s", eventBody)
+	return nil
+}
+
 // PushChatLatestEvent 함수: WebSocket 알림 송신
 func (e *Emitter) PushChatLatestEvent(chatLatest ChatLatestEvent) error {
 	channel, err := e.connection.Channel()

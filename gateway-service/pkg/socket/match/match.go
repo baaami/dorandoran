@@ -16,7 +16,6 @@ import (
 	"github.com/baaami/dorandoran/broker/pkg/types"
 	common "github.com/baaami/dorandoran/common/user"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -139,12 +138,6 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) erro
 	app.MatchClients.Store(userID, conn)
 	log.Printf("User %s register match server", userID)
 
-	matchFilter, err := GetMatchFilter(userID)
-	if err != nil {
-		log.Printf("Failed to get matchfilter, user: %s", userID)
-		return err
-	}
-
 	user, err := GetUserInfo(userID)
 	if err != nil {
 		log.Printf("Failed to get GetUserInfo, user: %s", userID)
@@ -152,15 +145,13 @@ func (app *Config) RegisterMatchClient(conn *websocket.Conn, userID string) erro
 	}
 
 	waitingUser := types.WaitingUser{
-		ID:              user.ID,
-		Gender:          user.Gender,
-		Birth:           user.Birth,
-		Address:         types.Address(user.Address),
-		AddressRangeUse: matchFilter.AddressRangeUse,
-		AgeGroupUse:     matchFilter.AgeGroupUse,
+		ID:      user.ID,
+		Gender:  user.Gender,
+		Birth:   user.Birth,
+		Address: types.Address(user.Address),
 	}
 
-	app.RedisClient.AddUserToQueue(matchFilter.CoupleCount, waitingUser)
+	app.RedisClient.AddUserToQueue(2, waitingUser)
 
 	log.Printf("User %s added to waiting queue", userID)
 
@@ -189,36 +180,6 @@ func (app *Config) UnRegisterMatchClient(userID string) {
 		log.Printf("fail pop %s user from redis queue", userID)
 	}
 	log.Printf("User %s unregister match server", userID)
-}
-
-// 대기열 모니터링
-func (app *Config) MonitorQueue(coupleCnt int) {
-	matchTotalNum := coupleCnt * 2 // 총 매침 인원 수
-
-	for {
-		// Redis에서 대기열 모니터링 처리
-		matchIDList, err := app.RedisClient.MonitorAndPopMatchingUsers(coupleCnt)
-		if err != nil || len(matchIDList) < matchTotalNum {
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		// 매침 성공 시 사용자 알림 및 방 생성
-		if len(matchIDList) == matchTotalNum {
-			roomID := uuid.New().String()
-			log.Printf("Matched room %s", roomID)
-
-			err = app.createRoom(roomID, data.MATCHING_ROOM, matchIDList)
-			if err != nil {
-				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
-			}
-
-			app.sendMatchSuccessMessage(matchIDList, roomID)
-		}
-
-		// 일정 주기만큼 실행
-		time.Sleep(2 * time.Second)
-	}
 }
 
 // 매칭 성공 메시지 전송 함수

@@ -8,10 +8,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/baaami/dorandoran/match-socket-service/pkg/types"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 )
@@ -58,12 +58,6 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 
 	userID := c.Request().Header.Get("X-User-ID")
 
-	matchFilter, err := GetMatchFilter(userID)
-	if err != nil {
-		log.Printf("Failed to get matchfilter, user: %s", userID)
-		return err
-	}
-
 	user, err := GetUserInfo(userID)
 	if err != nil {
 		log.Printf("Failed to get GetUserInfo, user: %s", userID)
@@ -71,28 +65,27 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 	}
 
 	waitingUser := types.WaitingUser{
-		ID:              user.ID,
-		Gender:          user.Gender,
-		Birth:           user.Birth,
-		Address:         types.Address(user.Address),
-		AddressRangeUse: matchFilter.AddressRangeUse,
-		AgeGroupUse:     matchFilter.AgeGroupUse,
+		ID:          user.ID,
+		Gender:      user.Gender,
+		Birth:       user.Birth,
+		Address:     types.Address(user.Address),
+		CoupleCount: 2,
 	}
 
 	// Check if user already exists in the Redis queue
-	exists, err := app.RedisClient.IsUserInQueue(waitingUser)
+	exists, queueName, err := app.RedisClient.IsUserInQueue(waitingUser)
 	if err != nil {
 		log.Printf("Error checking user %s in queue: %v", userID, err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to check user in queue")
 	}
 	if exists {
-		log.Printf("User %s is already in the matching queue", userID)
+		log.Printf("User %s is already in the matching queue (%s)", userID, queueName)
 		return echo.NewHTTPError(http.StatusConflict, "User already in matching queue")
 	}
 
 	// 매칭 서버에 사용자 등록
 	if err := app.RegisterMatchClient(conn, waitingUser); err != nil {
-		log.Printf("Failed to register user %s to queue: %v", waitingUser.ID, err)
+		log.Printf("Failed to register user %d to queue: %v", waitingUser.ID, err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to register user in matching queue")
 	}
 
@@ -144,22 +137,23 @@ func isTimeoutError(err error) bool {
 }
 
 func (app *Config) RegisterMatchClient(conn *websocket.Conn, waitingUser types.WaitingUser) error {
+	// 이미 등록된 사용자 확인
 	_, ok := app.MatchClients.Load(waitingUser.ID)
 	if ok {
-		log.Printf("User %s already registered match server", waitingUser.ID)
-		return fmt.Errorf("user %s already registered match server", waitingUser.ID)
+		log.Printf("User %d already registered match server", waitingUser.ID)
+		return fmt.Errorf("user %d already registered match server", waitingUser.ID)
 	}
 
-	// 1. user id에 매핑되는 websocket conn 추가
+	// 사용자 ID와 연결 객체 매핑
 	app.MatchClients.Store(waitingUser.ID, conn)
 
-	// 2. Redis 내 매칭 대기열에 추가
+	// Redis 매칭 대기열에 추가
 	if err := app.RedisClient.AddUserToQueue(waitingUser); err != nil {
-		log.Printf("Failed to add user %s to queue: %v", waitingUser.ID, err)
-		return fmt.Errorf("Failed to add user %s to queue: %v", waitingUser.ID, err)
+		log.Printf("Failed to add user %d to queue: %v", waitingUser.ID, err)
+		return fmt.Errorf("failed to add user %d to queue: %v", waitingUser.ID, err)
 	}
 
-	log.Printf("User %s added to waiting queue", waitingUser.ID)
+	log.Printf("User %d (gender: %d) added to waiting queue and MatchClients", waitingUser.ID, waitingUser.Gender)
 
 	return nil
 }
@@ -170,45 +164,16 @@ func (app *Config) UnRegisterMatchClient(waitingUser types.WaitingUser) error {
 
 	// 2. Redis 내 매칭 대기열에서 제거
 	if err := app.RedisClient.RemoveUserFromQueue(waitingUser); err != nil {
-		log.Printf("Failed to remove user %s from queue: %v", waitingUser.ID, err)
+		log.Printf("Failed to remove user %d from queue: %v", waitingUser.ID, err)
 	}
 
-	log.Printf("User %s removed from waiting queue", waitingUser.ID)
+	log.Printf("User %d removed from waiting queue", waitingUser.ID)
 
 	return nil
 }
 
-func (app *Config) MonitorQueue(coupleCnt int) {
-	matchTotalNum := coupleCnt * 2 // 총 매칭 인원 수
-
-	for {
-		// Redis에서 대기열 모니터링 처리
-		matchIDList, err := app.RedisClient.MonitorAndPopMatchingUsers(coupleCnt)
-		if err != nil || len(matchIDList) < matchTotalNum {
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		// 매칭 성공 시 사용자 알림 및 방 생성
-		if len(matchIDList) == matchTotalNum {
-			roomID := uuid.New().String()
-			log.Printf("Matched room %s", roomID)
-
-			err = app.createRoom(roomID, matchIDList)
-			if err != nil {
-				log.Printf("Failed to create room, room id: %s, err: %v", roomID, err.Error())
-			}
-
-			app.sendMatchSuccessMessage(matchIDList, roomID)
-		}
-
-		// 일정 주기만큼 실행
-		time.Sleep(2 * time.Second)
-	}
-}
-
 // 매칭 성공 메시지 전송 함수
-func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
+func (app *Config) sendMatchSuccessMessage(matchUserIDList []string, roomID string) {
 	matchMsg := MatchResponse{
 		Type:   PushMessageStatusMatchSuccess,
 		RoomID: roomID,
@@ -227,18 +192,21 @@ func (app *Config) sendMatchSuccessMessage(matchList []string, roomID string) {
 
 	log.Printf("Match Notify Start!!!")
 
-	for _, userID := range matchList {
+	for _, userID := range matchUserIDList {
+		nUserID, _ := strconv.Atoi(userID)
 		log.Printf("Try to notify user, %s", userID)
 
-		if conn, ok := app.MatchClients.Load(userID); ok {
+		if conn, ok := app.MatchClients.Load(nUserID); ok {
 			err := conn.(*websocket.Conn).WriteJSON(webSocketMsg)
 			if err != nil {
-				log.Printf("Failed to notify user %s: %v", userID, err)
+				log.Printf("Failed to notify user %d: %v", nUserID, err)
 			} else {
-				log.Printf("Notified %s about match in room %s", userID, roomID)
+				log.Printf("Notified %d about match in room %s", nUserID, roomID)
+
+				app.MatchClients.Delete(nUserID)
 			}
 		} else {
-			log.Printf("User %s not connected", userID)
+			log.Printf("Failed to notify, user %d not connected", nUserID)
 		}
 
 	}
@@ -267,51 +235,6 @@ func (app *Config) sendMatchFailureMessage(conn *websocket.Conn) {
 	if err := conn.WriteJSON(webSocketMsg); err != nil {
 		log.Printf("Failed to send match failure message: %v", err)
 	}
-}
-
-func (app *Config) createRoom(roomID string, matchList []string) error {
-	// Room creation logic would typically involve API calls or database updates.
-	log.Printf("Creating room %s for users: %v", roomID, matchList)
-	return nil // Simulate successful room creation
-}
-
-// [Bridge user] 유저 매칭 필터 조회
-func GetMatchFilter(userID string) (*types.MatchFilter, error) {
-	var matchFilter types.MatchFilter
-
-	// Matching 필터 획득
-	client := http.Client{}
-
-	req, err := http.NewRequest(http.MethodGet, "http://user-service/match/filter", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// 사용자 ID를 요청의 헤더에 추가
-	req.Header.Set("X-User-ID", userID)
-
-	// 요청 실행
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	err = json.Unmarshal(body, &matchFilter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &matchFilter, nil
 }
 
 // [Bridge user] 유저 정보 조회

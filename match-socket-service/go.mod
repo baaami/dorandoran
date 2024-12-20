@@ -4,10 +4,9 @@ go 1.22.5
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo/v4 v4.13.2
-	github.com/samber/lo v1.47.0
+	github.com/rabbitmq/amqp091-go v1.10.0
 )
 
 require (
