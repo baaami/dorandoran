@@ -11,7 +11,6 @@ import (
 	"github.com/baaami/dorandoran/broker/pkg/data"
 	"github.com/baaami/dorandoran/broker/pkg/redis"
 	"github.com/baaami/dorandoran/broker/pkg/socket/chat"
-	"github.com/baaami/dorandoran/broker/pkg/socket/match"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog/log"
@@ -45,13 +44,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// RabbitMQ Consumer
-	chatConsumer, err := event.NewConsumer(rabbitConn)
-	if err != nil {
-		log.Error().Msgf("Failed to make new event consumer: %v", err)
-		os.Exit(1)
-	}
-
 	// 채널 생성: 이벤트 전달용
 	chatEventChannel := make(chan data.WebSocketMessage, 100)
 
@@ -64,9 +56,11 @@ func main() {
 		EventChannel: chatEventChannel,
 	}
 
-	matchWSConfig := &match.Config{
-		MatchClients: sync.Map{},
-		RedisClient:  redisClient,
+	// RabbitMQ Consumer
+	chatConsumer, err := event.NewConsumer(rabbitConn)
+	if err != nil {
+		log.Error().Msgf("Failed to make new event consumer: %v", err)
+		os.Exit(1)
 	}
 
 	// RabbitMQ Consumer Listen 고루틴 실행
@@ -83,7 +77,7 @@ func main() {
 	log.Info().Msgf("Starting Gateway service on port %d", webPort)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", webPort),
-		Handler: app.routes(chatWSConfig, matchWSConfig),
+		Handler: app.routes(redisClient),
 	}
 
 	err = srv.ListenAndServe()

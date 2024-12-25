@@ -154,7 +154,11 @@ func forwardMessages(src, dest *websocket.Conn) {
 		// 메시지 읽기
 		messageType, msg, err := src.ReadMessage()
 		if err != nil {
-			log.Printf("Error reading WebSocket message: %v", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
+				log.Printf("Unexpected WebSocket close error")
+			} else {
+				log.Printf("WebSocket connection closed by client")
+			}
 			break
 		}
 

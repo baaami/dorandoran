@@ -5,14 +5,13 @@ import (
 	"net/http"
 
 	"github.com/baaami/dorandoran/broker/pkg/middleware"
-	"github.com/baaami/dorandoran/broker/pkg/socket/chat"
-	"github.com/baaami/dorandoran/broker/pkg/socket/match"
+	"github.com/baaami/dorandoran/broker/pkg/redis"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
 
-func (app *Config) routes(chatWSConfig *chat.Config, matchWSConfig *match.Config) http.Handler {
+func (app *Config) routes(redisClient *redis.RedisClient) http.Handler {
 	mux := chi.NewRouter()
 
 	mux.Use(cors.Handler(cors.Options{
@@ -26,12 +25,11 @@ func (app *Config) routes(chatWSConfig *chat.Config, matchWSConfig *match.Config
 
 	mux.Use(LogRequestURL)
 	// 세션 검증 미들웨어 추가
-	mux.Use(middleware.SessionMiddleware(chatWSConfig.RedisClient))
+	mux.Use(middleware.SessionMiddleware(redisClient))
 
 	// WebSocket 프록시 라우팅
 	mux.Handle("/ws/match", app.proxySocketServer("ws://match-socket-service"))
-	mux.HandleFunc("/ws/chat", chatWSConfig.HandleChatSocket)
-	// mux.Handle("/ws/chat", app.proxySocketServer("ws://chat-socket-service"))
+	mux.Handle("/ws/chat", app.proxySocketServer("ws://chat-socket-service"))
 
 	// 매칭
 	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))

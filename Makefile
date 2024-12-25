@@ -5,7 +5,8 @@ CONSUMER_BINARY=consumerApp
 AUTH_BINARY=authApp
 MATCH_BINARY=matchApp
 MATCH_SOCKET_BINARY=matchSocketApp
-SERVICES=gateway-service user-service chat-service consumer-service auth-service match-service match-socket-service
+CHAT_SOCKET_BINARY=chatSocketApp
+SERVICES=gateway-service user-service chat-service consumer-service auth-service match-service match-socket-service chat-socket-service
 
 ## up: starts all containers in the background without forcing build
 up:
@@ -14,7 +15,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user build_chat build_consumer build_auth build_match build_match_socket
+up_build: build_gateway build_user build_chat build_consumer build_auth build_match build_match_socket build_chat_socket
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -22,7 +23,7 @@ up_build: build_gateway build_user build_chat build_consumer build_auth build_ma
 	@echo "Docker images built and started!"
 
 ## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
-up_service: build_gateway build_user build_chat build_consumer build_auth build_match build_match_socket
+up_service: build_gateway build_user build_chat build_consumer build_auth build_match build_match_socket build_chat_socket
 	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
 	docker-compose stop ${SERVICES}
 	docker-compose rm -f ${SERVICES}
@@ -76,6 +77,12 @@ build_match_socket:
 	@echo "Building match socket binary..."
 	cd match-socket-service && env GOOS=linux CGO_ENABLED=0 go build -o ${MATCH_SOCKET_BINARY} ./api
 	@echo "Done!"
+
+## build_chat_socket: builds the auth binary as a linux executable
+build_chat_socket:
+	@echo "Building chat socket binary..."
+	cd chat-socket-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_SOCKET_BINARY} ./api
+	@echo "Done!"	
 
 ## build_consumer: builds the consumer binary as a linux executable
 build_consumer:

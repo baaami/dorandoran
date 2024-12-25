@@ -40,24 +40,6 @@ const (
 	PushMessageStatusMatchSuccess = "success"
 )
 
-// Game Type (Push)
-const (
-	PushMessageStatusGameStart                     = "start"
-	PushMessageStatusGameIntroduceStart            = "introduce_start"
-	PushMessageStatusGameIntroduceTurn             = "introduce_turn"
-	PushMessageStatusGameIntroduceEnd              = "introduce_end"
-	PushMessageStatusGameFirstImpressionVoteStart  = "first_impression_vote_start"
-	PushMessageStatusGameFirstImpressionVoteEnd    = "first_impression_vote_end"
-	PushMessageStatusGameFirstImpressionVoteResult = "first_impression_vote_result"
-	PushMessageStatusGameMiniGameStart             = "mini_game_start"
-	PushMessageStatusGameMiniGameEnd               = "mini_game_end"
-	PushMessageStatusGameSecretChatRoomCreated     = "secret_chat_room_created"
-	PushMessageStatusGameFinalSelectionStart       = "final_selection_start"
-	PushMessageStatusGameFinalSelectionEnd         = "final_selection_end"
-	PushMessageStatusGameFinalSelectionResult      = "final_selection_result"
-	PushMessageStatusGameEnd                       = "end"
-)
-
 type Client struct {
 	Conn *websocket.Conn
 	Send chan interface{}
