@@ -131,23 +131,22 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 
 	now := time.Now()
 	chat := types.Chat{
-		MessageId: primitive.NewObjectID(),
-		Type:      types.ChatTypeChat,
-		RoomID:    broadCastMsg.RoomID,
-		SenderID:  nUserID,
-		Message:   broadCastMsg.Message,
-		// TODO: 활성 사용자 수에서 room 에 접속하지 않은 사람
+		MessageId:   primitive.NewObjectID(),
+		Type:        types.ChatTypeChat,
+		RoomID:      broadCastMsg.RoomID,
+		SenderID:    nUserID,
+		Message:     broadCastMsg.Message,
 		UnreadCount: broadCastMsg.HeadCnt - len(joinedUserIDs), // 활성 사용자 수를 이용해 UnreadCount 계산
 		CreatedAt:   now,
 	}
 
 	// Broadcast to the room
-	if err := app.BroadcastToRoom(&chat, activeUserIDs); err != nil {
+	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
 }
 
-func (app *Config) BroadcastToRoom(chatMsg *types.Chat, activeUserIds []string) error {
+func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds []string) error {
 	chatEvent := types.ChatEvent{
 		MessageId:   chatMsg.MessageId,
 		Type:        chatMsg.Type,
@@ -155,7 +154,7 @@ func (app *Config) BroadcastToRoom(chatMsg *types.Chat, activeUserIds []string) 
 		SenderID:    chatMsg.SenderID,
 		Message:     chatMsg.Message,
 		UnreadCount: chatMsg.UnreadCount,
-		ReaderIds:   activeUserIds,
+		ReaderIds:   joinedUserIDs,
 		CreatedAt:   chatMsg.CreatedAt,
 	}
 
