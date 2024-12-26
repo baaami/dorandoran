@@ -116,17 +116,9 @@ func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- types.WebSoc
 
 				log.Printf("Send chat msg: %s to RoomID: %s", chatMsg.Message, chatMsg.RoomID)
 
-				payload, err := json.Marshal(types.RoomJoinEvent{
-					RoomID: chatMsg.RoomID,
-				})
-				if err != nil {
-					log.Printf("Failed to marshal payload for chat.latest event: %v", err)
-					continue
-				}
-
 				wsMessage := types.WebSocketMessage{
 					Kind:    types.MessageKindMessage,
-					Payload: json.RawMessage(payload),
+					Payload: json.RawMessage(payload.Data),
 				}
 
 				eventChannel <- wsMessage
