@@ -116,7 +116,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 	}
 
 	// 활성 사용자 ID 리스트 가져오기
-	activeUserIDs, err := app.getActiveUserIDs(broadCastMsg.RoomID)
+	activeUserIDs, err := app.RedisClient.GetActiveUserIDs(broadCastMsg.RoomID)
 	if err != nil {
 		log.Printf("Failed to get active users for room %s: %v", broadCastMsg.RoomID, err)
 		return
@@ -137,23 +137,6 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 	if err := app.BroadcastToRoom(&chat, activeUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
-}
-
-// 해당 room의 활성 사용자 수 계산
-func (app *Config) getActiveUserIDs(roomID string) ([]string, error) {
-	if room, ok := app.Rooms.Load(roomID); ok {
-		roomMap := room.(*sync.Map)
-		activeUsers := []string{}
-
-		roomMap.Range(func(userID, clientInterface interface{}) bool {
-			if client, ok := clientInterface.(*Client); ok && client != nil {
-				activeUsers = append(activeUsers, userID.(string))
-			}
-			return true
-		})
-		return activeUsers, nil
-	}
-	return nil, fmt.Errorf("room %s not found", roomID)
 }
 
 func (app *Config) BroadcastToRoom(chatMsg *types.Chat, activeUserIds []string) error {
@@ -195,26 +178,23 @@ func (app *Config) BroadcastToRoom(chatMsg *types.Chat, activeUserIds []string) 
 }
 
 func (app *Config) sendMessageToRoom(roomID string, message types.WebSocketMessage) error {
-	// TODO: Rooms는 아무도 join 하지 않으면 존재하지 않음...
-	if room, ok := app.Rooms.Load(roomID); ok {
-		roomMap := room.(*sync.Map)
-		roomMap.Range(func(userID, clientInterface interface{}) bool {
-			if client, ok := clientInterface.(*Client); ok && client != nil {
-				if !app.sendMessageToClient(client, message) {
-					log.Printf("Failed to send message to user %v in room %s", userID, roomID)
-					roomMap.Delete(userID)
-				}
-			} else {
-				log.Printf("Invalid client for user %v in room %s", userID, roomID)
-				roomMap.Delete(userID)
-			}
-			return true
-		})
-		return nil
+	activeUserIDs, err := app.RedisClient.GetActiveUserIDs(roomID)
+	if err != nil {
+		log.Printf("Failed to get active user id list, err: %s", err.Error())
+		return err
 	}
 
-	// TODO: Rooms는 아무도 join 하지 않으면 존재하지 않음...
-	return fmt.Errorf("room %s not found", roomID)
+	log.Printf("[sendMessageToRoom] active user: %v", activeUserIDs)
+
+	for _, activeUserID := range activeUserIDs {
+		if client, ok := app.ChatClients.Load(activeUserID); ok {
+			if !app.sendMessageToClient(client.(*Client), message) {
+				log.Printf("Failed to send message to user %v in room %s", activeUserID, roomID)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (app *Config) sendMessageToClient(client *Client, message types.WebSocketMessage) bool {
@@ -245,21 +225,9 @@ func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
 		return
 	}
-
-	app.LeaveRoom(leaveMsg.RoomID, userID)
 }
 
 func (app *Config) JoinRoom(roomID string, userID string) {
-	room, _ := app.Rooms.LoadOrStore(roomID, &sync.Map{})
-
-	clientInterface, ok := app.ChatClients.Load(userID)
-	if !ok {
-		log.Printf("Client not found for user %s", userID)
-		return
-	}
-	client := clientInterface.(*Client)
-
-	room.(*sync.Map).Store(userID, client)
 	log.Printf("User %s joined room %s", userID, roomID)
 
 	roomJoinMsg := types.RoomJoinEvent{
@@ -276,14 +244,6 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 	}
 }
 
-// Room에서 사용자 제거하기
-func (app *Config) LeaveRoom(roomID string, userID string) {
-	if room, ok := app.Rooms.Load(roomID); ok {
-		room.(*sync.Map).Delete(userID) // roomID에 해당하는 사용자 제거
-		log.Printf("User %s left room %s", userID, roomID)
-	}
-}
-
 func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
 	client := &Client{
 		Conn: conn,
@@ -294,6 +254,15 @@ func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
 	go client.writePump()
 
 	app.ChatClients.Store(userID, client)
+
+	// Redis에 활성 사용자로 등록
+	serverID := "unique-server-id" // TODO: 서버의 고유 식별자
+	if err := app.RedisClient.RegisterActiveUser(userID, serverID); err != nil {
+		log.Printf("Failed to register active user %s in Redis: %v", userID, err)
+	} else {
+		log.Printf("User %s registered as active on server %s", userID, serverID)
+	}
+
 	log.Printf("User %s register chat server", userID)
 }
 
@@ -306,6 +275,13 @@ func (app *Config) UnRegisterChatClient(userID string) {
 
 		// Channel에서 유저 제거
 		app.ChatClients.Delete(userID)
+
+		// Redis에서 활성 사용자 제거
+		if err := app.RedisClient.UnregisterActiveUser(userID); err != nil {
+			log.Printf("Failed to unregister active user %s in Redis: %v", userID, err)
+		} else {
+			log.Printf("User %s unregistered as active", userID)
+		}
 
 		log.Printf("User %s unregistered chat server", userID)
 	}
@@ -337,26 +313,55 @@ func (app *Config) SendSocketByChatEvents() {
 	for event := range app.EventChannel {
 		switch event.Kind {
 		case types.MessageKindChatLastest:
-			// chat.latest 이벤트 처리
-			var chatLatest types.ChatLatestEvent
-			if err := json.Unmarshal(event.Payload, &chatLatest); err != nil {
-				log.Printf("Failed to unmarshal payload for chat.latest event: %v", err)
-				continue
+			if err := app.handleChatLatestEvent(event.Payload); err != nil {
+				log.Printf("Failed to handle chat.latest event: %v", err)
 			}
-
-			log.Printf("Broadcasting chat.latest event for RoomID: %s", chatLatest.RoomID)
-
-			wsMessage := types.WebSocketMessage{
-				Kind:    types.MessageKindChatLastest,
-				Payload: event.Payload,
-			}
-
-			// Room에 메시지 브로드캐스트
-			if err := app.sendMessageToRoom(chatLatest.RoomID, wsMessage); err != nil {
-				log.Printf("Failed to broadcast chat.latest event to RoomID %s: %v", chatLatest.RoomID, err)
+		case types.MessageKindMessage:
+			if err := app.handleChatEvent(event.Payload); err != nil {
+				log.Printf("Failed to handle chat event: %v", err)
 			}
 		default:
 			log.Printf("Unknown WebSocket event kind: %s", event.Kind)
 		}
 	}
+}
+
+func (app *Config) handleChatLatestEvent(payload json.RawMessage) error {
+	var chatLatest types.ChatLatestEvent
+	if err := json.Unmarshal(payload, &chatLatest); err != nil {
+		return fmt.Errorf("failed to unmarshal chat.latest payload: %w", err)
+	}
+
+	log.Printf("Broadcasting chat.latest event for RoomID: %s", chatLatest.RoomID)
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindChatLastest,
+		Payload: payload,
+	}
+
+	if err := app.sendMessageToRoom(chatLatest.RoomID, wsMessage); err != nil {
+		return fmt.Errorf("failed to broadcast chat.latest for RoomID %s: %w", chatLatest.RoomID, err)
+	}
+
+	return nil
+}
+
+func (app *Config) handleChatEvent(payload json.RawMessage) error {
+	var chatMsg types.ChatEvent
+	if err := json.Unmarshal(payload, &chatMsg); err != nil {
+		return fmt.Errorf("failed to unmarshal chat payload: %w", err)
+	}
+
+	log.Printf("Broadcasting chat event for RoomID: %s", chatMsg.RoomID)
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindMessage,
+		Payload: payload,
+	}
+
+	if err := app.sendMessageToRoom(chatMsg.RoomID, wsMessage); err != nil {
+		return fmt.Errorf("failed to broadcast chat.latest for RoomID %s: %w", chatMsg.RoomID, err)
+	}
+
+	return nil
 }

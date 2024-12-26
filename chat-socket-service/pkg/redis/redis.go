@@ -39,3 +39,58 @@ func NewRedisClient() (*RedisClient, error) {
 	log.Println("Successfully connected to Redis")
 	return &RedisClient{Client: client}, nil
 }
+
+// 활성 사용자 등록
+func (r *RedisClient) RegisterActiveUser(userID, serverID string) error {
+	return r.Client.HSet(ctx, "client:active", userID, serverID).Err()
+}
+
+// 활성 사용자 제거
+func (r *RedisClient) UnregisterActiveUser(userID string) error {
+	return r.Client.HDel(ctx, "client:active", userID).Err()
+}
+
+// 사용자 활성 상태 확인
+func (r *RedisClient) IsUserActive(userID string) (bool, error) {
+	serverID, err := r.Client.HGet(ctx, "client:active", userID).Result()
+	if err == redis.Nil {
+		return false, nil // 활성화되지 않은 사용자
+	} else if err != nil {
+		return false, fmt.Errorf("failed to check user active status: %v", err)
+	}
+
+	return serverID != "", nil
+}
+
+// Room의 활성 사용자 ID 리스트를 반환
+func (r *RedisClient) GetActiveUserIDs(roomID string) ([]string, error) {
+	// Step 1: Room의 사용자 ID 리스트 가져오기
+	roomKey := fmt.Sprintf("room:%s", roomID)
+	userIDs, err := r.Client.SMembers(ctx, roomKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users for room %s: %v", roomID, err)
+	}
+
+	log.Printf("ROOM (%s) MEMBER in Redis, users: %v", roomID, userIDs)
+
+	// Step 2: 활성 사용자 필터링
+	activeUsers := []string{}
+	for _, userID := range userIDs {
+		activeKey := "client:active"
+		active, err := r.Client.HGet(ctx, activeKey, userID).Result()
+		if err == redis.Nil || active != "unique-server-id" {
+			log.Printf("active: %s", active)
+			// 사용자 비활성화 상태일 경우 무시
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to check active status for user %s: %v", userID, err)
+		}
+
+		// 활성 사용자 추가
+		activeUsers = append(activeUsers, userID)
+	}
+
+	log.Printf("ACTIVE USER in Redis, users: %s", activeUsers)
+
+	return activeUsers, nil
+}

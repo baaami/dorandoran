@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,6 +36,17 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := context.Background()
+	roomKey := fmt.Sprintf("room:%s", room.ID)
+
+	// Redis에 채팅방 정보 생성
+	err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, room.Users).Err()
+	if err != nil {
+		http.Error(w, "Failed to add room in redis", http.StatusInternalServerError)
+		log.Printf("Failed to add room in redis, err: %s", err.Error())
+		return
+	}
+
 	// 채팅방 Timer Setup
 	app.RoomManager.SetRoomTimeout(room.ID, 1*time.Minute)
 
@@ -63,6 +75,16 @@ func (app *Config) createGameRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		err := app.Models.ChatRoom.InsertRoom(&room)
 		if err != nil {
 			log.Printf("Failed to insert chat room to MongoDB: %v", err)
+			continue
+		}
+
+		ctx := context.Background()
+		roomKey := fmt.Sprintf("room:%s", room.ID)
+
+		// Redis에 채팅방 정보 생성
+		err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, room.Users).Err()
+		if err != nil {
+			log.Printf("Failed to add room in redis, err: %s", err.Error())
 			continue
 		}
 
@@ -250,6 +272,17 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := context.Background()
+	roomKey := fmt.Sprintf("room:%s", roomID)
+
+	// Redis에 채팅방 정보 생성
+	err = app.RoomManager.RedisClient.Client.Del(ctx, roomKey).Err()
+	if err != nil {
+		http.Error(w, "Failed to delete room in redis", http.StatusInternalServerError)
+		log.Printf("Failed to delete room in redis, err: %s", err.Error())
+		return
+	}
+
 	// TODO: 채팅방 삭제 이벤트 발행
 
 	w.WriteHeader(http.StatusOK)
@@ -425,19 +458,22 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 		messageIDs = append(messageIDs, message.MessageId)
 	}
 
-	// unread_count 업데이트
-	err = app.Models.Chat.UpdateUnreadCounts(messageIDs)
-	if err != nil {
-		log.Printf("Failed to update unread counts for RoomID %s: %v", roomJoinEvent.RoomID, err)
-		http.Error(w, "Failed to update unread counts", http.StatusInternalServerError)
-		return
+	if len(messageIDs) > 0 {
+		// unread_count 업데이트
+		err = app.Models.Chat.UpdateUnreadCounts(messageIDs)
+		if err != nil {
+			log.Printf("Failed to update unread counts for RoomID %s: %v", roomJoinEvent.RoomID, err)
+			http.Error(w, "Failed to update unread counts", http.StatusInternalServerError)
+			return
+		}
+
+		app.Emitter.PushChatLatestEvent(event.ChatLatestEvent{
+			RoomID: roomJoinEvent.RoomID,
+		})
+
+		log.Printf("Successfully processed RoomJoinEvent for RoomID: %s, UserID: %d", roomJoinEvent.RoomID, userID)
 	}
 
-	app.Emitter.PushChatLatestEvent(event.ChatLatestEvent{
-		RoomID: roomJoinEvent.RoomID,
-	})
-
-	log.Printf("Successfully processed RoomJoinEvent for RoomID: %s, UserID: %d", roomJoinEvent.RoomID, userID)
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Room join event processed successfully"))
 }

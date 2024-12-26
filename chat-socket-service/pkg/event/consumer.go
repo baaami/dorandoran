@@ -107,7 +107,30 @@ func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- types.WebSoc
 			}
 
 			// Process the event payload based on its EventType
-			if payload.EventType == "chat.latest" {
+			if payload.EventType == "chat" {
+				var chatMsg types.ChatEvent
+				if err := json.Unmarshal(payload.Data, &chatMsg); err != nil {
+					log.Printf("Failed to unmarshal chat event: %v", err)
+					continue
+				}
+
+				log.Printf("Send chat msg: %s to RoomID: %s", chatMsg.Message, chatMsg.RoomID)
+
+				payload, err := json.Marshal(types.RoomJoinEvent{
+					RoomID: chatMsg.RoomID,
+				})
+				if err != nil {
+					log.Printf("Failed to marshal payload for chat.latest event: %v", err)
+					continue
+				}
+
+				wsMessage := types.WebSocketMessage{
+					Kind:    types.MessageKindMessage,
+					Payload: json.RawMessage(payload),
+				}
+
+				eventChannel <- wsMessage
+			} else if payload.EventType == "chat.latest" {
 				var chatLatest types.ChatLatestEvent
 				if err := json.Unmarshal(payload.Data, &chatLatest); err != nil {
 					log.Printf("Failed to unmarshal chat.latest event: %v", err)
@@ -116,7 +139,7 @@ func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- types.WebSoc
 
 				log.Printf("Send chat.latest event for RoomID: %s", chatLatest.RoomID)
 
-				payload, err := json.Marshal(types.RoomJoinEvent{
+				payload, err := json.Marshal(types.ChatLatestEvent{
 					RoomID: chatLatest.RoomID,
 				})
 				if err != nil {
