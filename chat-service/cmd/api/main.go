@@ -79,12 +79,6 @@ func main() {
 	// RoomManager 초기화
 	roomManager := manager.NewRoomManager(redisClient, emitter, models)
 
-	matchConsumer, err := event.NewConsumer(rabbitConn)
-	if err != nil {
-		log.Printf("Failed to make new match consumer: %v", err)
-		os.Exit(1)
-	}
-
 	chatRoomChan := make(chan types.MatchEvent)
 
 	// Config 구조체 초기화
@@ -95,8 +89,11 @@ func main() {
 		RoomManager: roomManager,
 	}
 
-	// 채팅방 타임아웃 이벤트를 발행하기 위한 루프
-	go app.RoomManager.MonitorRoomTimeouts()
+	matchConsumer, err := event.NewConsumer(rabbitConn)
+	if err != nil {
+		log.Printf("Failed to make new match consumer: %v", err)
+		os.Exit(1)
+	}
 
 	go func() {
 		log.Println("Starting RabbitMQ consumer for matching events")

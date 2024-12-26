@@ -55,7 +55,6 @@ func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
 }
 
 // 매칭 성공 시 게임방 생성 루틴
-// createChatRoom listens for MatchEvent and creates a chatroom
 func (app *Config) createGameRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 	for matchEvent := range chatRoomCreateChan {
 		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
