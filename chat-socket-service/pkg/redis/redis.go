@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/baaami/dorandoran/chat-socket-service/pkg/types"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -65,6 +66,7 @@ func (r *RedisClient) IsUserActive(userID string) (bool, error) {
 // Room의 활성 사용자 ID 리스트를 반환
 func (r *RedisClient) GetActiveUserIDs(roomID string) ([]string, error) {
 	// Step 1: Room의 사용자 ID 리스트 가져오기
+	// TODO: MongoDB 시작 시 Redis와 동기화 작업이 필요함
 	roomKey := fmt.Sprintf("room:%s", roomID)
 	userIDs, err := r.Client.SMembers(ctx, roomKey).Result()
 	if err != nil {
@@ -95,6 +97,18 @@ func (r *RedisClient) GetActiveUserIDs(roomID string) ([]string, error) {
 	return activeUsers, nil
 }
 
+// Room 내 존재하는 user의 ID 리스트 반환
+func (r *RedisClient) GetRoomUserIDs(roomID string) ([]string, error) {
+	// Step 1: Room의 사용자 ID 리스트 가져오기
+	roomKey := fmt.Sprintf("room:%s", roomID)
+	userIDs, err := r.Client.SMembers(ctx, roomKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users for room %s: %v", roomID, err)
+	}
+
+	return userIDs, nil
+}
+
 func (r *RedisClient) JoinRoom(roomID, userID string) error {
 	roomKey := fmt.Sprintf("join_room:%s", roomID)
 	err := r.Client.SAdd(ctx, roomKey, userID).Err()
@@ -105,6 +119,7 @@ func (r *RedisClient) JoinRoom(roomID, userID string) error {
 	return nil
 }
 
+// TODO: 사용자 웹소켓이 끊기면 Leave해줘야함
 func (r *RedisClient) LeaveRoom(roomID, userID string) error {
 	roomKey := fmt.Sprintf("join_room:%s", roomID)
 	err := r.Client.SRem(ctx, roomKey, userID).Err()
@@ -124,4 +139,91 @@ func (r *RedisClient) GetJoinedUser(roomID string) ([]string, error) {
 
 	log.Printf("Users in room %s: %v", roomID, userIDs)
 	return userIDs, nil
+}
+
+// Room Timeout 사용자 추가
+func (r *RedisClient) AddTimeoutUser(roomID, userID string) error {
+	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
+	err := r.Client.SAdd(ctx, timeoutKey, userID).Err()
+	if err != nil {
+		return fmt.Errorf("failed to add timeout user %s to room %s: %v", userID, roomID, err)
+	}
+	log.Printf("User %s marked as timeout in room %s", userID, roomID)
+	return nil
+}
+
+// Room Timeout된 사용자 개수 취합
+func (r *RedisClient) GetTimeoutUserCount(roomID string) (int64, error) {
+	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
+	count, err := r.Client.SCard(ctx, timeoutKey).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get timeout user count for room %s: %v", roomID, err)
+	}
+	return count, nil
+}
+
+func (r *RedisClient) ClearRoomTimeout(roomID string) error {
+	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
+	err := r.Client.Del(ctx, timeoutKey).Err()
+	if err != nil {
+		return fmt.Errorf("failed to clear room timeout data for room %s: %v", roomID, err)
+	}
+	log.Printf("Cleared timeout data for room %s", roomID)
+	return nil
+}
+
+func (r *RedisClient) SaveUserChoice(roomID, userID, selectedUserID string) error {
+	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
+	err := r.Client.HSet(ctx, choiceKey, userID, selectedUserID).Err()
+	if err != nil {
+		return fmt.Errorf("failed to save user choice for room %s, user %s: %v", roomID, userID, err)
+	}
+	log.Printf("User %s selected %s in room %s", userID, selectedUserID, roomID)
+	return nil
+}
+
+func (r *RedisClient) IsAllChoicesCompleted(roomID string, totalUsers int64) (bool, error) {
+	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
+	choiceCount, err := r.Client.HLen(ctx, choiceKey).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to get choice count for room %s: %v", roomID, err)
+	}
+
+	log.Printf("Room %s: %d/%d users have made their choices", roomID, choiceCount, totalUsers)
+	return choiceCount == totalUsers, nil
+}
+
+func (r *RedisClient) GetAllChoices(roomID string) (*types.FinalChoiceResultMessage, error) {
+	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
+	choicesMap, err := r.Client.HGetAll(ctx, choiceKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all choices for room %s: %v", roomID, err)
+	}
+
+	// 변환된 데이터 저장
+	var choices []types.UserChoice
+	for userID, selectedUserID := range choicesMap {
+		choices = append(choices, types.UserChoice{
+			UserID:         userID,
+			SelectedUserID: selectedUserID,
+		})
+	}
+
+	finalChoices := &types.FinalChoiceResultMessage{
+		RoomID:  roomID,
+		Choices: choices,
+	}
+
+	log.Printf("Final choices for room %s: %+v", roomID, finalChoices)
+	return finalChoices, nil
+}
+
+func (r *RedisClient) ClearFinalChoiceRoom(roomID string) error {
+	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
+	err := r.Client.Del(ctx, choiceKey).Err()
+	if err != nil {
+		return fmt.Errorf("failed to clear final choice room data for room %s: %v", roomID, err)
+	}
+	log.Printf("Cleared final choice data for room %s", roomID)
+	return nil
 }

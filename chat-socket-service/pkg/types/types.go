@@ -76,14 +76,16 @@ type ChatEvent struct {
 }
 
 const (
-	MessageKindMessage       = "message"
-	MessageKindJoin          = "join"
-	MessageKindLeave         = "leave"
-	MessageKindCheckRead     = "check_read"
-	MessageKindChatLastest   = "chat_latest"
-	MessageKindRoomRemaining = "room_remaining"
-	MessageKindRoomTimeout   = "room_timeout"
-	MessageKindFinalChoice   = "final_choice"
+	MessageKindMessage           = "message"
+	MessageKindJoin              = "join"
+	MessageKindLeave             = "leave"
+	MessageKindCheckRead         = "check_read"
+	MessageKindChatLastest       = "chat_latest"
+	MessageKindRoomRemaining     = "room_remaining"
+	MessageKindRoomTimeout       = "room_timeout"
+	MessageKindFinalChoiceStart  = "final_choice_start"
+	MessageKindFinalChoice       = "final_choice"
+	MessageKindFinalChoiceResult = "final_choice_result"
 )
 
 const (
@@ -91,6 +93,16 @@ const (
 	ChatTypeJoin  = "join"
 	ChatTypeLeave = "leave"
 )
+
+type UserChoice struct {
+	UserID         string `json:"user_id"`
+	SelectedUserID string `json:"selected_user_id"`
+}
+
+type FinalChoiceResultMessage struct {
+	RoomID  string       `json:"room_id"`
+	Choices []UserChoice `json:"choices"`
+}
 
 type JoinRoomMessage struct {
 	RoomID string `json:"room_id"`
@@ -100,7 +112,12 @@ type LeaveRoomMessage struct {
 	RoomID string `json:"room_id"`
 }
 
+type RoomTimeoutMessage struct {
+	RoomID string `json:"room_id"`
+}
+
 type FinalChoiceMessage struct {
+	RoomID         string `json:"room_id"`
 	SelectedUserID string `json:"selected_user_id"`
 }
 

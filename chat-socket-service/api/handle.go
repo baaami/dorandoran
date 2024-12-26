@@ -94,6 +94,10 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				app.handleJoinMessage(wsMsg.Payload, userID)
 			case types.MessageKindLeave:
 				app.handleLeaveMessage(wsMsg.Payload, userID)
+				// 게임방 타임아웃
+			case types.MessageKindRoomTimeout:
+				app.handleRoomTimeoutMessage(wsMsg.Payload, userID)
+				// 최종 선택 메시지
 			case types.MessageKindFinalChoice:
 				app.handleFinalChoiceMessage(wsMsg.Payload, userID)
 			default:
@@ -144,6 +148,59 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
+}
+
+// TODO: 최종 선택을 시작하기 위한 조건을 명확히 해야한다.
+// -> 모든 클라이언트에서 timeout이 발생 OR Backend에서 timeout이 발생한 방이 모든 클라이언트에게 timeout을 받지 못했을 경우 3초간 대기 후 최종 선택을 강제 시작한다.
+// TODO: Backend에서 timeout이 발생한 방이 존재하고 n초 지났을 때 최종 선택을 시작하도록 한다.
+// TODO: or 모든 클라이언트에서 timeout이 발생하였을 때 최종 선택을 시작하도록 한다.
+func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
+	message := types.WebSocketMessage{
+		Kind: "final_choice_start",
+	}
+
+	// Room 사용자에게 브로드캐스트
+	if err := app.sendMessageToRoom(roomID, message); err != nil {
+		return fmt.Errorf("failed to broadcast final_choice_start to room %s: %v", roomID, err)
+	}
+
+	app.RedisClient.ClearRoomTimeout(roomID)
+
+	log.Printf("Broadcasted final_choice_start event to room %s", roomID)
+
+	return nil
+}
+
+// TODO: 최종 선택 완료 후 현황을 공개하기 위한 조건을 명확히 해야한다.
+// -> 모든 클라이언트에서 최종 선택 메시지 송신 OR Backend에서 최종 선택 시간이 timeout된 후 모든 클라이언트에게 최종 선택을 받지 못했을 경우 5초간 대기 후 최종 선택을 공개한다.
+func (app *Config) BroadcastFinalChoices(roomID string) error {
+	// Redis에서 선택 결과 조회
+	finalChoices, err := app.RedisClient.GetAllChoices(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast final choices: %v", err)
+	}
+
+	// JSON으로 직렬화
+	payload, err := json.Marshal(finalChoices)
+	if err != nil {
+		return fmt.Errorf("failed to marshal final choices: %v", err)
+	}
+
+	// WebSocket 메시지 생성
+	message := types.WebSocketMessage{
+		Kind:    types.MessageKindFinalChoiceResult,
+		Payload: json.RawMessage(payload),
+	}
+
+	// Room 사용자에게 브로드캐스트
+	if err := app.sendMessageToRoom(roomID, message); err != nil {
+		return fmt.Errorf("failed to broadcast choices to room %s: %v", roomID, err)
+	}
+
+	app.RedisClient.ClearFinalChoiceRoom(roomID)
+
+	log.Printf("Broadcasted final choices to room %s", roomID)
+	return nil
 }
 
 func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds []string) error {
@@ -219,17 +276,70 @@ func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 	app.RedisClient.LeaveRoom(leaveMsg.RoomID, userID)
 }
 
-// Leave 메시지 처리
-func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID string) {
+// 채팅방 타임아웃 메시지 처리
+func (app *Config) handleRoomTimeoutMessage(payload json.RawMessage, userID string) error {
+	var roomTimeoutMsg types.RoomTimeoutMessage
+	if err := json.Unmarshal(payload, &roomTimeoutMsg); err != nil {
+		log.Printf("Failed to unmarshal final choice message: %v, err: %v", payload, err)
+		return nil
+	}
+
+	err := app.RedisClient.AddTimeoutUser(roomTimeoutMsg.RoomID, userID)
+	if err != nil {
+		log.Printf("Failed to SaveUserChoice, err: %v", err)
+		return nil
+	}
+
+	roomTimeoutUserIds, err := app.RedisClient.GetTimeoutUserCount(roomTimeoutMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to GetTimeoutUserCount, err: %v", err)
+		return nil
+	}
+
+	roomTotalUserIds, err := app.RedisClient.GetRoomUserIDs(roomTimeoutMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to GetRoomUserIDs, err: %v", err)
+		return nil
+	}
+
+	if int(roomTimeoutUserIds) == len(roomTotalUserIds) {
+		app.BroadcastFinalChoiceStart(roomTimeoutMsg.RoomID)
+	}
+
+	return nil
+}
+
+// 최종 선택 메시지 처리
+func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID string) error {
 	var finalChoice types.FinalChoiceMessage
 	if err := json.Unmarshal(payload, &finalChoice); err != nil {
 		log.Printf("Failed to unmarshal final choice message: %v, err: %v", payload, err)
-		return
+		return nil
 	}
 
-	// REDIS에 최종 선택 결과 저장
-
 	// 최종 선택 완료 이벤트 발생 시
+	err := app.RedisClient.SaveUserChoice(finalChoice.RoomID, userID, finalChoice.SelectedUserID)
+	if err != nil {
+		log.Printf("Failed to SaveUserChoice, err: %v", err)
+		return nil
+	}
+
+	roomTotalUserIds, err := app.RedisClient.GetRoomUserIDs(finalChoice.RoomID)
+	if err != nil {
+		log.Printf("Failed to GetRoomUserIDs, err: %v", err)
+		return nil
+	}
+
+	ok, err := app.RedisClient.IsAllChoicesCompleted(finalChoice.RoomID, int64(len(roomTotalUserIds)))
+	if err != nil {
+		log.Printf("Failed to IsAllChoicesCompleted, err: %v", err)
+		return nil
+	}
+	if ok {
+		app.BroadcastFinalChoices(finalChoice.RoomID)
+	}
+
+	return nil
 }
 
 func (app *Config) JoinRoom(roomID string, userID string) {
