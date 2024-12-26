@@ -140,22 +140,6 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 }
 
 func (app *Config) BroadcastToRoom(chatMsg *types.Chat, activeUserIds []string) error {
-	// WebSocket 메시지 생성
-	payload, err := json.Marshal(chatMsg)
-	if err != nil {
-		log.Printf("Failed to marshal chatMsg: %v", err)
-		return err
-	}
-	webSocketMsg := types.WebSocketMessage{
-		Kind:    types.MessageKindMessage,
-		Payload: json.RawMessage(payload),
-	}
-
-	// Room에 Websocket 메시지 전송
-	if err := app.sendMessageToRoom(chatMsg.RoomID, webSocketMsg); err != nil {
-		log.Printf("Failed to send message to room %s: %v", chatMsg.RoomID, err)
-	}
-
 	chatEvent := types.ChatEvent{
 		MessageId:   chatMsg.MessageId,
 		Type:        chatMsg.Type,
