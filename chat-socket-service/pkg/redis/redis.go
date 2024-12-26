@@ -94,3 +94,34 @@ func (r *RedisClient) GetActiveUserIDs(roomID string) ([]string, error) {
 
 	return activeUsers, nil
 }
+
+func (r *RedisClient) JoinRoom(roomID, userID string) error {
+	roomKey := fmt.Sprintf("join_room:%s", roomID)
+	err := r.Client.SAdd(ctx, roomKey, userID).Err()
+	if err != nil {
+		return fmt.Errorf("failed to join room %s for user %s: %v", roomID, userID, err)
+	}
+	log.Printf("User %s joined room %s", userID, roomID)
+	return nil
+}
+
+func (r *RedisClient) LeaveRoom(roomID, userID string) error {
+	roomKey := fmt.Sprintf("join_room:%s", roomID)
+	err := r.Client.SRem(ctx, roomKey, userID).Err()
+	if err != nil {
+		return fmt.Errorf("failed to leave room %s for user %s: %v", roomID, userID, err)
+	}
+	log.Printf("User %s left room %s", userID, roomID)
+	return nil
+}
+
+func (r *RedisClient) GetJoinedUser(roomID string) ([]string, error) {
+	roomKey := fmt.Sprintf("join_room:%s", roomID)
+	userIDs, err := r.Client.SMembers(ctx, roomKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users for room %s: %v", roomID, err)
+	}
+
+	log.Printf("Users in room %s: %v", roomID, userIDs)
+	return userIDs, nil
+}

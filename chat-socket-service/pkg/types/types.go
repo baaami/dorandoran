@@ -83,6 +83,7 @@ const (
 	MessageKindChatLastest   = "chat_latest"
 	MessageKindRoomRemaining = "room_remaining"
 	MessageKindRoomTimeout   = "room_timeout"
+	MessageKindFinalChoice   = "final_choice"
 )
 
 const (
@@ -97,6 +98,10 @@ type JoinRoomMessage struct {
 
 type LeaveRoomMessage struct {
 	RoomID string `json:"room_id"`
+}
+
+type FinalChoiceMessage struct {
+	SelectedUserID string `json:"selected_user_id"`
 }
 
 type RoomJoinEvent struct {

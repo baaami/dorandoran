@@ -39,7 +39,6 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 		log.Printf("Failed to upgrade connection: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "WebSocket upgrade failed")
 	}
-	defer conn.Close()
 
 	userID := c.Request().Header.Get("X-User-ID")
 
@@ -52,8 +51,6 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
 	wg.Add(1) // 두 개의 고루틴 (listenChatEvent, pingPump)
-
-	// 게임에 필요한 초기 정보 전달
 
 	// 메시지 처리 고루틴
 	go func() {
@@ -97,6 +94,10 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				app.handleJoinMessage(wsMsg.Payload, userID)
 			case types.MessageKindLeave:
 				app.handleLeaveMessage(wsMsg.Payload, userID)
+			case types.MessageKindFinalChoice:
+				app.handleFinalChoiceMessage(wsMsg.Payload, userID)
+			default:
+				log.Printf("Unknown Message: %s", wsMsg.Kind)
 			}
 		}
 	}
@@ -114,7 +115,6 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		log.Printf("Failed to atoi, userid: %s, err: %s", userID, err.Error())
 		return
 	}
-
 	// 활성 사용자 ID 리스트 가져오기
 	activeUserIDs, err := app.RedisClient.GetActiveUserIDs(broadCastMsg.RoomID)
 	if err != nil {
@@ -122,14 +122,22 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		return
 	}
 
+	// 방에 접속해있는 사용자 ID 리스트 가져오기
+	joinedUserIDs, err := app.RedisClient.GetJoinedUser(broadCastMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to get joined room users for room %s: %v", broadCastMsg.RoomID, err)
+		return
+	}
+
 	now := time.Now()
 	chat := types.Chat{
-		MessageId:   primitive.NewObjectID(),
-		Type:        types.ChatTypeChat,
-		RoomID:      broadCastMsg.RoomID,
-		SenderID:    nUserID,
-		Message:     broadCastMsg.Message,
-		UnreadCount: broadCastMsg.HeadCnt - len(activeUserIDs), // 활성 사용자 수를 이용해 UnreadCount 계산
+		MessageId: primitive.NewObjectID(),
+		Type:      types.ChatTypeChat,
+		RoomID:    broadCastMsg.RoomID,
+		SenderID:  nUserID,
+		Message:   broadCastMsg.Message,
+		// TODO: 활성 사용자 수에서 room 에 접속하지 않은 사람
+		UnreadCount: broadCastMsg.HeadCnt - len(joinedUserIDs), // 활성 사용자 수를 이용해 UnreadCount 계산
 		CreatedAt:   now,
 	}
 
@@ -168,10 +176,9 @@ func (app *Config) sendMessageToRoom(roomID string, message types.WebSocketMessa
 		return err
 	}
 
-	log.Printf("[sendMessageToRoom] active user: %v", activeUserIDs)
-
 	for _, activeUserID := range activeUserIDs {
 		if client, ok := app.ChatClients.Load(activeUserID); ok {
+			log.Printf("Send Realtime Chat Socket to id: %s, kind: %s", activeUserID, message.Kind)
 			if !app.sendMessageToClient(client.(*Client), message) {
 				log.Printf("Failed to send message to user %v in room %s", activeUserID, roomID)
 			}
@@ -209,10 +216,27 @@ func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
 		return
 	}
+
+	app.RedisClient.LeaveRoom(leaveMsg.RoomID, userID)
+}
+
+// Leave 메시지 처리
+func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID string) {
+	var finalChoice types.FinalChoiceMessage
+	if err := json.Unmarshal(payload, &finalChoice); err != nil {
+		log.Printf("Failed to unmarshal final choice message: %v, err: %v", payload, err)
+		return
+	}
+
+	// REDIS에 최종 선택 결과 저장
+
+	// 최종 선택 완료 이벤트 발생 시
 }
 
 func (app *Config) JoinRoom(roomID string, userID string) {
 	log.Printf("User %s joined room %s", userID, roomID)
+
+	app.RedisClient.JoinRoom(roomID, userID)
 
 	roomJoinMsg := types.RoomJoinEvent{
 		RoomID: roomID,
@@ -273,7 +297,6 @@ func (app *Config) UnRegisterChatClient(userID string) {
 
 func (c *Client) writePump() {
 	defer func() {
-		c.Conn.Close()
 		log.Printf("[INFO] writePump for user %v exited", c.Conn.RemoteAddr())
 	}()
 
@@ -293,6 +316,7 @@ func (c *Client) writePump() {
 	}
 }
 
+// RabbitMQ 소비자로부터 발생한 이벤트 처리 함수
 func (app *Config) SendSocketByChatEvents() {
 	for event := range app.EventChannel {
 		switch event.Kind {
@@ -310,6 +334,7 @@ func (app *Config) SendSocketByChatEvents() {
 	}
 }
 
+// RabbitMQ 소비자로부터 발생한 chat.latest 이벤트 처리 함수
 func (app *Config) handleChatLatestEvent(payload json.RawMessage) error {
 	var chatLatest types.ChatLatestEvent
 	if err := json.Unmarshal(payload, &chatLatest); err != nil {
@@ -330,6 +355,7 @@ func (app *Config) handleChatLatestEvent(payload json.RawMessage) error {
 	return nil
 }
 
+// RabbitMQ 소비자로부터 발생한 chat 이벤트 처리 함수
 func (app *Config) handleChatEvent(payload json.RawMessage) error {
 	var chatMsg types.ChatEvent
 	if err := json.Unmarshal(payload, &chatMsg); err != nil {
