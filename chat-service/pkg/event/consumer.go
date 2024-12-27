@@ -47,12 +47,12 @@ func (consumer *Consumer) Listen(chatRoomCreateChan chan<- types.MatchEvent) err
 
 	// Temporary queue 생성
 	queue, err := channel.QueueDeclare(
-		"",    // name (empty for a temporary queue)
-		false, // durable
-		true,  // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
+		"match_queue", // name (empty for a temporary queue)
+		false,         // durable
+		true,          // delete when unused
+		false,         // exclusive
+		false,         // no-wait
+		nil,           // arguments
 	)
 	if err != nil {
 		log.Printf("Failed to declare queue: %v", err)

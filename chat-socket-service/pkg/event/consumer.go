@@ -56,15 +56,25 @@ func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<
 	defer channel.Close()
 
 	for _, config := range c.routingConfigs {
-		queue, err := channel.QueueDeclare("", false, false, true, false, nil)
+		queue, err := channel.QueueDeclare("chat_socket_queue", false, false, true, false, nil)
 		if err != nil {
 			return err
 		}
 
-		for _, key := range config.Keys {
-			err := channel.QueueBind(queue.Name, key, config.Exchange.Name, false, nil)
+		// topic exchnage
+		if config.Exchange.Type == "topic" {
+			for _, key := range config.Keys {
+				err := channel.QueueBind(queue.Name, key, config.Exchange.Name, false, nil)
+				if err != nil {
+					log.Printf("Failed to bind queue %s to routing key %s: %v", queue.Name, key, err)
+					return err
+				}
+			}
+		} else if config.Exchange.Type == "fanout" {
+			// fanout exchnage
+			err := channel.QueueBind(queue.Name, "", config.Exchange.Name, false, nil)
 			if err != nil {
-				log.Printf("Failed to bind queue %s to routing key %s: %v", queue.Name, key, err)
+				log.Printf("Failed to bind queue %s to routing key %s: %v", queue.Name, "", err)
 				return err
 			}
 		}

@@ -119,7 +119,7 @@ func (consumer *Consumer) Listen(routingkeys []string) error {
 	}
 	defer ch.Close()
 
-	q, err := declareRandomQueue(ch)
+	q, err := declareAppTopicQueue(ch)
 	if err != nil {
 		log.Printf("Failed to declare random queue: %v", err)
 		return err
