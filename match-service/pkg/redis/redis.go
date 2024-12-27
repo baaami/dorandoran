@@ -91,6 +91,7 @@ func (r *RedisClient) MonitorAndMatchUsers(coupleCount int, emitter *event.Emitt
 		// 매칭 이벤트 생성
 		matchEvent := types.MatchEvent{
 			MatchId:      matchID,
+			MatchType:    types.MATCH_GAME,
 			MatchedUsers: append(matchedMales, matchedFemales...),
 		}
 

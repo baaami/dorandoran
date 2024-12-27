@@ -38,17 +38,24 @@ func main() {
 	defer rabbitConn.Close()
 
 	// 채팅방 데이터 처리를 위한 채널 생성
-	chatRoomChan := make(chan types.ChatRoom)
+	eventChannel := make(chan types.ChatRoom)
 
-	chatRoomConsumer, err := event.NewConsumer(rabbitConn)
+	// Consumer 생성
+	exchanges := []string{event.ExchangeChatRoomCreateEvents}
+	consumer, err := event.NewConsumer(rabbitConn, exchanges)
 	if err != nil {
-		log.Printf("Failed to make new match consumer: %v", err)
+		log.Fatalf("Failed to create consumer: %v", err)
 		os.Exit(1)
+	}
+
+	// 핸들러 설정
+	handlers := map[string]event.MessageHandler{
+		event.EventTypeRoomCreate: event.ChatRoomCreateHandler,
 	}
 
 	go func() {
 		log.Println("Starting RabbitMQ consumer for chat_room_create_events exchange")
-		if err := chatRoomConsumer.Listen(chatRoomChan); err != nil {
+		if err := consumer.Listen(handlers, eventChannel); err != nil {
 			log.Printf("Failed to start RabbitMQ consumer: %v", err)
 			os.Exit(1)
 		}
@@ -61,7 +68,7 @@ func main() {
 
 	// 채팅방 데이터 처리
 	go func() {
-		for chatRoom := range chatRoomChan {
+		for chatRoom := range eventChannel {
 			// 사용자들에게 매칭 성공 메시지 전송
 			app.sendMatchSuccessMessage(chatRoom.Users, chatRoom.ID)
 		}

@@ -123,12 +123,16 @@ services:
     #   - ./db-data/mongo/:/data/db
 
   rabbitmq:
-    image: "rabbitmq:3.9-alpine"
+    image: "rabbitmq:3.9-management-alpine"
     ports:
       - "5672:5672"
+      - "15672:15672" # RabbitMQ Management Plugin 포트
     deploy:
       mode: replicated
       replicas: 1
+    environment:
+      RABBITMQ_DEFAULT_USER: guest # 기본 사용자
+      RABBITMQ_DEFAULT_PASS: guest # 기본 비밀번호
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
 

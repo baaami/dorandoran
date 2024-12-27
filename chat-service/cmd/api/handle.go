@@ -18,56 +18,34 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// 채팅방 생성
-func (app *Config) createChatRoom(w http.ResponseWriter, r *http.Request) {
-	var room data.ChatRoom
-
-	// 요청 바디에서 데이터 읽기
-	err := json.NewDecoder(r.Body).Decode(&room)
-	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
-	}
-
-	// MongoDB에 새로운 채팅방 삽입
-	err = app.Models.ChatRoom.InsertRoom(&room)
-	if err != nil {
-		http.Error(w, "Failed to create chat room", http.StatusInternalServerError)
-		return
-	}
-
-	ctx := context.Background()
-	roomKey := fmt.Sprintf("room:%s", room.ID)
-
-	// Redis에 채팅방 정보 생성
-	err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, room.Users).Err()
-	if err != nil {
-		http.Error(w, "Failed to add room in redis", http.StatusInternalServerError)
-		log.Printf("Failed to add room in redis, err: %s", err.Error())
-		return
-	}
-
-	// 채팅방 Timer Setup
-	app.RoomManager.SetRoomTimeout(room.ID, 1*time.Minute)
-
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(room)
-}
-
 // 매칭 성공 시 게임방 생성 루틴
-func (app *Config) createGameRoom(chatRoomCreateChan <-chan types.MatchEvent) {
+func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 	for matchEvent := range chatRoomCreateChan {
 		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
 		chatRoomID := matchEvent.MatchId
 
-		// 채팅방 생성
+		var startTime time.Time
+		var finishTime time.Time
+
+		if matchEvent.MatchType == types.MATCH_GAME {
+			log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
+			startTime = time.Now()
+			// TODO: 시간 수정 필요
+			finishTime = startTime.Add(5 * time.Minute)
+		} else {
+			log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
+			startTime = time.Now()
+			// TODO: 시간 수정 필요
+			finishTime = startTime.Add(10 * time.Minute)
+		}
+
 		room := data.ChatRoom{
 			ID:           chatRoomID,
-			Type:         1, // 채팅방 타입 (기본값 설정)
+			Type:         matchEvent.MatchType,
 			Users:        extractUserIDs(matchEvent.MatchedUsers),
-			CreatedAt:    time.Now(),
-			FinishChatAt: time.Now().Add(1 * time.Hour), // 채팅방 유효시간
-			ModifiedAt:   time.Now(),
+			CreatedAt:    startTime,
+			FinishChatAt: finishTime,
+			ModifiedAt:   startTime,
 		}
 
 		// MongoDB에 채팅방 삽입
@@ -92,14 +70,25 @@ func (app *Config) createGameRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 
 		log.Printf("Chat room created: %s with users: %v", room.ID, room.Users)
 
-		// 채팅방 생성 이벤트 발행
-		err = app.Emitter.PublishChatRoomCreateEvent(room)
-		if err != nil {
-			log.Printf("Failed to publish chat room event: %v", err)
-			continue
-		}
+		if matchEvent.MatchType == types.MATCH_GAME {
+			// 채팅방 생성 이벤트 발행
+			err = app.Emitter.PublishChatRoomCreateEvent(room)
+			if err != nil {
+				log.Printf("Failed to publish chat room event: %v", err)
+				continue
+			}
 
-		log.Printf("Published chat room event for room ID: %s", room.ID)
+			log.Printf("Published chat room event for room ID: %s", room.ID)
+		} else {
+			// 커플방 생성 이벤트 발행
+			err = app.Emitter.PublishCoupleRoomCreateEvent(room)
+			if err != nil {
+				log.Printf("Failed to publish chat room event: %v", err)
+				continue
+			}
+
+			log.Printf("Published chat room event for room ID: %s", room.ID)
+		}
 	}
 }
 

@@ -8,8 +8,13 @@ import (
 )
 
 const (
-	MATCHING_ROOM = iota
-	DATE_ROOM
+	MALE = iota
+	FEMALE
+)
+
+const (
+	MATCH_GAME = iota
+	MATCH_COUPLE
 )
 
 type Chat struct {
@@ -76,16 +81,17 @@ type ChatEvent struct {
 }
 
 const (
-	MessageKindMessage           = "message"
-	MessageKindJoin              = "join"
-	MessageKindLeave             = "leave"
-	MessageKindCheckRead         = "check_read"
-	MessageKindChatLastest       = "chat_latest"
-	MessageKindRoomRemaining     = "room_remaining"
-	MessageKindRoomTimeout       = "room_timeout"
-	MessageKindFinalChoiceStart  = "final_choice_start"
-	MessageKindFinalChoice       = "final_choice"
-	MessageKindFinalChoiceResult = "final_choice_result"
+	MessageKindMessage            = "message"
+	MessageKindJoin               = "join"
+	MessageKindLeave              = "leave"
+	MessageKindCheckRead          = "check_read"
+	MessageKindChatLastest        = "chat_latest"
+	MessageKindRoomRemaining      = "room_remaining"
+	MessageKindRoomTimeout        = "room_timeout"
+	MessageKindFinalChoiceStart   = "final_choice_start"
+	MessageKindFinalChoice        = "final_choice"
+	MessageKindFinalChoiceResult  = "final_choice_result"
+	MessageKindCoupleMatchSuccess = "couple_match_success"
 )
 
 const (
@@ -121,8 +127,48 @@ type FinalChoiceMessage struct {
 	SelectedUserID string `json:"selected_user_id"`
 }
 
+type CoupleMatchSuccessMessage struct {
+	RoomID string `json:"room_id"`
+}
+
 type RoomJoinEvent struct {
 	RoomID string    `bson:"room_id" json:"room_id"`
 	UserID string    `bson:"user_id" json:"user_id"`
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
+type Address struct {
+	City     string `gorm:"size:100" json:"city"`
+	District string `gorm:"size:100" json:"district"`
+	Street   string `gorm:"size:100" json:"street"`
+}
+
+type WaitingUser struct {
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Gender      int     `json:"gender"`
+	Birth       string  `json:"birth"`
+	Address     Address `json:"address"`
+	CoupleCount int     `json:"couple_count"`
+}
+
+type MatchEvent struct {
+	MatchId      string        `bson:"match_id" json:"match_id"`
+	MatchType    int           `bson:"match_type" json:"match_type"`
+	MatchedUsers []WaitingUser `bson:"matched_users" json:"matched_users"`
+}
+
+type User struct {
+	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType int     `gorm:"index" json:"sns_type"`
+	SnsID   string  `gorm:"index" json:"sns_id"`
+	Name    string  `gorm:"size:100" json:"name"`
+	Gender  int     `json:"gender"`
+	Birth   string  `gorm:"size:20" json:"birth"`
+	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+}
+
+type Couple struct {
+	UserID1 string `json:"user_id_1"`
+	UserID2 string `json:"user_id_2"`
 }

@@ -60,7 +60,13 @@ func main() {
 		}
 	}()
 
-	emitter, err := event.NewEmitter(rabbitConn)
+	exchanges := []event.ExchangeConfig{
+		{Name: event.ExchangeAppTopic, Type: "topic"},
+		{Name: event.ExchangeChatRoomCreateEvents, Type: "fanout"},
+		{Name: event.ExchangeCoupleRoomCreateEvents, Type: "fanout"},
+	}
+
+	emitter, err := event.NewEmitter(rabbitConn, exchanges)
 	if err != nil {
 		log.Printf("Failed to make new event emitter: %v", err)
 		os.Exit(1)
@@ -105,7 +111,7 @@ func main() {
 
 	go func() {
 		log.Println("Starting ChatRoom creator routine")
-		app.createGameRoom(chatRoomChan)
+		app.createRoom(chatRoomChan)
 	}()
 
 	// 웹 서버 시작

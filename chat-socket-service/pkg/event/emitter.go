@@ -36,6 +36,40 @@ func NewEventEmitter(conn *amqp.Connection) (Emitter, error) {
 	return emitter, nil
 }
 
+func (e *Emitter) PublishMatchEvent(event types.MatchEvent) error {
+	channel, err := e.connection.Channel()
+	if err != nil {
+		log.Printf("Failed to open channel: %v", err)
+		return err
+	}
+	defer channel.Close()
+
+	eventBody, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("Failed to marshal match event: %v", err)
+		return err
+	}
+
+	exchange := "match_events"
+	err = channel.Publish(
+		exchange, // exchange
+		"",       // routing key
+		false,    // mandatory
+		false,    // immediate
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        eventBody,
+		},
+	)
+	if err != nil {
+		log.Printf("Failed to publish match event: %v", err)
+		return err
+	}
+
+	log.Printf("Published match event: %s", eventBody)
+	return nil
+}
+
 func (e *Emitter) PushChatToQueue(chatEventMsg types.ChatEvent) error {
 	if e.connection == nil {
 		log.Println("RabbitMQ connection is nil")
@@ -51,7 +85,7 @@ func (e *Emitter) PushChatToQueue(chatEventMsg types.ChatEvent) error {
 
 	// EventPayload에 맞게 데이터를 래핑
 	payload := types.EventPayload{
-		EventType: "chat",
+		EventType: EventTypeChat,
 		Data:      chatData,
 	}
 
@@ -111,7 +145,7 @@ func (e *Emitter) PushRoomJoinToQueue(roomJoinMsg types.RoomJoinEvent) error {
 }
 
 // PushBytes 함수는 바이트 슬라이스 데이터를 RabbitMQ로 전송
-func (e *Emitter) PushBytes(event []byte, severity string) error {
+func (e *Emitter) PushBytes(event []byte, routingKeyName string) error {
 	channel, err := e.connection.Channel()
 	if err != nil {
 		return err
@@ -122,10 +156,10 @@ func (e *Emitter) PushBytes(event []byte, severity string) error {
 
 	// 메시지 전송
 	err = channel.Publish(
-		"app_topic", // 교환기 이름
-		severity,    // 라우팅 키
-		false,       // mandatory
-		false,       // immediate
+		"app_topic",    // 교환기 이름
+		routingKeyName, // 라우팅 키
+		false,          // mandatory
+		false,          // immediate
 		amqp.Publishing{
 			ContentType: "application/json", // 콘텐츠 타입 설정
 			Body:        event,              // 바이트 슬라이스 데이터를 메시지로 전송

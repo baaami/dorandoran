@@ -17,15 +17,14 @@ func declareChatExchange(ch *amqp.Channel) error {
 	)
 }
 
-// 현재 여기서는 chat.latest 라우팅 키를 위해서만 사용됨 -> 변경이 필요해보임
-func declareExchange(ch *amqp.Channel) error {
-	return ch.ExchangeDeclare(
-		"app_topic", // name
-		"topic",     // type
-		true,        // durable?
-		false,       // auto-deleted?
-		false,       // internal?
-		false,       // no-wait?
-		nil,         // arguements?
+func DeclareExchange(channel *amqp.Channel, exchangeConfig ExchangeConfig) error {
+	return channel.ExchangeDeclare(
+		exchangeConfig.Name, // Exchange 이름
+		exchangeConfig.Type, // Exchange 타입 (topic, fanout 등)
+		true,                // Durable
+		false,               // Auto-deleted
+		false,               // Internal
+		false,               // No-wait
+		nil,                 // Arguments
 	)
 }

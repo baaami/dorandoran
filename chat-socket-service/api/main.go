@@ -55,19 +55,36 @@ func main() {
 		EventChannel: chatEventChannel,
 	}
 
-	// RabbitMQ Consumer
-	chatConsumer, err := event.NewConsumer(rabbitConn)
+	// RoutingConfig 설정
+	routingConfigs := []event.RoutingConfig{
+		{
+			Exchange: event.ExchangeConfig{Name: event.ExchangeAppTopic, Type: "topic"},
+			Keys:     []string{"chat", "chat.latest"},
+		},
+		{
+			Exchange: event.ExchangeConfig{Name: event.ExchangeCoupleRoomCreateEvents, Type: "fanout"},
+			Keys:     []string{}, // fanout 타입은 라우팅 키가 필요 없음
+		},
+	}
+
+	// Consumer 생성
+	chatConsumer, err := event.NewConsumer(rabbitConn, routingConfigs)
 	if err != nil {
-		log.Printf("Failed to make new event consumer: %v", err)
-		os.Exit(1)
+		log.Fatalf("Failed to create RabbitMQ consumer: %v", err)
+	}
+
+	// key: event type, value: handler function
+	handlers := map[string]event.MessageHandler{
+		event.EventTypeChat:             event.ChatMessageHandler,      // 채팅 메시지 핸들러
+		event.EventTypeChatLatest:       event.ChatLatestHandler,       // 최신 채팅 핸들러
+		event.EventTypeCoupleRoomCreate: event.CreateCoupleRoomHandler, // 커플 방 생성 핸들러
 	}
 
 	// RabbitMQ Consumer Listen 고루틴 실행
 	go func() {
-		log.Println("Starting RabbitMQ consumer for chat.latest events")
-		if err := chatConsumer.Listen([]string{"chat", "chat.latest"}, chatEventChannel); err != nil {
-			log.Printf("Failed to start RabbitMQ consumer: %v", err)
-			os.Exit(1)
+		log.Println("Starting RabbitMQ consumer for events")
+		if err := chatConsumer.Listen(handlers, chatEventChannel); err != nil {
+			log.Fatalf("Failed to start RabbitMQ consumer: %v", err)
 		}
 	}()
 

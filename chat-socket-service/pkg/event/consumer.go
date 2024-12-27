@@ -9,13 +9,15 @@ import (
 )
 
 type Consumer struct {
-	conn *amqp.Connection
+	conn           *amqp.Connection
+	routingConfigs []RoutingConfig // Exchange와 Routing Key 설정
 }
 
 // NewConsumer 함수: RabbitMQ Consumer 초기화
-func NewConsumer(conn *amqp.Connection) (*Consumer, error) {
+func NewConsumer(conn *amqp.Connection, routingConfigs []RoutingConfig) (*Consumer, error) {
 	consumer := &Consumer{
-		conn: conn,
+		conn:           conn,
+		routingConfigs: routingConfigs,
 	}
 
 	err := consumer.setup()
@@ -27,128 +29,113 @@ func NewConsumer(conn *amqp.Connection) (*Consumer, error) {
 	return consumer, nil
 }
 
-func (consumer *Consumer) setup() error {
-	channel, err := consumer.conn.Channel()
-	if err != nil {
-		return err
-	}
-
-	// Exchange 선언
-	return declareExchange(channel)
-}
-
-// Listen 함수
-func (c *Consumer) Listen(routingKeys []string, eventChannel chan<- types.WebSocketMessage) error {
-	log.Println("Setting up listener for routing keys:", routingKeys)
-
+func (c *Consumer) setup() error {
 	channel, err := c.conn.Channel()
 	if err != nil {
-		log.Printf("Failed to open channel: %v", err)
 		return err
 	}
 	defer channel.Close()
 
-	// Declare a unique, exclusive queue for this consumer
-	queue, err := channel.QueueDeclare(
-		"",    // Name: empty string for a random name
-		false, // Durable: not persistent
-		false, // Auto-delete: delete when unused
-		true,  // Exclusive: this consumer only
-		false, // No-wait
-		nil,   // Arguments
-	)
-	if err != nil {
-		log.Printf("Failed to declare queue: %v", err)
-		return err
-	}
-
-	// Bind the queue to all provided routing keys
-	for _, key := range routingKeys {
-		err = channel.QueueBind(
-			queue.Name,
-			key,         // Routing key
-			"app_topic", // Exchange name
-			false,       // No-wait
-			nil,         // Arguments
-		)
+	// 모든 Exchanges 선언
+	for _, config := range c.routingConfigs {
+		err := DeclareExchange(channel, config.Exchange)
 		if err != nil {
-			log.Printf("Failed to bind queue to routing key %s: %v", key, err)
+			log.Printf("Failed to declare exchange %s: %v", config.Exchange.Name, err)
 			return err
 		}
-		log.Printf("Queue %s bound to routing key %s", queue.Name, key)
 	}
+	return nil
+}
 
-	// Consume messages from the queue
-	messages, err := channel.Consume(
-		queue.Name, // Queue name
-		"",         // Consumer tag
-		true,       // Auto-acknowledge
-		false,      // Exclusive
-		false,      // No-local
-		false,      // No-wait
-		nil,        // Arguments
-	)
+// Listen 함수
+func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<- types.WebSocketMessage) error {
+	channel, err := c.conn.Channel()
 	if err != nil {
-		log.Printf("Failed to consume messages: %v", err)
 		return err
 	}
+	defer channel.Close()
 
-	// Start processing messages
-	go func() {
-		for d := range messages {
-			log.Printf("Message received: %s", string(d.Body))
+	for _, config := range c.routingConfigs {
+		queue, err := channel.QueueDeclare("", false, false, true, false, nil)
+		if err != nil {
+			return err
+		}
 
-			// Unmarshal the message into the EventPayload struct
-			var payload types.EventPayload
-			err := json.Unmarshal(d.Body, &payload)
+		for _, key := range config.Keys {
+			err := channel.QueueBind(queue.Name, key, config.Exchange.Name, false, nil)
 			if err != nil {
-				log.Printf("Failed to unmarshal message: %v", err)
-				continue
-			}
-
-			// Process the event payload based on its EventType
-			if payload.EventType == "chat" {
-				var chatMsg types.ChatEvent
-				if err := json.Unmarshal(payload.Data, &chatMsg); err != nil {
-					log.Printf("Failed to unmarshal chat event: %v", err)
-					continue
-				}
-
-				log.Printf("Send chat msg: %s to RoomID: %s", chatMsg.Message, chatMsg.RoomID)
-
-				wsMessage := types.WebSocketMessage{
-					Kind:    types.MessageKindMessage,
-					Payload: json.RawMessage(payload.Data),
-				}
-
-				eventChannel <- wsMessage
-			} else if payload.EventType == "chat.latest" {
-				var chatLatest types.ChatLatestEvent
-				if err := json.Unmarshal(payload.Data, &chatLatest); err != nil {
-					log.Printf("Failed to unmarshal chat.latest event: %v", err)
-					continue
-				}
-
-				log.Printf("Send chat.latest event for RoomID: %s", chatLatest.RoomID)
-
-				payload, err := json.Marshal(types.ChatLatestEvent{
-					RoomID: chatLatest.RoomID,
-				})
-				if err != nil {
-					log.Printf("Failed to marshal payload for chat.latest event: %v", err)
-					continue
-				}
-
-				wsMessage := types.WebSocketMessage{
-					Kind:    types.MessageKindChatLastest,
-					Payload: json.RawMessage(payload),
-				}
-
-				eventChannel <- wsMessage
+				log.Printf("Failed to bind queue %s to routing key %s: %v", queue.Name, key, err)
+				return err
 			}
 		}
-	}()
 
-	log.Printf("Listening for messages on exchange 'app_topic' with routing keys: %v", routingKeys)
+		messages, err := channel.Consume(queue.Name, "", true, false, false, false, nil)
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			for d := range messages {
+				var payload types.EventPayload
+				if err := json.Unmarshal(d.Body, &payload); err != nil {
+					log.Printf("Failed to unmarshal message: %v", err)
+					continue
+				}
+
+				if handler, ok := handlers[payload.EventType]; ok {
+					handler(payload, eventChannel)
+				} else {
+					log.Printf("No handler for event type: %s", payload.EventType)
+				}
+			}
+		}()
+	}
 	select {} // Block forever
+}
+
+type MessageHandler func(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage)
+
+// event: chat
+func ChatMessageHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
+	var chatMsg types.ChatEvent
+	if err := json.Unmarshal(payload.Data, &chatMsg); err != nil {
+		log.Printf("Failed to unmarshal chat event: %v", err)
+		return
+	}
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindMessage,
+		Payload: json.RawMessage(payload.Data),
+	}
+	eventChannel <- wsMessage
+}
+
+// event: chat.latest
+func ChatLatestHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
+	var chatLatest types.ChatLatestEvent
+	if err := json.Unmarshal(payload.Data, &chatLatest); err != nil {
+		log.Printf("Failed to unmarshal chat.latest event: %v", err)
+		return
+	}
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindChatLastest,
+		Payload: json.RawMessage(payload.Data),
+	}
+	eventChannel <- wsMessage
+}
+
+// event: room.couple.create
+func CreateCoupleRoomHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
+	var coupleRoomEvent types.ChatRoom
+	if err := json.Unmarshal(payload.Data, &coupleRoomEvent); err != nil {
+		log.Printf("Failed to unmarshal chat.latest event: %v", err)
+		return
+	}
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindCoupleMatchSuccess,
+		Payload: json.RawMessage(payload.Data),
+	}
+	eventChannel <- wsMessage
 }

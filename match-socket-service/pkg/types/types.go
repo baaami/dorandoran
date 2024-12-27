@@ -44,6 +44,7 @@ type User struct {
 
 type MatchEvent struct {
 	MatchId      string        `bson:"match_id" json:"match_id"`
+	MatchType    int           `bson:"match_type" json:"match_type"`
 	MatchedUsers []WaitingUser `bson:"matched_users" json:"matched_users"`
 }
 

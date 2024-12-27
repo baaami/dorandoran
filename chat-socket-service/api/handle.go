@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -156,7 +158,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 // TODO: or 모든 클라이언트에서 timeout이 발생하였을 때 최종 선택을 시작하도록 한다.
 func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
 	message := types.WebSocketMessage{
-		Kind: "final_choice_start",
+		Kind: types.MessageKindFinalChoiceStart,
 	}
 
 	// Room 사용자에게 브로드캐스트
@@ -197,10 +199,99 @@ func (app *Config) BroadcastFinalChoices(roomID string) error {
 		return fmt.Errorf("failed to broadcast choices to room %s: %v", roomID, err)
 	}
 
+	var matchMap sync.Map
+	var couples []types.Couple
+
+	for _, userChoice := range finalChoices.Choices {
+		matchMap.LoadOrStore(userChoice.UserID, userChoice.SelectedUserID)
+	}
+
+	for _, userChoice := range finalChoices.Choices {
+		// 선택된 사용자 ID를 확인
+		selectedUserID := userChoice.SelectedUserID
+		userID := userChoice.UserID
+
+		// 현재 사용자를 선택한 사용자가 matchMap에 있는지 확인
+		if matchedUserID, ok := matchMap.Load(selectedUserID); ok && matchedUserID == userID {
+			// 상호 선택된 경우 커플로 추가
+			couples = append(couples, types.Couple{
+				UserID1: userID,
+				UserID2: selectedUserID,
+			})
+		}
+
+		// matchMap에 사용자 추가
+		matchMap.Store(userID, selectedUserID)
+	}
+
+	// 커플 데이터를 로그로 확인
+	log.Printf("Generated couples for room %s: %+v", roomID, couples)
+
+	err = app.createCoupleRoomEvent(couples)
+	if err != nil {
+		return fmt.Errorf("failed to createCoupleRoomEvents, err: %v", err)
+	}
+
 	app.RedisClient.ClearFinalChoiceRoom(roomID)
 
 	log.Printf("Broadcasted final choices to room %s", roomID)
 	return nil
+}
+
+func (app *Config) createCoupleRoomEvent(couples []types.Couple) error {
+	for _, couple := range couples {
+		var matchedMales []types.WaitingUser
+		var matchedFemales []types.WaitingUser
+
+		user1, err := GetWaitingUserInfo(couple.UserID1)
+		if err != nil {
+			log.Printf("Failed to GetWaitingUserInfo, err: %v", err.Error())
+			continue
+		}
+
+		user2, err := GetWaitingUserInfo(couple.UserID2)
+		if err != nil {
+			log.Printf("Failed to GetWaitingUserInfo, err: %v", err.Error())
+			continue
+		}
+
+		if user1.Gender == types.MALE {
+			matchedMales = append(matchedMales, *user1)
+			matchedFemales = append(matchedFemales, *user2)
+		} else {
+			matchedMales = append(matchedMales, *user2)
+			matchedFemales = append(matchedFemales, *user1)
+		}
+
+		// 매칭 ID 생성
+		matchID := generateMatchID(matchedMales, matchedFemales)
+
+		matchEvent := types.MatchEvent{
+			MatchId:      matchID,
+			MatchType:    types.MATCH_COUPLE,
+			MatchedUsers: append(matchedMales, matchedFemales...),
+		}
+
+		err = app.ChatEmitter.PublishMatchEvent(matchEvent)
+		if err != nil {
+			log.Printf("Failed to PublishMatchEvent, err: %v", err.Error())
+		}
+	}
+	return nil
+}
+
+// generateMatchID creates a unique match ID based on datetime and user IDs
+func generateMatchID(males, females []types.WaitingUser) string {
+	timestamp := time.Now().Format("20060102150405")
+	var userIDs []string
+	for _, user := range append(males, females...) {
+		userIDs = append(userIDs, strconv.Itoa(user.ID))
+	}
+	return fmt.Sprintf("%s_%s", timestamp, joinIDs(userIDs))
+}
+
+func joinIDs(ids []string) string {
+	return strings.Join(ids, "_")
 }
 
 func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds []string) error {
@@ -238,6 +329,18 @@ func (app *Config) sendMessageToRoom(roomID string, message types.WebSocketMessa
 			if !app.sendMessageToClient(client.(*Client), message) {
 				log.Printf("Failed to send message to user %v in room %s", activeUserID, roomID)
 			}
+		}
+	}
+
+	return nil
+}
+
+func (app *Config) sendMessageToUser(userID string, message types.WebSocketMessage) error {
+
+	if client, ok := app.ChatClients.Load(userID); ok {
+		log.Printf("Send Realtime Chat Socket to id: %s, kind: %s", userID, message.Kind)
+		if !app.sendMessageToClient(client.(*Client), message) {
+			log.Printf("Failed to send message to user id %v", userID)
 		}
 	}
 
@@ -430,11 +533,15 @@ func (app *Config) SendSocketByChatEvents() {
 	for event := range app.EventChannel {
 		switch event.Kind {
 		case types.MessageKindChatLastest:
-			if err := app.handleChatLatestEvent(event.Payload); err != nil {
+			if err := app.handleChatLatestMessage(event.Payload); err != nil {
 				log.Printf("Failed to handle chat.latest event: %v", err)
 			}
 		case types.MessageKindMessage:
-			if err := app.handleChatEvent(event.Payload); err != nil {
+			if err := app.handleChatMessage(event.Payload); err != nil {
+				log.Printf("Failed to handle chat event: %v", err)
+			}
+		case types.MessageKindCoupleMatchSuccess:
+			if err := app.handleCoupleMatchSuccessMessage(event.Payload); err != nil {
 				log.Printf("Failed to handle chat event: %v", err)
 			}
 		default:
@@ -444,7 +551,7 @@ func (app *Config) SendSocketByChatEvents() {
 }
 
 // RabbitMQ 소비자로부터 발생한 chat.latest 이벤트 처리 함수
-func (app *Config) handleChatLatestEvent(payload json.RawMessage) error {
+func (app *Config) handleChatLatestMessage(payload json.RawMessage) error {
 	var chatLatest types.ChatLatestEvent
 	if err := json.Unmarshal(payload, &chatLatest); err != nil {
 		return fmt.Errorf("failed to unmarshal chat.latest payload: %w", err)
@@ -465,7 +572,7 @@ func (app *Config) handleChatLatestEvent(payload json.RawMessage) error {
 }
 
 // RabbitMQ 소비자로부터 발생한 chat 이벤트 처리 함수
-func (app *Config) handleChatEvent(payload json.RawMessage) error {
+func (app *Config) handleChatMessage(payload json.RawMessage) error {
 	var chatMsg types.ChatEvent
 	if err := json.Unmarshal(payload, &chatMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal chat payload: %w", err)
@@ -483,4 +590,85 @@ func (app *Config) handleChatEvent(payload json.RawMessage) error {
 	}
 
 	return nil
+}
+
+func (app *Config) handleCoupleMatchSuccessMessage(payload json.RawMessage) error {
+	var chatRoom types.ChatRoom
+	if err := json.Unmarshal(payload, &chatRoom); err != nil {
+		return fmt.Errorf("failed to unmarshal chat payload: %w", err)
+	}
+
+	log.Printf("Broadcasting couple match success event, room id: %s, user id: %v", chatRoom.ID, chatRoom.Users)
+
+	CoupleMatchSuccessMsg := types.CoupleMatchSuccessMessage{
+		RoomID: chatRoom.ID,
+	}
+
+	data, err := json.Marshal(CoupleMatchSuccessMsg)
+	if err != nil {
+		log.Printf("Failed to marshal CoupleMatchSuccessMsg data: %v", err)
+		return err
+	}
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindCoupleMatchSuccess,
+		Payload: data,
+	}
+
+	for _, userID := range chatRoom.Users {
+		err := app.sendMessageToUser(userID, wsMessage)
+		if err != nil {
+			log.Printf("failed to sendMessageToUser, userID: %s", userID)
+			continue
+		}
+	}
+
+	return nil
+}
+
+// [Bridge user] 유저 정보 조회
+func GetWaitingUserInfo(userID string) (*types.WaitingUser, error) {
+	var user types.User
+
+	// Matching 필터 획득
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, "http://user-service/find", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 사용자 ID를 요청의 헤더에 추가
+	req.Header.Set("X-User-ID", userID)
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	waitingUser := types.WaitingUser{
+		ID:          user.ID,
+		Gender:      user.Gender,
+		Birth:       user.Birth,
+		Address:     types.Address(user.Address),
+		CoupleCount: 2,
+	}
+
+	return &waitingUser, nil
 }
