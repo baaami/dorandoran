@@ -95,15 +95,24 @@ func main() {
 		RoomManager: roomManager,
 	}
 
-	matchConsumer, err := event.NewConsumer(rabbitConn)
+	consumerExchanges := []event.ExchangeConfig{
+		{Name: "match_events", Type: "fanout"},
+	}
+
+	consumer, err := event.NewConsumer(rabbitConn, consumerExchanges)
 	if err != nil {
 		log.Printf("Failed to make new match consumer: %v", err)
 		os.Exit(1)
 	}
 
+	// 핸들러 설정
+	handlers := map[string]event.MessageHandler{
+		"match": event.MatchEventHandler,
+	}
+
 	go func() {
 		log.Println("Starting RabbitMQ consumer for matching events")
-		if err := matchConsumer.Listen(chatRoomChan); err != nil {
+		if err := consumer.Listen(handlers, chatRoomChan); err != nil {
 			log.Printf("Failed to start RabbitMQ consumer: %v", err)
 			os.Exit(1)
 		}

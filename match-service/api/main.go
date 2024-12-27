@@ -26,7 +26,11 @@ func main() {
 	}
 	defer rabbitConn.Close()
 
-	emitter, err := event.NewEmitter(rabbitConn)
+	exchanges := []event.ExchangeConfig{
+		{Name: "match_events", Type: "fanout"},
+	}
+
+	emitter, err := event.NewEmitter(rabbitConn, exchanges)
 	if err != nil {
 		log.Fatalf("Failed to initialize RabbitMQ emitter: %v", err)
 	}

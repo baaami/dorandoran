@@ -5,38 +5,30 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/baaami/dorandoran/chat-socket-service/pkg/types"
+	"github.com/baaami/dorandoran/match-service/pkg/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
+// Emitter 구조체
 type Emitter struct {
 	connection *amqp.Connection
 	exchanges  map[string]ExchangeConfig
 }
 
-func (e *Emitter) setup() error {
-	channel, err := e.connection.Channel()
-	if err != nil {
-		return err
-	}
-
-	defer channel.Close()
-	return declareChatExchange(channel)
-}
-
+// NewEmitter 함수: Emitter 초기화
 func NewEmitter(conn *amqp.Connection, exchanges []ExchangeConfig) (*Emitter, error) {
 	emitter := &Emitter{
 		connection: conn,
 		exchanges:  make(map[string]ExchangeConfig),
 	}
 
-	// Exchange 설정
 	channel, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open channel: %v", err)
 	}
 	defer channel.Close()
 
+	// Exchange 설정
 	for _, exchange := range exchanges {
 		err := channel.ExchangeDeclare(
 			exchange.Name,
@@ -58,7 +50,7 @@ func NewEmitter(conn *amqp.Connection, exchanges []ExchangeConfig) (*Emitter, er
 }
 
 // publish 함수: 메시지 발행
-func (e *Emitter) publish(exchangeName, routingKey string, payload types.EventPayload) error {
+func (e *Emitter) publish(exchangeName, routingKey string, payload EventPayload) error {
 	channel, err := e.connection.Channel()
 	if err != nil {
 		return fmt.Errorf("failed to open channel: %v", err)
@@ -71,12 +63,12 @@ func (e *Emitter) publish(exchangeName, routingKey string, payload types.EventPa
 		return fmt.Errorf("failed to marshal payload: %v", err)
 	}
 
-	// 메시지 전송
+	// 메시지 발행
 	err = channel.Publish(
-		exchangeName, // Exchange
-		routingKey,   // Routing Key
-		false,        // Mandatory
-		false,        // Immediate
+		exchangeName,
+		routingKey,
+		false, // Mandatory
+		false, // Immediate
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        messageBody,
@@ -90,25 +82,16 @@ func (e *Emitter) publish(exchangeName, routingKey string, payload types.EventPa
 	return nil
 }
 
-// PushChatToQueue 함수: 채팅 이벤트 발행
-func (e *Emitter) PushChatToQueue(chatEventMsg types.ChatEvent) error {
-	payload := types.EventPayload{
-		EventType: "chat",
-		Data:      toJSON(chatEventMsg),
+// PublishMatchEvent 함수: match 이벤트 발행
+func (e *Emitter) PublishMatchEvent(event types.MatchEvent) error {
+	payload := EventPayload{
+		EventType: "match",
+		Data:      toJSON(event),
 	}
-	return e.publish("app_topic", "chat", payload)
+	return e.publish("match_events", "", payload)
 }
 
-// PushRoomJoinToQueue 함수: 방 참가 이벤트 발행
-func (e *Emitter) PushRoomJoinToQueue(roomJoinMsg types.RoomJoinEvent) error {
-	payload := types.EventPayload{
-		EventType: "room.join",
-		Data:      toJSON(roomJoinMsg),
-	}
-	return e.publish("app_topic", "room.join", payload)
-}
-
-// Helper 함수: 데이터를 JSON 형식으로 변환
+// toJSON 함수: 데이터를 JSON으로 변환
 func toJSON(data interface{}) json.RawMessage {
 	bytes, err := json.Marshal(data)
 	if err != nil {
@@ -116,15 +99,4 @@ func toJSON(data interface{}) json.RawMessage {
 		return nil
 	}
 	return json.RawMessage(bytes)
-}
-
-func (e *Emitter) PublishMatchEvent(event types.MatchEvent) error {
-	// EventPayload 생성
-	payload := types.EventPayload{
-		EventType: "match",
-		Data:      toJSON(event), // MatchEvent 데이터를 JSON으로 직렬화
-	}
-
-	// 메시지 발행
-	return e.publish("match_events", "", payload)
 }

@@ -39,8 +39,14 @@ func main() {
 	}
 	defer rabbitConn.Close()
 
+	exchanges := []event.ExchangeConfig{
+		{Name: "app_topic", Type: "topic"},
+		// TODO: match_events를 topic으로 하여 라우팅 키로 game, couple을 나눠도 될듯
+		{Name: "match_events", Type: "fanout"},
+	}
+
 	// RabbitMQ Emitter 생성
-	chatEmitter, err := event.NewEventEmitter(rabbitConn)
+	chatEmitter, err := event.NewEmitter(rabbitConn, exchanges)
 	if err != nil {
 		log.Fatalf("Failed to create RabbitMQ emitter: %v", err)
 		os.Exit(1)
@@ -51,7 +57,7 @@ func main() {
 
 	app := &Config{
 		RedisClient:  redisClient,
-		ChatEmitter:  &chatEmitter,
+		ChatEmitter:  chatEmitter,
 		EventChannel: chatEventChannel,
 	}
 
