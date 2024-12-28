@@ -42,7 +42,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		room := data.ChatRoom{
 			ID:           chatRoomID,
 			Type:         matchEvent.MatchType,
-			Users:        extractUserIDs(matchEvent.MatchedUsers),
+			UserIDs:      extractUserIDs(matchEvent.MatchedUsers),
 			CreatedAt:    startTime,
 			FinishChatAt: finishTime,
 			ModifiedAt:   startTime,
@@ -59,7 +59,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		roomKey := fmt.Sprintf("room:%s", room.ID)
 
 		// Redis에 채팅방 정보 생성
-		err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, room.Users).Err()
+		err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, IntToStringArray(room.UserIDs)).Err()
 		if err != nil {
 			log.Printf("Failed to add room in redis, err: %s", err.Error())
 			continue
@@ -68,7 +68,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		// 채팅방 타임아웃 설정
 		app.RoomManager.SetRoomTimeout(room.ID, time.Until(room.FinishChatAt))
 
-		log.Printf("Chat room created: %s with users: %v", room.ID, room.Users)
+		log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)
 
 		if matchEvent.MatchType == types.MATCH_GAME {
 			// 채팅방 생성 이벤트 발행
@@ -94,9 +94,17 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 
 // 특정 유저의 채팅방 목록 조회
 func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
 		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
 		return
 	}
 
@@ -117,11 +125,10 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		nUserID, _ := strconv.Atoi(userID)
 		// 읽지 않은 메시지 개수 조회
-		unreadCount, err := app.Models.ChatReader.GetUnreadCountByUserAndRoom(nUserID, room.ID)
+		unreadCount, err := app.Models.ChatReader.GetUnreadCountByUserAndRoom(userID, room.ID)
 		if err != nil {
-			log.Printf("Failed to retrieve unread count for user %s in room %s: %v", userID, room.ID, err)
+			log.Printf("Failed to retrieve unread count for user %d in room %s: %v", userID, room.ID, err)
 			unreadCount = 0
 		}
 
@@ -167,14 +174,14 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 
 	var userList []common.User
 
-	for _, userID := range room.Users {
-		user, err := getUserByUserID(userID)
+	for _, userID := range room.UserIDs {
+		user, err := getUserByUserID(strconv.Itoa(userID))
 		if err != nil {
-			log.Printf("Failed to get user, id: %s, err: %s", userID, err.Error())
+			log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
 			continue
 		}
 		if user == nil {
-			log.Printf("Cannot find user in room, id: %s, room id: %s", userID, roomID)
+			log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
 			continue
 		}
 
@@ -279,15 +286,23 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 
 // 채팅방 나가기
 func (app *Config) leaveChatRoom(w http.ResponseWriter, r *http.Request) {
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
 		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
 		return
 	}
 
 	roomID := chi.URLParam(r, "id")
 
-	err := app.Models.ChatRoom.LeaveRoom(roomID, userID)
+	err = app.Models.ChatRoom.LeaveRoom(roomID, userID)
 	if err != nil {
 		http.Error(w, "Failed to leave chat room", http.StatusInternalServerError)
 		return
@@ -297,9 +312,9 @@ func (app *Config) leaveChatRoom(w http.ResponseWriter, r *http.Request) {
 	roomKey := fmt.Sprintf("room:%s", roomID)
 
 	// Redis에서 유저 제거
-	err = app.RoomManager.RedisClient.Client.SRem(ctx, roomKey, userID).Err()
+	err = app.RoomManager.RedisClient.Client.SRem(ctx, roomKey, strconv.Itoa(userID)).Err()
 	if err != nil {
-		log.Printf("Failed to remove user %s from Redis room %s: %v", userID, roomKey, err)
+		log.Printf("Failed to remove user %d from Redis room %s: %v", userID, roomKey, err)
 		http.Error(w, "Failed to update Redis room", http.StatusInternalServerError)
 		return
 	}
@@ -356,26 +371,20 @@ func (app *Config) addChatMsg(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Chat message from %d in room[%s]", chat.SenderID, chat.RoomID)
 }
 
-func (app *Config) addChatReaders(messageID primitive.ObjectID, roomID string, readerIDs []string, readAt time.Time) error {
+func (app *Config) addChatReaders(messageID primitive.ObjectID, roomID string, readerIDs []int, readAt time.Time) error {
 	for _, userID := range readerIDs {
-		userIDInt, err := strconv.Atoi(userID)
-		if err != nil {
-			log.Printf("Invalid user ID %s: %v", userID, err)
-			return fmt.Errorf("invalid user ID: %w", err)
-		}
-
 		// ChatReader 데이터 생성
 		reader := data.ChatReader{
 			MessageId: messageID,
 			RoomID:    roomID,
-			UserId:    userIDInt,
+			UserId:    userID,
 			ReadAt:    readAt,
 		}
 
 		// 데이터베이스에 삽입
-		err = app.Models.ChatReader.Insert(reader)
+		err := app.Models.ChatReader.Insert(reader)
 		if err != nil {
-			log.Printf("Failed to insert ChatReader for user %d: %v", userIDInt, err)
+			log.Printf("Failed to insert ChatReader for user %d: %v", userID, err)
 			return fmt.Errorf("failed to insert ChatReader: %w", err)
 		}
 	}
@@ -442,17 +451,9 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Processing RoomJoinEvent: %+v", roomJoinEvent)
 
-	// UserID를 숫자로 변환
-	userID, err := strconv.Atoi(roomJoinEvent.UserID)
-	if err != nil {
-		log.Printf("Invalid user ID %s: %v", roomJoinEvent.UserID, err)
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
-		return
-	}
-
 	// TODO: 메시지를 가져오지 않고 바로 작업을 할 수 있지 않을까??
 	// 읽지 않은 JoinAt 이전의 메시지 가져오기
-	messages, err := app.Models.Chat.GetUnreadMessagesBefore(roomJoinEvent.RoomID, roomJoinEvent.JoinAt, userID)
+	messages, err := app.Models.Chat.GetUnreadMessagesBefore(roomJoinEvent.RoomID, roomJoinEvent.JoinAt, roomJoinEvent.UserID)
 	if err != nil {
 		log.Printf("Failed to get messages for RoomID %s: %v", roomJoinEvent.RoomID, err)
 		http.Error(w, "Failed to get messages", http.StatusInternalServerError)
@@ -466,7 +467,7 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 		reader := data.ChatReader{
 			MessageId: message.MessageId,
 			RoomID:    roomJoinEvent.RoomID,
-			UserId:    userID,
+			UserId:    roomJoinEvent.UserID,
 			ReadAt:    roomJoinEvent.JoinAt,
 		}
 
@@ -492,7 +493,7 @@ func (app *Config) handleRoomJoin(w http.ResponseWriter, r *http.Request) {
 			RoomID: roomJoinEvent.RoomID,
 		})
 
-		log.Printf("Successfully processed RoomJoinEvent for RoomID: %s, UserID: %d", roomJoinEvent.RoomID, userID)
+		log.Printf("Successfully processed RoomJoinEvent for RoomID: %s, UserID: %d", roomJoinEvent.RoomID, roomJoinEvent.UserID)
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -566,10 +567,10 @@ func getUserByUserID(userID string) (*common.User, error) {
 	return &user, nil
 }
 
-func extractUserIDs(users []types.WaitingUser) []string {
-	ids := make([]string, len(users))
+func extractUserIDs(users []types.WaitingUser) []int {
+	ids := make([]int, len(users))
 	for i, user := range users {
-		ids[i] = strconv.Itoa(user.ID)
+		ids[i] = user.ID
 	}
 	return ids
 }

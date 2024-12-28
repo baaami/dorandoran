@@ -146,7 +146,7 @@ func ChatRoomCreateHandler(payload types.EventPayload, eventChannel chan<- types
 	}
 
 	// 로그 출력
-	log.Printf("Chat Room Created: ID=%s, Users=%v", chatRoom.ID, chatRoom.Users)
+	log.Printf("Chat Room Created: ID=%s, Users=%v", chatRoom.ID, chatRoom.UserIDs)
 
 	eventChannel <- chatRoom
 }

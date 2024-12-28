@@ -42,7 +42,12 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "WebSocket upgrade failed")
 	}
 
-	userID := c.Request().Header.Get("X-User-ID")
+	xUserID := c.Request().Header.Get("X-User-ID")
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		return err
+	}
 
 	app.RegisterChatClient(conn, userID)
 	defer func() {
@@ -67,7 +72,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 }
 
 // 메시지 읽기 처리
-func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, userID string) {
+func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, userID int) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,18 +114,13 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 	}
 }
 
-func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string) {
+func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID int) {
 	var broadCastMsg types.ChatMessage
 	if err := json.Unmarshal(payload, &broadCastMsg); err != nil {
 		log.Printf("Failed to unmarshal broadcast message: %v", err)
 		return
 	}
 
-	nUserID, err := strconv.Atoi(userID)
-	if err != nil {
-		log.Printf("Failed to atoi, userid: %s, err: %s", userID, err.Error())
-		return
-	}
 	// 활성 사용자 ID 리스트 가져오기
 	activeUserIDs, err := app.RedisClient.GetActiveUserIDs(broadCastMsg.RoomID)
 	if err != nil {
@@ -140,7 +140,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID string
 		MessageId:   primitive.NewObjectID(),
 		Type:        types.ChatTypeChat,
 		RoomID:      broadCastMsg.RoomID,
-		SenderID:    nUserID,
+		SenderID:    userID,
 		Message:     broadCastMsg.Message,
 		UnreadCount: broadCastMsg.HeadCnt - len(joinedUserIDs), // 활성 사용자 수를 이용해 UnreadCount 계산
 		CreatedAt:   now,
@@ -306,7 +306,7 @@ func joinIDs(ids []string) string {
 	return strings.Join(ids, "_")
 }
 
-func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds []string) error {
+func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds []int) error {
 	chatEvent := types.ChatEvent{
 		MessageId:   chatMsg.MessageId,
 		Type:        chatMsg.Type,
@@ -337,7 +337,7 @@ func (app *Config) sendMessageToRoom(roomID string, message types.WebSocketMessa
 
 	for _, activeUserID := range activeUserIDs {
 		if client, ok := app.ChatClients.Load(activeUserID); ok {
-			log.Printf("Send Realtime Chat Socket to id: %s, kind: %s", activeUserID, message.Kind)
+			log.Printf("Send Realtime Chat Socket to id: %d, kind: %s", activeUserID, message.Kind)
 			if !app.sendMessageToClient(client.(*Client), message) {
 				log.Printf("Failed to send message to user %v in room %s", activeUserID, roomID)
 			}
@@ -347,10 +347,10 @@ func (app *Config) sendMessageToRoom(roomID string, message types.WebSocketMessa
 	return nil
 }
 
-func (app *Config) sendMessageToUser(userID string, message types.WebSocketMessage) error {
+func (app *Config) sendMessageToUser(userID int, message types.WebSocketMessage) error {
 
 	if client, ok := app.ChatClients.Load(userID); ok {
-		log.Printf("Send Realtime Chat Socket to id: %s, kind: %s", userID, message.Kind)
+		log.Printf("Send Realtime Chat Socket to id: %d, kind: %s", userID, message.Kind)
 		if !app.sendMessageToClient(client.(*Client), message) {
 			log.Printf("Failed to send message to user id %v", userID)
 		}
@@ -370,7 +370,7 @@ func (app *Config) sendMessageToClient(client *Client, message types.WebSocketMe
 }
 
 // Join 메시지 처리
-func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
+func (app *Config) handleJoinMessage(payload json.RawMessage, userID int) {
 	var joinMsg types.JoinRoomMessage
 	if err := json.Unmarshal(payload, &joinMsg); err != nil {
 		log.Printf("Failed to unmarshal join message: %v, err: %v", payload, err)
@@ -381,7 +381,7 @@ func (app *Config) handleJoinMessage(payload json.RawMessage, userID string) {
 }
 
 // Leave 메시지 처리
-func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
+func (app *Config) handleLeaveMessage(payload json.RawMessage, userID int) {
 	var leaveMsg types.LeaveRoomMessage
 	if err := json.Unmarshal(payload, &leaveMsg); err != nil {
 		log.Printf("Failed to unmarshal leave message: %v, err: %v", payload, err)
@@ -392,7 +392,7 @@ func (app *Config) handleLeaveMessage(payload json.RawMessage, userID string) {
 }
 
 // 채팅방 타임아웃 메시지 처리
-func (app *Config) handleRoomTimeoutMessage(payload json.RawMessage, userID string) error {
+func (app *Config) handleRoomTimeoutMessage(payload json.RawMessage, userID int) error {
 	var roomTimeoutMsg types.RoomTimeoutMessage
 	if err := json.Unmarshal(payload, &roomTimeoutMsg); err != nil {
 		log.Printf("Failed to unmarshal final choice message: %v, err: %v", payload, err)
@@ -425,7 +425,7 @@ func (app *Config) handleRoomTimeoutMessage(payload json.RawMessage, userID stri
 }
 
 // 최종 선택 메시지 처리
-func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID string) error {
+func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID int) error {
 	var finalChoice types.FinalChoiceMessage
 	if err := json.Unmarshal(payload, &finalChoice); err != nil {
 		log.Printf("Failed to unmarshal final choice message: %v, err: %v", payload, err)
@@ -433,7 +433,7 @@ func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID stri
 	}
 
 	// 최종 선택 완료 이벤트 발생 시
-	err := app.RedisClient.SaveUserChoice(finalChoice.RoomID, userID, strconv.Itoa(finalChoice.SelectedUserID))
+	err := app.RedisClient.SaveUserChoice(finalChoice.RoomID, userID, finalChoice.SelectedUserID)
 	if err != nil {
 		log.Printf("Failed to SaveUserChoice, err: %v", err)
 		return nil
@@ -457,8 +457,8 @@ func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID stri
 	return nil
 }
 
-func (app *Config) JoinRoom(roomID string, userID string) {
-	log.Printf("User %s joined room %s", userID, roomID)
+func (app *Config) JoinRoom(roomID string, userID int) {
+	log.Printf("User %d joined room %s", userID, roomID)
 
 	app.RedisClient.JoinRoom(roomID, userID)
 
@@ -468,7 +468,7 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 		JoinAt: time.Now(),
 	}
 
-	log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %s, time: %v", roomJoinMsg.RoomID, roomJoinMsg.UserID, roomJoinMsg.JoinAt)
+	log.Printf("Pushing room join event to RabbitMQ, roomID: %s, userID: %d, time: %v", roomJoinMsg.RoomID, roomJoinMsg.UserID, roomJoinMsg.JoinAt)
 
 	err := app.ChatEmitter.PushRoomJoinToQueue(types.RoomJoinEvent(roomJoinMsg))
 	if err != nil {
@@ -476,7 +476,7 @@ func (app *Config) JoinRoom(roomID string, userID string) {
 	}
 }
 
-func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
+func (app *Config) RegisterChatClient(conn *websocket.Conn, userID int) {
 	client := &Client{
 		Conn: conn,
 		Send: make(chan interface{}, 256),
@@ -490,15 +490,15 @@ func (app *Config) RegisterChatClient(conn *websocket.Conn, userID string) {
 	// Redis에 활성 사용자로 등록
 	serverID := "unique-server-id" // TODO: 서버의 고유 식별자
 	if err := app.RedisClient.RegisterActiveUser(userID, serverID); err != nil {
-		log.Printf("Failed to register active user %s in Redis: %v", userID, err)
+		log.Printf("Failed to register active user %d in Redis: %v", userID, err)
 	} else {
-		log.Printf("User %s registered as active on server %s", userID, serverID)
+		log.Printf("User %d registered as active on server %s", userID, serverID)
 	}
 
-	log.Printf("User %s register chat server", userID)
+	log.Printf("User %d register chat server", userID)
 }
 
-func (app *Config) UnRegisterChatClient(userID string) {
+func (app *Config) UnRegisterChatClient(userID int) {
 	if clientInterface, ok := app.ChatClients.Load(userID); ok {
 		client := clientInterface.(*Client)
 
@@ -510,12 +510,12 @@ func (app *Config) UnRegisterChatClient(userID string) {
 
 		// Redis에서 활성 사용자 제거
 		if err := app.RedisClient.UnregisterActiveUser(userID); err != nil {
-			log.Printf("Failed to unregister active user %s in Redis: %v", userID, err)
+			log.Printf("Failed to unregister active user %d in Redis: %v", userID, err)
 		} else {
-			log.Printf("User %s unregistered as active", userID)
+			log.Printf("User %d unregistered as active", userID)
 		}
 
-		log.Printf("User %s unregistered chat server", userID)
+		log.Printf("User %d unregistered chat server", userID)
 	}
 }
 
@@ -610,7 +610,7 @@ func (app *Config) handleCoupleMatchSuccessMessage(payload json.RawMessage) erro
 		return fmt.Errorf("failed to unmarshal chat payload: %w", err)
 	}
 
-	log.Printf("Broadcasting couple match success event, room id: %s, user id: %v", chatRoom.ID, chatRoom.Users)
+	log.Printf("Broadcasting couple match success event, room id: %s, user id: %v", chatRoom.ID, chatRoom.UserIDs)
 
 	CoupleMatchSuccessMsg := types.CoupleMatchSuccessMessage{
 		RoomID: chatRoom.ID,
@@ -627,7 +627,7 @@ func (app *Config) handleCoupleMatchSuccessMessage(payload json.RawMessage) erro
 		Payload: data,
 	}
 
-	for _, userID := range chatRoom.Users {
+	for _, userID := range chatRoom.UserIDs {
 		err := app.sendMessageToUser(userID, wsMessage)
 		if err != nil {
 			log.Printf("failed to sendMessageToUser, userID: %s", userID)

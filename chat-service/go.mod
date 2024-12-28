@@ -6,9 +6,9 @@ require (
 	github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
-	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/samber/lo v1.47.0
 	go.mongodb.org/mongo-driver v1.16.1
 )
 

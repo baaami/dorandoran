@@ -36,7 +36,7 @@ type ChatMessage struct {
 type ChatRoom struct {
 	ID           string    `bson:"id" json:"id"` // UUID 사용
 	Type         int       `bson:"type" json:"type"`
-	Users        []string  `bson:"users" json:"users"`
+	UserIDs      []int     `bson:"user_ids" json:"user_ids"`
 	CreatedAt    time.Time `bson:"created_at" json:"created_at"`
 	FinishChatAt time.Time `bson:"finish_chat_at" json:"finish_chat_at"`
 	ModifiedAt   time.Time `bson:"modified_at" json:"modified_at"`
@@ -76,7 +76,7 @@ type ChatEvent struct {
 	SenderID    int                `bson:"sender_id" json:"sender_id"`
 	Message     string             `bson:"message" json:"message"`
 	UnreadCount int                `bson:"unread_count" json:"unread_count"`
-	ReaderIds   []string           `bson:"reader_ids" json:"reader_ids"`
+	ReaderIds   []int              `bson:"reader_ids" json:"reader_ids"`
 	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
 }
 
@@ -133,7 +133,7 @@ type CoupleMatchSuccessMessage struct {
 
 type RoomJoinEvent struct {
 	RoomID string    `bson:"room_id" json:"room_id"`
-	UserID string    `bson:"user_id" json:"user_id"`
+	UserID int       `bson:"user_id" json:"user_id"`
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
 }
 

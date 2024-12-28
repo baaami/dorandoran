@@ -383,7 +383,7 @@ func (c *ChatRoom) DeleteRoom(roomID string) error {
 }
 
 // 채팅방 나가기
-func (c *ChatRoom) LeaveRoom(roomID string, userID string) error {
+func (c *ChatRoom) LeaveRoom(roomID string, userID int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -392,23 +392,23 @@ func (c *ChatRoom) LeaveRoom(roomID string, userID string) error {
 	// Step 1: 방에서 사용자 제거
 	filter := bson.M{"id": roomID}
 	update := bson.M{
-		"$pull": bson.M{"users": userID}, // users 배열에서 userID 제거
+		"$pull": bson.M{"user_ids": userID}, // users 배열에서 userID 제거
 	}
 
 	// 업데이트 실행
 	result, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		log.Printf("Error removing user %s from room %s: %v", userID, roomID, err)
+		log.Printf("Error removing user %d from room %s: %v", userID, roomID, err)
 		return err
 	}
 
 	// Step 2: 업데이트된 방 확인
 	if result.MatchedCount == 0 {
-		log.Printf("No room found with ID %s for user %s to leave", roomID, userID)
+		log.Printf("No room found with ID %s for user %d to leave", roomID, userID)
 		return nil
 	}
 
-	log.Printf("User %s left from room %s", userID, roomID)
+	log.Printf("User %d left from room %s", userID, roomID)
 
 	// Step 4: 모든 유저가 나갔다면 방 삭제
 	// if len(room.Users) == 0 {
@@ -445,13 +445,13 @@ func (c *ChatRoom) GetRoomByID(roomID string) (*ChatRoom, error) {
 }
 
 // 특정 유저의 채팅방 목록 조회
-func (c *ChatRoom) GetRoomsByUserID(userID string) ([]ChatRoom, error) {
+func (c *ChatRoom) GetRoomsByUserID(userID int) ([]ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("rooms")
 	cursor, err := collection.Find(ctx, bson.M{
-		"users": userID,
+		"user_ids": userID,
 	})
 	if err != nil {
 		log.Println("Error finding rooms:", err)

@@ -70,7 +70,7 @@ func main() {
 	go func() {
 		for chatRoom := range eventChannel {
 			// 사용자들에게 매칭 성공 메시지 전송
-			app.sendMatchSuccessMessage(chatRoom.Users, chatRoom.ID)
+			app.sendMatchSuccessMessage(chatRoom.UserIDs, chatRoom.ID)
 		}
 	}()
 

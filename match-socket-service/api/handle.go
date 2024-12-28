@@ -56,11 +56,16 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 
 	log.Println("WebSocket connection established")
 
-	userID := c.Request().Header.Get("X-User-ID")
+	xUserID := c.Request().Header.Get("X-User-ID")
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		return err
+	}
 
 	user, err := GetUserInfo(userID)
 	if err != nil {
-		log.Printf("Failed to get GetUserInfo, user: %s", userID)
+		log.Printf("Failed to get GetUserInfo, user: %d", userID)
 		return err
 	}
 
@@ -75,11 +80,11 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 	// Check if user already exists in the Redis queue
 	exists, queueName, err := app.RedisClient.IsUserInQueue(waitingUser)
 	if err != nil {
-		log.Printf("Error checking user %s in queue: %v", userID, err)
+		log.Printf("Error checking user %d in queue: %v", userID, err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to check user in queue")
 	}
 	if exists {
-		log.Printf("User %s is already in the matching queue (%s)", userID, queueName)
+		log.Printf("User %d is already in the matching queue (%s)", userID, queueName)
 		return echo.NewHTTPError(http.StatusConflict, "User already in matching queue")
 	}
 
@@ -91,7 +96,7 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 
 	defer func() {
 		if err := app.UnRegisterMatchClient(waitingUser); err != nil {
-			log.Printf("Failed to remove user %s from queue: %v", userID, err)
+			log.Printf("Failed to remove user %d from queue: %v", userID, err)
 		}
 		conn.Close()
 	}()
@@ -107,7 +112,7 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 		case <-ctx.Done():
 			// 30초 타임아웃 시 매칭 실패 메시지 전송
 			if ctx.Err() == context.DeadlineExceeded {
-				log.Printf("Matching timed out for user %s", userID)
+				log.Printf("Matching timed out for user %d", userID)
 				app.sendMatchFailureMessage(conn)
 			}
 
@@ -118,7 +123,7 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 					log.Printf("Unexpected WebSocket close error: %v", err)
 				} else if ctx.Err() == context.DeadlineExceeded || isTimeoutError(err) {
-					log.Printf("WebSocket read timeout for user %s", userID)
+					log.Printf("WebSocket read timeout for user %d", userID)
 					app.sendMatchFailureMessage(conn)
 					continue
 				} else {
@@ -173,7 +178,7 @@ func (app *Config) UnRegisterMatchClient(waitingUser types.WaitingUser) error {
 }
 
 // 매칭 성공 메시지 전송 함수
-func (app *Config) sendMatchSuccessMessage(matchUserIDList []string, roomID string) {
+func (app *Config) sendMatchSuccessMessage(matchUserIDList []int, roomID string) {
 	matchMsg := MatchResponse{
 		Type:   PushMessageStatusMatchSuccess,
 		RoomID: roomID,
@@ -193,20 +198,19 @@ func (app *Config) sendMatchSuccessMessage(matchUserIDList []string, roomID stri
 	log.Printf("Match Notify Start!!!")
 
 	for _, userID := range matchUserIDList {
-		nUserID, _ := strconv.Atoi(userID)
-		log.Printf("Try to notify user, %s", userID)
+		log.Printf("Try to notify user, %d", userID)
 
-		if conn, ok := app.MatchClients.Load(nUserID); ok {
+		if conn, ok := app.MatchClients.Load(userID); ok {
 			err := conn.(*websocket.Conn).WriteJSON(webSocketMsg)
 			if err != nil {
-				log.Printf("Failed to notify user %d: %v", nUserID, err)
+				log.Printf("Failed to notify user %d: %v", userID, err)
 			} else {
-				log.Printf("Notified %d about match in room %s", nUserID, roomID)
+				log.Printf("Notified %d about match in room %s", userID, roomID)
 
-				app.MatchClients.Delete(nUserID)
+				app.MatchClients.Delete(userID)
 			}
 		} else {
-			log.Printf("Failed to notify, user %d not connected", nUserID)
+			log.Printf("Failed to notify, user %d not connected", userID)
 		}
 
 	}
@@ -238,7 +242,7 @@ func (app *Config) sendMatchFailureMessage(conn *websocket.Conn) {
 }
 
 // [Bridge user] 유저 정보 조회
-func GetUserInfo(userID string) (*types.User, error) {
+func GetUserInfo(userID int) (*types.User, error) {
 	var user types.User
 
 	// Matching 필터 획득
@@ -250,7 +254,7 @@ func GetUserInfo(userID string) (*types.User, error) {
 	}
 
 	// 사용자 ID를 요청의 헤더에 추가
-	req.Header.Set("X-User-ID", userID)
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
 
 	// 요청 실행
 	resp, err := client.Do(req)

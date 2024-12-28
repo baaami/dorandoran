@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/rs/zerolog v1.33.0
+	github.com/samber/lo v1.47.0
 	go.mongodb.org/mongo-driver v1.17.1
 )
 

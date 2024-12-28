@@ -32,14 +32,20 @@ func (app *Config) findUserList(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 조회
 func (app *Config) findUser(w http.ResponseWriter, r *http.Request) {
-
-	userIDStr := r.Header.Get("X-User-ID")
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
-		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
 		return
 	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		return
+	}
+
 	// DB에서 유저 정보 조회
 	user, err := app.Models.GetUserByID(userID)
 	if err != nil {
@@ -145,11 +151,17 @@ func (app *Config) registerUser(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 업데이트
 func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	userID, err := strconv.Atoi(userIDStr)
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
 	if err != nil {
-		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
-		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
 		return
 	}
 
@@ -189,11 +201,17 @@ func (app *Config) updateUser(w http.ResponseWriter, r *http.Request) {
 
 // 유저 정보 삭제
 func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	userID, err := strconv.Atoi(userIDStr)
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
 	if err != nil {
-		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
-		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
 		return
 	}
 
@@ -213,13 +231,20 @@ func (app *Config) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 // 자신의 매칭 필터 정보 조회
 func (app *Config) findMatchFilter(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
-		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
 		return
 	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		return
+	}
+
 	// DB에서 매치 필터 정보 조회
 	matchFilter, err := app.Models.GetMatchFilterByUserID(userID)
 	if err != nil {
@@ -240,11 +265,17 @@ func (app *Config) findMatchFilter(w http.ResponseWriter, r *http.Request) {
 
 // 자신의 매칭 필터 업데이트
 func (app *Config) updateMatchFilter(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	userID, err := strconv.Atoi(userIDStr)
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
 	if err != nil {
-		log.Printf("Failed to Atoi user ID, err: %s", err.Error())
-		http.Error(w, "Failed to Atoi user ID", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
 		return
 	}
 
