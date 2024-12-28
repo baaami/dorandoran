@@ -174,6 +174,7 @@ func (consumer *Consumer) Listen(routingkeys []string) error {
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
 				handleChatAddPayload(chatMsg)
 
+			// TODO: 사용하는 이벤트 타입인지??
 			case "chat.read":
 				var readEvent ChatReadersEvent
 				if err := json.Unmarshal(eventPayload.Data, &readEvent); err != nil {

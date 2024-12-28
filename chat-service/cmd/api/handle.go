@@ -263,11 +263,44 @@ func (app *Config) deleteChatRoom(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	roomKey := fmt.Sprintf("room:%s", roomID)
 
-	// Redis에 채팅방 정보 생성
+	// Redis에 채팅방 정보 삭제
 	err = app.RoomManager.RedisClient.Client.Del(ctx, roomKey).Err()
 	if err != nil {
 		http.Error(w, "Failed to delete room in redis", http.StatusInternalServerError)
 		log.Printf("Failed to delete room in redis, err: %s", err.Error())
+		return
+	}
+
+	// TODO: 채팅방 삭제 이벤트 발행
+
+	w.WriteHeader(http.StatusOK)
+	log.Printf("Chat room deleted, roomID: %s", roomID)
+}
+
+// 채팅방 나가기
+func (app *Config) leaveChatRoom(w http.ResponseWriter, r *http.Request) {
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		return
+	}
+
+	roomID := chi.URLParam(r, "id")
+
+	err := app.Models.ChatRoom.LeaveRoom(roomID, userID)
+	if err != nil {
+		http.Error(w, "Failed to leave chat room", http.StatusInternalServerError)
+		return
+	}
+
+	ctx := context.Background()
+	roomKey := fmt.Sprintf("room:%s", roomID)
+
+	// Redis에서 유저 제거
+	err = app.RoomManager.RedisClient.Client.SRem(ctx, roomKey, userID).Err()
+	if err != nil {
+		log.Printf("Failed to remove user %s from Redis room %s: %v", userID, roomKey, err)
+		http.Error(w, "Failed to update Redis room", http.StatusInternalServerError)
 		return
 	}
 
