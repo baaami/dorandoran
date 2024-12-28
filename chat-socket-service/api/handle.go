@@ -199,6 +199,8 @@ func (app *Config) BroadcastFinalChoices(roomID string) error {
 		return fmt.Errorf("failed to broadcast choices to room %s: %v", roomID, err)
 	}
 
+	log.Printf("Send %s event, value: %v", types.MessageKindFinalChoiceResult, finalChoiceResults)
+
 	var matchMap sync.Map
 	coupleSet := make(map[string]bool) // 중복 방지를 위한 map
 	var couples []types.Couple
