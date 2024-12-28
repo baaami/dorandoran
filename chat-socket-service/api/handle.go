@@ -177,13 +177,13 @@ func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
 // -> 모든 클라이언트에서 최종 선택 메시지 송신 OR Backend에서 최종 선택 시간이 timeout된 후 모든 클라이언트에게 최종 선택을 받지 못했을 경우 5초간 대기 후 최종 선택을 공개한다.
 func (app *Config) BroadcastFinalChoices(roomID string) error {
 	// Redis에서 선택 결과 조회
-	finalChoices, err := app.RedisClient.GetAllChoices(roomID)
+	finalChoiceResults, err := app.RedisClient.GetAllChoices(roomID)
 	if err != nil {
 		return fmt.Errorf("failed to broadcast final choices: %v", err)
 	}
 
 	// JSON으로 직렬화
-	payload, err := json.Marshal(finalChoices)
+	payload, err := json.Marshal(finalChoiceResults)
 	if err != nil {
 		return fmt.Errorf("failed to marshal final choices: %v", err)
 	}
@@ -200,28 +200,38 @@ func (app *Config) BroadcastFinalChoices(roomID string) error {
 	}
 
 	var matchMap sync.Map
+	coupleSet := make(map[string]bool) // 중복 방지를 위한 map
 	var couples []types.Couple
 
-	for _, userChoice := range finalChoices.Choices {
+	// 매칭 데이터를 matchMap에 저장
+	for _, userChoice := range finalChoiceResults.Choices {
 		matchMap.LoadOrStore(userChoice.UserID, userChoice.SelectedUserID)
 	}
 
-	for _, userChoice := range finalChoices.Choices {
-		// 선택된 사용자 ID를 확인
+	// 매칭 결과로 커플 생성
+	for _, userChoice := range finalChoiceResults.Choices {
 		selectedUserID := userChoice.SelectedUserID
 		userID := userChoice.UserID
 
 		// 현재 사용자를 선택한 사용자가 matchMap에 있는지 확인
 		if matchedUserID, ok := matchMap.Load(selectedUserID); ok && matchedUserID == userID {
-			// 상호 선택된 경우 커플로 추가
-			couples = append(couples, types.Couple{
-				UserID1: userID,
-				UserID2: selectedUserID,
-			})
-		}
+			// 항상 작은 ID가 UserID1, 큰 ID가 UserID2가 되도록 정렬
+			user1, user2 := userID, selectedUserID
+			if user1 > user2 {
+				user1, user2 = user2, user1
+			}
 
-		// matchMap에 사용자 추가
-		matchMap.Store(userID, selectedUserID)
+			// 커플을 문자열로 변환하여 중복 확인
+			coupleKey := fmt.Sprintf("%d-%d", user1, user2)
+			if _, exists := coupleSet[coupleKey]; !exists {
+				// 중복되지 않은 경우에만 추가
+				couples = append(couples, types.Couple{
+					UserID1: user1,
+					UserID2: user2,
+				})
+				coupleSet[coupleKey] = true
+			}
+		}
 	}
 
 	// 커플 데이터를 로그로 확인
