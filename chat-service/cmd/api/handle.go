@@ -122,7 +122,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 		unreadCount, err := app.Models.ChatReader.GetUnreadCountByUserAndRoom(nUserID, room.ID)
 		if err != nil {
 			log.Printf("Failed to retrieve unread count for user %s in room %s: %v", userID, room.ID, err)
-			continue
+			unreadCount = 0
 		}
 
 		lastMessage := data.LastMessage{

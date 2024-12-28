@@ -479,10 +479,15 @@ func (c *Chat) GetLastMessageByRoomID(roomID string) (*Chat, error) {
 
 	collection := client.Database("chat_db").Collection("messages")
 
-	// 최신 메시지를 가져오기 위해 내림차순 정렬
 	var lastMessage Chat
 	err := collection.FindOne(ctx, bson.M{"room_id": roomID}, options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})).Decode(&lastMessage)
-	if err != nil {
+	if err == mongo.ErrNoDocuments {
+		return &Chat{
+			Message:   "",
+			SenderID:  0,
+			CreatedAt: time.Time{},
+		}, nil
+	} else if err != nil {
 		log.Println("Finding last chat message error:", err)
 		return nil, err
 	}
