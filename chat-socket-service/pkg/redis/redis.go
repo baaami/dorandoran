@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/baaami/dorandoran/chat-socket-service/pkg/types"
 	"github.com/go-redis/redis/v8"
@@ -203,9 +204,12 @@ func (r *RedisClient) GetAllChoices(roomID string) (*types.FinalChoiceResultMess
 	// 변환된 데이터 저장
 	var choices []types.UserChoice
 	for userID, selectedUserID := range choicesMap {
+		nUserID, _ := strconv.Atoi(userID)
+		nSelectedUserID, _ := strconv.Atoi(selectedUserID)
+
 		choices = append(choices, types.UserChoice{
-			UserID:         userID,
-			SelectedUserID: selectedUserID,
+			UserID:         nUserID,
+			SelectedUserID: nSelectedUserID,
 		})
 	}
 

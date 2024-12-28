@@ -101,8 +101,8 @@ const (
 )
 
 type UserChoice struct {
-	UserID         string `json:"user_id"`
-	SelectedUserID string `json:"selected_user_id"`
+	UserID         int `json:"user_id"`
+	SelectedUserID int `json:"selected_user_id"`
 }
 
 type FinalChoiceResultMessage struct {
@@ -169,6 +169,6 @@ type User struct {
 }
 
 type Couple struct {
-	UserID1 string `json:"user_id_1"`
-	UserID2 string `json:"user_id_2"`
+	UserID1 int `json:"user_id_1"`
+	UserID2 int `json:"user_id_2"`
 }

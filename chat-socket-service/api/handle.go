@@ -243,13 +243,13 @@ func (app *Config) createCoupleRoomEvent(couples []types.Couple) error {
 		var matchedMales []types.WaitingUser
 		var matchedFemales []types.WaitingUser
 
-		user1, err := GetWaitingUserInfo(couple.UserID1)
+		user1, err := GetWaitingUserInfo(strconv.Itoa(couple.UserID1))
 		if err != nil {
 			log.Printf("Failed to GetWaitingUserInfo, err: %v", err.Error())
 			continue
 		}
 
-		user2, err := GetWaitingUserInfo(couple.UserID2)
+		user2, err := GetWaitingUserInfo(strconv.Itoa(couple.UserID2))
 		if err != nil {
 			log.Printf("Failed to GetWaitingUserInfo, err: %v", err.Error())
 			continue
