@@ -124,7 +124,7 @@ type RoomTimeoutMessage struct {
 
 type FinalChoiceMessage struct {
 	RoomID         string `json:"room_id"`
-	SelectedUserID string `json:"selected_user_id"`
+	SelectedUserID int    `json:"selected_user_id"`
 }
 
 type CoupleMatchSuccessMessage struct {

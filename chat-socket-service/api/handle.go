@@ -421,7 +421,7 @@ func (app *Config) handleFinalChoiceMessage(payload json.RawMessage, userID stri
 	}
 
 	// 최종 선택 완료 이벤트 발생 시
-	err := app.RedisClient.SaveUserChoice(finalChoice.RoomID, userID, finalChoice.SelectedUserID)
+	err := app.RedisClient.SaveUserChoice(finalChoice.RoomID, userID, strconv.Itoa(finalChoice.SelectedUserID))
 	if err != nil {
 		log.Printf("Failed to SaveUserChoice, err: %v", err)
 		return nil
