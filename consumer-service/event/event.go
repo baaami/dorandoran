@@ -16,13 +16,13 @@ func declareExchange(ch *amqp.Channel) error {
 	)
 }
 
-func declareRandomQueue(ch *amqp.Channel) (amqp.Queue, error) {
+func declareAppTopicQueue(ch *amqp.Channel) (amqp.Queue, error) {
 	return ch.QueueDeclare(
-		"",    // name?
-		false, // durable?
-		false, // delete when unused?
-		true,  // exclusive?
-		false, // no-wait?
-		nil,   // arguments?
+		"app_topic_queue", // name?
+		false,             // durable?
+		false,             // delete when unused?
+		true,              // exclusive?
+		false,             // no-wait?
+		nil,               // arguments?
 	)
 }

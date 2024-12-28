@@ -8,3 +8,5 @@ index.html
 match-service/matchApp
 realtime-service/realtimeApp
 consumer-service/consumerApp
+match-socket-service/matchSocketApp
+chat-socket-service/chatSocketApp

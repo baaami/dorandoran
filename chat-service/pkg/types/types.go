@@ -1,16 +1,14 @@
 package types
 
+const (
+	MATCH_GAME = iota
+	MATCH_COUPLE
+)
+
 type Address struct {
 	City     string `gorm:"size:100" json:"city"`
 	District string `gorm:"size:100" json:"district"`
 	Street   string `gorm:"size:100" json:"street"`
-}
-
-type MatchFilter struct {
-	UserID          int  `gorm:"primaryKey" json:"user_id"`
-	CoupleCount     int  `json:"couple_count"`
-	AddressRangeUse bool `json:"address_range_use"`
-	AgeGroupUse     bool `json:"age_group_use"`
 }
 
 type WaitingUser struct {
@@ -22,8 +20,8 @@ type WaitingUser struct {
 	CoupleCount int     `json:"couple_count"`
 }
 
-const (
-	ChatTypeChat  = "chat"
-	ChatTypeJoin  = "join"
-	ChatTypeLeave = "leave"
-)
+type MatchEvent struct {
+	MatchId      string        `bson:"match_id" json:"match_id"`
+	MatchType    int           `bson:"match_type" json:"match_type"`
+	MatchedUsers []WaitingUser `bson:"matched_users" json:"matched_users"`
+}

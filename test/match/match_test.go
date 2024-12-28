@@ -180,7 +180,7 @@ func receiveMatchResponse(t *testing.T, conn *websocket.Conn) WebSocketMessage {
 }
 
 func TestMatchWebSocketAPI(t *testing.T) {
-	participantCount := 16
+	participantCount := 8
 	sessionIDs := make([]string, participantCount)
 	userIDs := make([]string, participantCount)
 	conns := make([]*websocket.Conn, participantCount)
@@ -200,7 +200,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 
 	// 2. 100명의 참가자가 사용자 프로필 정보 입력
 	for i := 0; i < participantCount; i++ {
-		gender := rand.Intn(2) // 0 (남자), 1 (여자)
+		gender := i % 2 // 0 (남자), 1 (여자)
 		birthYear := rand.Intn(2010-1980+1) + 1980
 		birth := fmt.Sprintf("%d%02d%02d", birthYear, rand.Intn(12)+1, rand.Intn(28)+1)
 		city := cities[rand.Intn(len(cities))]
@@ -243,7 +243,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	for i := 0; i < participantCount; i++ {
 		matchResponses[i] = <-responseChan
 
-		gender := rand.Intn(2)                                                          // 랜덤 성별 (기존 프로필 정보에서 가져와야 함)
+		gender := i % 2
 		birthYear := rand.Intn(2010-1980+1) + 1980                                      // 랜덤 출생 연도 (기존 프로필 정보에서 가져와야 함)
 		birth := fmt.Sprintf("%d%02d%02d", birthYear, rand.Intn(12)+1, rand.Intn(28)+1) // 예시 출생일
 

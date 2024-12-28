@@ -382,6 +382,48 @@ func (c *ChatRoom) DeleteRoom(roomID string) error {
 	return nil
 }
 
+// 채팅방 나가기
+func (c *ChatRoom) LeaveRoom(roomID string, userID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("rooms")
+
+	// Step 1: 방에서 사용자 제거
+	filter := bson.M{"id": roomID}
+	update := bson.M{
+		"$pull": bson.M{"users": userID}, // users 배열에서 userID 제거
+	}
+
+	// 업데이트 실행
+	result, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error removing user %s from room %s: %v", userID, roomID, err)
+		return err
+	}
+
+	// Step 2: 업데이트된 방 확인
+	if result.MatchedCount == 0 {
+		log.Printf("No room found with ID %s for user %s to leave", roomID, userID)
+		return nil
+	}
+
+	log.Printf("User %s left from room %s", userID, roomID)
+
+	// Step 4: 모든 유저가 나갔다면 방 삭제
+	// if len(room.Users) == 0 {
+	// 	// TODO: 채팅방 삭제 이벤트 발행
+	// 	_, err = collection.DeleteOne(ctx, bson.M{"id": roomID})
+	// 	if err != nil {
+	// 		log.Printf("Error deleting room %s after all users left: %v", roomID, err)
+	// 		return err
+	// 	}
+	// 	log.Printf("Room %s deleted as all users left", roomID)
+	// }
+
+	return nil
+}
+
 // Room ID로 채팅방 조회
 func (c *ChatRoom) GetRoomByID(roomID string) (*ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -437,10 +479,15 @@ func (c *Chat) GetLastMessageByRoomID(roomID string) (*Chat, error) {
 
 	collection := client.Database("chat_db").Collection("messages")
 
-	// 최신 메시지를 가져오기 위해 내림차순 정렬
 	var lastMessage Chat
 	err := collection.FindOne(ctx, bson.M{"room_id": roomID}, options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})).Decode(&lastMessage)
-	if err != nil {
+	if err == mongo.ErrNoDocuments {
+		return &Chat{
+			Message:   "",
+			SenderID:  0,
+			CreatedAt: time.Time{},
+		}, nil
+	} else if err != nil {
 		log.Println("Finding last chat message error:", err)
 		return nil, err
 	}

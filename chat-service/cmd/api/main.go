@@ -12,6 +12,7 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/baaami/dorandoran/chat/pkg/manager"
 	"github.com/baaami/dorandoran/chat/pkg/redis"
+	"github.com/baaami/dorandoran/chat/pkg/types"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -59,7 +60,13 @@ func main() {
 		}
 	}()
 
-	emitter, err := event.NewEmitter(rabbitConn)
+	exchanges := []event.ExchangeConfig{
+		{Name: event.ExchangeAppTopic, Type: "topic"},
+		{Name: event.ExchangeChatRoomCreateEvents, Type: "fanout"},
+		{Name: event.ExchangeCoupleRoomCreateEvents, Type: "fanout"},
+	}
+
+	emitter, err := event.NewEmitter(rabbitConn, exchanges)
 	if err != nil {
 		log.Printf("Failed to make new event emitter: %v", err)
 		os.Exit(1)
@@ -78,6 +85,8 @@ func main() {
 	// RoomManager 초기화
 	roomManager := manager.NewRoomManager(redisClient, emitter, models)
 
+	chatRoomChan := make(chan types.MatchEvent)
+
 	// Config 구조체 초기화
 	app := Config{
 		Models:      models,
@@ -86,8 +95,33 @@ func main() {
 		RoomManager: roomManager,
 	}
 
-	// 채팅방 타임아웃 이벤트를 발행하기 위한 루프
-	go app.RoomManager.MonitorRoomTimeouts()
+	consumerExchanges := []event.ExchangeConfig{
+		{Name: "match_events", Type: "fanout"},
+	}
+
+	consumer, err := event.NewConsumer(rabbitConn, consumerExchanges)
+	if err != nil {
+		log.Printf("Failed to make new match consumer: %v", err)
+		os.Exit(1)
+	}
+
+	// 핸들러 설정
+	handlers := map[string]event.MessageHandler{
+		"match": event.MatchEventHandler,
+	}
+
+	go func() {
+		log.Println("Starting RabbitMQ consumer for matching events")
+		if err := consumer.Listen(handlers, chatRoomChan); err != nil {
+			log.Printf("Failed to start RabbitMQ consumer: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	go func() {
+		log.Println("Starting ChatRoom creator routine")
+		app.createRoom(chatRoomChan)
+	}()
 
 	// 웹 서버 시작
 	log.Println("Starting Chat Service on port", webPort)

@@ -2,6 +2,7 @@ package event
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/baaami/dorandoran/chat/pkg/data"
@@ -26,177 +27,117 @@ type RoomTimeoutEvent struct {
 // Emitter 구조체 정의
 type Emitter struct {
 	connection *amqp.Connection
+	exchanges  map[string]ExchangeConfig
 }
 
-// NewEmitter 함수: RabbitMQ Emitter 초기화
-func NewEmitter(conn *amqp.Connection) (*Emitter, error) {
+func NewEmitter(conn *amqp.Connection, exchanges []ExchangeConfig) (*Emitter, error) {
 	emitter := &Emitter{
 		connection: conn,
+		exchanges:  make(map[string]ExchangeConfig),
 	}
 
 	channel, err := conn.Channel()
 	if err != nil {
-		log.Printf("Failed to open channel: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to open channel: %v", err)
 	}
+	defer channel.Close()
 
-	err = declareExchange(channel)
-	if err != nil {
-		log.Printf("Failed to declare exchange: %v", err)
-		return nil, err
+	// Declare all exchanges
+	for _, ex := range exchanges {
+		err := channel.ExchangeDeclare(
+			ex.Name,
+			ex.Type,
+			true,  // Durable
+			false, // Auto-deleted
+			false, // Internal
+			false, // No-wait
+			nil,   // Arguments
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to declare exchange %s: %v", ex.Name, err)
+		}
+		emitter.exchanges[ex.Name] = ex
 	}
 
 	return emitter, nil
 }
 
-// PushChatLatestEvent 함수: WebSocket 알림 송신
-func (e *Emitter) PushChatLatestEvent(chatLatest ChatLatestEvent) error {
+func (e *Emitter) publish(exchangeName, routingKey string, payload EventPayload) error {
 	channel, err := e.connection.Channel()
 	if err != nil {
-		log.Printf("Failed to open channel: %v", err)
-		return err
+		return fmt.Errorf("failed to open channel: %v", err)
 	}
 	defer channel.Close()
 
-	// WebSocketNotification을 JSON으로 직렬화
-	data, err := json.Marshal(chatLatest)
+	// Serialize payload
+	messageBody, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("Failed to marshal WebSocket chatLatest data: %v", err)
-		return err
+		return fmt.Errorf("failed to marshal EventPayload: %v", err)
 	}
 
-	// EventPayload 생성
-	eventPayload := EventPayload{
-		EventType: "chat.latest", // 채팅 데이터 최신화 (읽음 처리 완료)
-		Data:      data,          // 알림 데이터
-	}
-
-	// EventPayload를 JSON으로 직렬화
-	messageBody, err := json.Marshal(eventPayload)
-	if err != nil {
-		log.Printf("Failed to marshal EventPayload: %v", err)
-		return err
-	}
-
-	// RabbitMQ 메시지 송신
+	// Publish message
 	err = channel.Publish(
-		"app_topic",   // exchange
-		"chat.latest", // routing key
-		false,         // mandatory
-		false,         // immediate
+		exchangeName, // Exchange
+		routingKey,   // Routing Key
+		false,        // Mandatory
+		false,        // Immediate
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        messageBody,
 		},
 	)
 	if err != nil {
-		log.Printf("Failed to publish WebSocket chatLatest: %v", err)
-		return err
+		return fmt.Errorf("failed to publish event: %v", err)
 	}
 
-	log.Printf("WebSocket chatLatest published: %+v", chatLatest)
+	log.Printf("Event published to exchange %s with routing key %s: %+v", exchangeName, routingKey, payload)
 	return nil
 }
 
-func (e *Emitter) PushRoomRemainTime(roomID string, remaining int) error {
-	channel, err := e.connection.Channel()
-	if err != nil {
-		log.Printf("Failed to open channel: %v", err)
-		return err
+// PublishChatRoomEvent publishes a chat room creation event
+func (e *Emitter) PublishChatRoomCreateEvent(chatRoom data.ChatRoom) error {
+	payload := EventPayload{
+		EventType: EventTypeRoomCreate,
+		Data:      toJSON(chatRoom),
 	}
-	defer channel.Close()
+	return e.publish(ExchangeChatRoomCreateEvents, "", payload)
+}
 
-	// RoomRemainTimeEvent 데이터 생성
+func (e *Emitter) PublishCoupleRoomCreateEvent(chatRoom data.ChatRoom) error {
+	payload := EventPayload{
+		EventType: EventTypeCoupleRoomCreate,
+		Data:      toJSON(chatRoom),
+	}
+	return e.publish(ExchangeCoupleRoomCreateEvents, "", payload)
+}
+
+// 채팅 내용 최신화 필요 이벤트 발행
+func (e *Emitter) PushChatLatestEvent(chatLatest ChatLatestEvent) error {
+	payload := EventPayload{
+		EventType: EventTypeChatLatest,
+		Data:      toJSON(chatLatest),
+	}
+	return e.publish(ExchangeAppTopic, "chat.latest", payload)
+}
+
+// 채팅방 남은시간 이벤트 발행
+func (e *Emitter) PushRoomRemainTime(roomID string, remaining int) error {
 	roomRemainTime := data.RoomRemainingEvent{
 		RoomID:    roomID,
 		Remaining: remaining,
 	}
-
-	// 데이터 직렬화
-	data, err := json.Marshal(roomRemainTime)
-	if err != nil {
-		log.Printf("Failed to marshal RoomRemainTimeEvent data: %v", err)
-		return err
+	payload := EventPayload{
+		EventType: EventTypeRoomRemainTime,
+		Data:      toJSON(roomRemainTime),
 	}
-
-	// EventPayload 생성
-	eventPayload := EventPayload{
-		EventType: "room.remain.time", // 이벤트 타입
-		Data:      data,               // 알림 데이터
-	}
-
-	// EventPayload 직렬화
-	messageBody, err := json.Marshal(eventPayload)
-	if err != nil {
-		log.Printf("Failed to marshal EventPayload: %v", err)
-		return err
-	}
-
-	// RabbitMQ 메시지 송신
-	err = channel.Publish(
-		"app_topic",        // exchange
-		"room.remain.time", // routing key
-		false,              // mandatory
-		false,              // immediate
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        messageBody,
-		},
-	)
-	if err != nil {
-		log.Printf("Failed to publish room.remain.time: %v", err)
-		return err
-	}
-
-	log.Printf("RoomRemainTimeEvent published: %+v", roomRemainTime)
-	return nil
+	return e.publish(ExchangeAppTopic, "room.remain.time", payload)
 }
 
-// RabbitMQ에 방 타임아웃 이벤트 발행
+// 채팅방 타임아웃 이벤트 발행
 func (e *Emitter) PushRoomTimeout(timeoutEvent RoomTimeoutEvent) error {
-	channel, err := e.connection.Channel()
-	if err != nil {
-		log.Printf("Failed to open channel: %v", err)
-		return err
+	payload := EventPayload{
+		EventType: EventTypeRoomTimeout,
+		Data:      toJSON(timeoutEvent),
 	}
-	defer channel.Close()
-
-	// JSON 직렬화
-	data, err := json.Marshal(timeoutEvent)
-	if err != nil {
-		log.Printf("Failed to marshal RoomTimeoutEvent: %v", err)
-		return err
-	}
-
-	// EventPayload 생성
-	eventPayload := EventPayload{
-		EventType: "room.timeout", // 이벤트 타입
-		Data:      data,           // 이벤트 데이터
-	}
-
-	// EventPayload를 JSON으로 직렬화
-	messageBody, err := json.Marshal(eventPayload)
-	if err != nil {
-		log.Printf("Failed to marshal EventPayload: %v", err)
-		return err
-	}
-
-	// RabbitMQ 메시지 발행
-	err = channel.Publish(
-		"app_topic",    // Exchange
-		"room.timeout", // Routing Key
-		false,          // Mandatory
-		false,          // Immediate
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        messageBody,
-		},
-	)
-	if err != nil {
-		log.Printf("Failed to publish timeout event: %v", err)
-		return err
-	}
-
-	log.Printf("Room timeout event published for RoomID: %s", timeoutEvent.RoomID)
-	return nil
+	return e.publish(ExchangeAppTopic, "room.timeout", payload)
 }
