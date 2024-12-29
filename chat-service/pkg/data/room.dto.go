@@ -8,6 +8,7 @@ import (
 
 type ChatRoomDetailResponse struct {
 	ID           string        `bson:"id" json:"id"` // UUID 사용
+	Type         int           `bson:"type" json:"type"`
 	Users        []common.User `bson:"users" json:"users"`
 	CreatedAt    time.Time     `bson:"created_at" json:"created_at"`
 	FinishChatAt time.Time     `bson:"finish_chat_at" json:"finish_chat_at"`
@@ -23,6 +24,7 @@ type LastMessage struct {
 type ChatRoomLatestResponse struct {
 	ID          string      `json:"id"`
 	RoomName    string      `json:"room_name"`
+	RoomType    int         `json:"room_type"`
 	LastMessage LastMessage `json:"last_message"`
 	UnreadCount int         `json:"unread_count"`
 	CreatedAt   time.Time   `json:"created_at"`

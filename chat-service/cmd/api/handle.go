@@ -140,7 +140,8 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 
 		chatRoomResponse := data.ChatRoomLatestResponse{
 			ID:          room.ID,
-			RoomName:    "채팅방 이름", // 필요시 동적으로 추가
+			RoomName:    "채팅방 이름",  // 필요시 동적으로 추가
+			RoomType:    room.Type, // 0: 게임방, 1: 커플방
 			LastMessage: lastMessage,
 			UnreadCount: unreadCount,
 			CreatedAt:   room.CreatedAt,
@@ -190,6 +191,7 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 
 	payload := data.ChatRoomDetailResponse{
 		ID:           room.ID,
+		Type:         room.Type,
 		Users:        userList,
 		CreatedAt:    room.CreatedAt,
 		FinishChatAt: room.FinishChatAt,
