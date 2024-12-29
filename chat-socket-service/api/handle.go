@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/baaami/dorandoran/chat-socket-service/pkg/event"
 	"github.com/baaami/dorandoran/chat-socket-service/pkg/types"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo"
@@ -548,6 +549,10 @@ func (app *Config) SendSocketByChatEvents() {
 			if err := app.handleChatLatestMessage(event.Payload); err != nil {
 				log.Printf("Failed to handle chat.latest event: %v", err)
 			}
+		case types.MessageKindLeave:
+			if err := app.handleRoomLeaveMessage(event.Payload); err != nil {
+				log.Printf("Failed to handle room.leave event: %v", err)
+			}
 		case types.MessageKindMessage:
 			if err := app.handleChatMessage(event.Payload); err != nil {
 				log.Printf("Failed to handle chat event: %v", err)
@@ -578,6 +583,26 @@ func (app *Config) handleChatLatestMessage(payload json.RawMessage) error {
 
 	if err := app.sendMessageToRoom(chatLatest.RoomID, wsMessage); err != nil {
 		return fmt.Errorf("failed to broadcast chat.latest for RoomID %s: %w", chatLatest.RoomID, err)
+	}
+
+	return nil
+}
+
+func (app *Config) handleRoomLeaveMessage(payload json.RawMessage) error {
+	var roomLeave event.RoomLeaveEvent
+	if err := json.Unmarshal(payload, &roomLeave); err != nil {
+		return fmt.Errorf("failed to unmarshal room leave payload: %w", err)
+	}
+
+	log.Printf("Broadcasting room leave event, room id: %s, user id: %v", roomLeave.RoomID, roomLeave.LeaveUserID)
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindLeave,
+		Payload: payload,
+	}
+
+	if err := app.sendMessageToRoom(roomLeave.RoomID, wsMessage); err != nil {
+		return fmt.Errorf("failed to broadcast leave to room %s, err: %v", roomLeave.RoomID, err)
 	}
 
 	return nil

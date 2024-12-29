@@ -65,7 +65,7 @@ func main() {
 	routingConfigs := []event.RoutingConfig{
 		{
 			Exchange: event.ExchangeConfig{Name: event.ExchangeAppTopic, Type: "topic"},
-			Keys:     []string{"chat", "chat.latest"},
+			Keys:     []string{"chat", "chat.latest", "room.leave"},
 		},
 		{
 			Exchange: event.ExchangeConfig{Name: event.ExchangeCoupleRoomCreateEvents, Type: "fanout"},
@@ -84,6 +84,7 @@ func main() {
 		event.EventTypeChat:             event.ChatMessageHandler,      // 채팅 메시지 핸들러
 		event.EventTypeChatLatest:       event.ChatLatestHandler,       // 최신 채팅 핸들러
 		event.EventTypeCoupleRoomCreate: event.CreateCoupleRoomHandler, // 커플 방 생성 핸들러
+		event.EventTypeRoomLeave:        event.RoomLeaveHandler,
 	}
 
 	// RabbitMQ Consumer Listen 고루틴 실행

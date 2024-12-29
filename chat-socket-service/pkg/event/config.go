@@ -17,6 +17,7 @@ type RoutingConfig struct {
 const (
 	EventTypeChat             = "chat"
 	EventTypeChatLatest       = "chat.latest"
+	EventTypeRoomLeave        = "room.leave"
 	EventTypeRoomCreate       = "room.create"
 	EventTypeCoupleRoomCreate = "couple.room.create"
 	EventTypeRoomTimeout      = "room.timeout"
@@ -29,3 +30,8 @@ const (
 	ExchangeChatRoomCreateEvents   = "chat_room_create_events"
 	ExchangeCoupleRoomCreateEvents = "couple_room_create_events"
 )
+
+type RoomLeaveEvent struct {
+	LeaveUserID int    `json:"leave_user_id"`
+	RoomID      string `json:"room_id"`
+}

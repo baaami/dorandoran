@@ -9,21 +9,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// EventPayload 구조체 정의
-type EventPayload struct {
-	EventType string          `json:"event_type"`
-	Data      json.RawMessage `json:"data"`
-}
-
-type ChatLatestEvent struct {
-	RoomID string `json:"room_id"`
-}
-
-// RoomTimeoutEvent 정의
-type RoomTimeoutEvent struct {
-	RoomID string `json:"room_id"`
-}
-
 // Emitter 구조체 정의
 type Emitter struct {
 	connection *amqp.Connection
@@ -118,6 +103,15 @@ func (e *Emitter) PushChatLatestEvent(chatLatest ChatLatestEvent) error {
 		Data:      toJSON(chatLatest),
 	}
 	return e.publish(ExchangeAppTopic, "chat.latest", payload)
+}
+
+// 채팅방에 유저 나감 이벤트 발행
+func (e *Emitter) PushRoomLeaveEvent(roomLeave RoomLeaveEvent) error {
+	payload := EventPayload{
+		EventType: EventTypeRoomLeave,
+		Data:      toJSON(roomLeave),
+	}
+	return e.publish(ExchangeAppTopic, "room.leave", payload)
 }
 
 // 채팅방 남은시간 이벤트 발행

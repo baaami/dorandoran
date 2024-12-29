@@ -321,6 +321,17 @@ func (app *Config) leaveChatRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 채팅방 나가기 이벤트 발행
+	err = app.Emitter.PushRoomLeaveEvent(event.RoomLeaveEvent{
+		LeaveUserID: userID,
+		RoomID:      roomID,
+	})
+	if err != nil {
+		log.Printf("Failed to PushRoomLeaveEvent user %d from room %s, err: %v", userID, roomID, err)
+		http.Error(w, "Failed to PushRoomLeaveEvent", http.StatusInternalServerError)
+		return
+	}
+
 	// TODO: 채팅방 삭제 이벤트 발행
 
 	w.WriteHeader(http.StatusOK)

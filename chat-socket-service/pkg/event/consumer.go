@@ -135,6 +135,21 @@ func ChatLatestHandler(payload types.EventPayload, eventChannel chan<- types.Web
 	eventChannel <- wsMessage
 }
 
+// event: room.leave
+func RoomLeaveHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
+	var roomLeave RoomLeaveEvent
+	if err := json.Unmarshal(payload.Data, &roomLeave); err != nil {
+		log.Printf("Failed to unmarshal room.leave event: %v", err)
+		return
+	}
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindLeave,
+		Payload: json.RawMessage(payload.Data),
+	}
+	eventChannel <- wsMessage
+}
+
 // event: room.couple.create
 func CreateCoupleRoomHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
 	var coupleRoomEvent types.ChatRoom
