@@ -82,8 +82,6 @@ func (r *RedisClient) GetActiveUserIDs(roomID string) ([]int, error) {
 		activeKey := "client:active"
 		active, err := r.Client.HGet(ctx, activeKey, sUserID).Result()
 		if err == redis.Nil || active != "unique-server-id" {
-			log.Printf("active: %s", active)
-			// 사용자 비활성화 상태일 경우 무시
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to check active status for user %s: %v", sUserID, err)

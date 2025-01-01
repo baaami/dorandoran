@@ -75,7 +75,7 @@ func (e *Emitter) publish(exchangeName, routingKey string, payload EventPayload)
 		return fmt.Errorf("failed to publish event: %v", err)
 	}
 
-	log.Printf("Event published to exchange %s with routing key %s: %+v", exchangeName, routingKey, payload)
+	log.Printf("Event published to exchange %s with routing key %s", exchangeName, routingKey)
 	return nil
 }
 

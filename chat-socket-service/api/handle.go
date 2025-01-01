@@ -596,13 +596,34 @@ func (app *Config) handleRoomLeaveMessage(payload json.RawMessage) error {
 
 	log.Printf("Broadcasting room leave event, room id: %s, user id: %v", roomLeave.RoomID, roomLeave.LeaveUserID)
 
-	wsMessage := types.WebSocketMessage{
-		Kind:    types.MessageKindLeave,
-		Payload: payload,
+	// 활성 사용자 ID 리스트 가져오기
+	activeUserIDs, err := app.RedisClient.GetActiveUserIDs(roomLeave.RoomID)
+	if err != nil {
+		log.Printf("Failed to get active users for room %s: %v", roomLeave.RoomID, err)
+		return err
 	}
 
-	if err := app.sendMessageToRoom(roomLeave.RoomID, wsMessage); err != nil {
-		return fmt.Errorf("failed to broadcast leave to room %s, err: %v", roomLeave.RoomID, err)
+	// 방에 접속해있는 사용자 ID 리스트 가져오기
+	joinedUserIDs, err := app.RedisClient.GetJoinedUser(roomLeave.RoomID)
+	if err != nil {
+		log.Printf("Failed to get joined room users for room %s: %v", roomLeave.RoomID, err)
+		return err
+	}
+
+	now := time.Now()
+	chat := types.Chat{
+		MessageId:   primitive.NewObjectID(),
+		Type:        types.ChatTypeLeave,
+		RoomID:      roomLeave.RoomID,
+		SenderID:    roomLeave.LeaveUserID,
+		Message:     "",
+		UnreadCount: 0,
+		CreatedAt:   now,
+	}
+
+	// Broadcast to the room
+	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs); err != nil {
+		log.Printf("Failed to broadcast message: %v", err)
 	}
 
 	return nil
