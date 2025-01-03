@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -169,4 +170,23 @@ func forwardMessages(src, dest *websocket.Conn) {
 			break
 		}
 	}
+}
+
+func (app *Config) profileHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract query parameters
+	gender := r.URL.Query().Get("gender")
+	characterID := r.URL.Query().Get("character_id")
+
+	if gender == "" || characterID == "" {
+		http.Error(w, "Missing query parameters", http.StatusBadRequest)
+		return
+	}
+
+	imageBaseDir := "/app/images"
+
+	// Construct the file path
+	filePath := filepath.Join(imageBaseDir, "profile_"+gender+"_"+characterID+".png")
+
+	// Serve the file
+	http.ServeFile(w, r, filePath)
 }
