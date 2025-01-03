@@ -165,8 +165,8 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 
 		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(findLastMessage.SenderID, room.ID)
 		if err != nil {
-			if err.Error() == "user not found in the room" {
-				log.Printf("user not found in the room")
+			if err.Error() == "user not found in the game" {
+				log.Printf("user not found in the game")
 			} else {
 				log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", findLastMessage.SenderID, room.ID, err)
 				continue
@@ -239,8 +239,12 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		// room 내 해당 user의 정보
 		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(userID, roomID)
 		if err != nil {
-			log.Printf("Failed to GetUserGameInfoInRoom, user id: %d, room id: %s", userID, roomID)
-			continue
+			if err.Error() == "user not found in the game" {
+				log.Printf("user not found in the game")
+			} else {
+				log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", user.ID, room.ID, err)
+				continue
+			}
 		}
 
 		gamer := types.Gamer{
