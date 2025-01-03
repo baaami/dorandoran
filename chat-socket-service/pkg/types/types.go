@@ -34,12 +34,19 @@ type ChatMessage struct {
 }
 
 type ChatRoom struct {
-	ID           string    `bson:"id" json:"id"` // UUID 사용
-	Type         int       `bson:"type" json:"type"`
-	UserIDs      []int     `bson:"user_ids" json:"user_ids"`
-	CreatedAt    time.Time `bson:"created_at" json:"created_at"`
-	FinishChatAt time.Time `bson:"finish_chat_at" json:"finish_chat_at"`
-	ModifiedAt   time.Time `bson:"modified_at" json:"modified_at"`
+	ID           string      `bson:"id" json:"id"` // UUID 사용
+	Type         int         `bson:"type" json:"type"`
+	UserIDs      []int       `bson:"user_ids" json:"user_ids"`
+	Gamers       []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
+	CreatedAt    time.Time   `bson:"created_at" json:"created_at"`
+	FinishChatAt time.Time   `bson:"finish_chat_at" json:"finish_chat_at"`
+	ModifiedAt   time.Time   `bson:"modified_at" json:"modified_at"`
+}
+
+type GamerInfo struct {
+	UserID      int    `bson:"user_id" json:"user_id"`           // 사용자 ID
+	CharacterID int    `bson:"character_id" json:"character_id"` // 캐릭터 식별자 (0 ~ 5)
+	AvatarURL   string `bson:"avatar_url" json:"avatar_url"`     // 캐릭터 아바타 이미지 URL
 }
 
 type ChatLastest struct {

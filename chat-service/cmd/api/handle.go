@@ -13,12 +13,11 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/baaami/dorandoran/chat/pkg/types"
-	common "github.com/baaami/dorandoran/common/user"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// 매칭 성공 시 게임방 생성 루틴
+// 방 생성
 func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 	for matchEvent := range chatRoomCreateChan {
 		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
@@ -27,11 +26,33 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		var startTime time.Time
 		var finishTime time.Time
 
+		var gamers []data.GamerInfo
+
 		if matchEvent.MatchType == types.MATCH_GAME {
 			log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
 			startTime = time.Now()
 			// TODO: 시간 수정 필요
 			finishTime = startTime.Add(5 * time.Minute)
+
+			// 나는 솔로 캐릭터 할당
+			male := 0
+			female := 0
+
+			for _, user := range matchEvent.MatchedUsers {
+				var gamer data.GamerInfo
+
+				gamer.UserID = user.ID
+				gamer.AvatarURL = ""
+				if user.Gender == types.MALE {
+					gamer.CharacterID = male
+					male++
+				} else {
+					gamer.CharacterID = female
+					female++
+				}
+
+				gamers = append(gamers, gamer)
+			}
 		} else {
 			log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
 			startTime = time.Now()
@@ -43,6 +64,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 			ID:           chatRoomID,
 			Type:         matchEvent.MatchType,
 			UserIDs:      extractUserIDs(matchEvent.MatchedUsers),
+			Gamers:       gamers,
 			CreatedAt:    startTime,
 			FinishChatAt: finishTime,
 			ModifiedAt:   startTime,
@@ -92,7 +114,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 	}
 }
 
-// 특정 유저의 채팅방 목록 조회
+// 채팅방 목록 조회
 func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	xUserID := r.Header.Get("X-User-ID")
 	if xUserID == "" {
@@ -132,10 +154,18 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			unreadCount = 0
 		}
 
+		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(findLastMessage.SenderID, room.ID)
+		if err != nil {
+			log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", userID, room.ID, err)
+			continue
+		}
+
 		lastMessage := data.LastMessage{
-			SenderID:  findLastMessage.SenderID,
-			Message:   findLastMessage.Message,
-			CreatedAt: findLastMessage.CreatedAt,
+			SenderID:    findLastMessage.SenderID,
+			Message:     findLastMessage.Message,
+			GamerID:     gamerInfo.UserID,
+			GamerAvatar: gamerInfo.AvatarURL,
+			CreatedAt:   findLastMessage.CreatedAt,
 		}
 
 		chatRoomResponse := data.ChatRoomLatestResponse{
@@ -158,7 +188,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// Room ID로 채팅방 상세 정보 조회
+// 채팅방 상세 정보 조회
 func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "id")
 
@@ -173,33 +203,82 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var userList []common.User
+	if room.Type == types.MATCH_COUPLE {
+		var userList []types.User
 
-	for _, userID := range room.UserIDs {
-		user, err := getUserByUserID(strconv.Itoa(userID))
-		if err != nil {
-			log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
-			continue
+		for _, userID := range room.UserIDs {
+			user, err := getUserByUserID(strconv.Itoa(userID))
+			if err != nil {
+				log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
+				continue
+			}
+			if user == nil {
+				log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
+				continue
+			}
+
+			userList = append(userList, *user)
 		}
-		if user == nil {
-			log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
-			continue
+
+		payload := data.CoupleRoomDetailResponse{
+			ID:           room.ID,
+			Type:         room.Type,
+			Users:        userList,
+			CreatedAt:    room.CreatedAt,
+			FinishChatAt: room.FinishChatAt,
+			ModifiedAt:   room.ModifiedAt,
 		}
 
-		userList = append(userList, *user)
-	}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(payload)
+	} else if room.Type == types.MATCH_GAME {
+		var gamerList []types.Gamer
 
-	payload := data.ChatRoomDetailResponse{
-		ID:           room.ID,
-		Type:         room.Type,
-		Users:        userList,
-		CreatedAt:    room.CreatedAt,
-		FinishChatAt: room.FinishChatAt,
-		ModifiedAt:   room.ModifiedAt,
-	}
+		for _, userID := range room.UserIDs {
+			user, err := getUserByUserID(strconv.Itoa(userID))
+			if err != nil {
+				log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
+				continue
+			}
+			if user == nil {
+				log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
+				continue
+			}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(payload)
+			// room 내 해당 user의 정보
+			gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(userID, roomID)
+			if err != nil {
+				log.Printf("Failed to GetUserGameInfoInRoom, user id: %d, room id: %s", userID, roomID)
+				continue
+			}
+
+			gamer := types.Gamer{
+				ID:            user.ID,
+				SnsType:       user.SnsType,
+				SnsID:         user.SnsID,
+				Name:          user.Name,
+				Gender:        user.Gender,
+				Birth:         user.Birth,
+				Address:       user.Address,
+				GameID:        gamerInfo.CharacterID,
+				GameAvatarURL: gamerInfo.AvatarURL,
+			}
+
+			gamerList = append(gamerList, gamer)
+		}
+
+		payload := data.GameRoomDetailResponse{
+			ID:           room.ID,
+			Type:         room.Type,
+			Users:        gamerList,
+			CreatedAt:    room.CreatedAt,
+			FinishChatAt: room.FinishChatAt,
+			ModifiedAt:   room.ModifiedAt,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(payload)
+	}
 }
 
 // 특정 방의 채팅 목록 조회
@@ -528,7 +607,7 @@ func (app *Config) deleteChatByRoomID(w http.ResponseWriter, r *http.Request) {
 }
 
 // [Bridge user] 회원 정보 획득
-func getUserByUserID(userID string) (*common.User, error) {
+func getUserByUserID(userID string) (*types.User, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
@@ -562,7 +641,7 @@ func getUserByUserID(userID string) (*common.User, error) {
 	}
 
 	// 응답 본문에서 유저 정보 디코딩
-	var user common.User
+	var user types.User
 
 	// 응답 본문 로깅 추가
 	body, err := io.ReadAll(resp.Body)
