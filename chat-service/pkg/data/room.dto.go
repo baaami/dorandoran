@@ -15,6 +15,10 @@ type RoomDetailResponse struct {
 	ModifiedAt   time.Time     `bson:"modified_at" json:"modified_at"`
 }
 
+type RoomCharacterNameResponse struct {
+	name string `json:"name"`
+}
+
 type LastMessage struct {
 	SenderID  int            `json:"sender_id"`
 	Message   string         `json:"message"`

@@ -53,7 +53,7 @@ type Gamer struct {
 }
 
 type GameInfo struct {
-	CharaterID        int    `gorm:"index" json:"charater_id"`
-	CharaterName      string `gorm:"size:64" json:"charater_name"`
-	CharaterAvatarURL string `gorm:"size:256" json:"charater_avatar_url"`
+	CharacterID        int    `gorm:"index" json:"character_id"`
+	CharacterName      string `gorm:"size:64" json:"character_name"`
+	CharacterAvatarURL string `gorm:"size:256" json:"character_avatar_url"`
 }

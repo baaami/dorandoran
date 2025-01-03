@@ -51,19 +51,19 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 				gamer.UserID = user.ID
 				if user.Gender == types.MALE {
 					gamer.CharacterID = male
-					gamer.CharaterName = data.MaleNames[male]
+					gamer.CharacterName = data.MaleNames[male]
 					male++
 				} else {
 					gamer.CharacterID = female
-					gamer.CharaterName = data.FemaleNames[female]
+					gamer.CharacterName = data.FemaleNames[female]
 					female++
 				}
 
-				gamer.CharaterAvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
+				gamer.CharacterAvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
 			} else {
 				// 사용하지 않음
 				gamer.CharacterID = -1
-				gamer.CharaterAvatarURL = ""
+				gamer.CharacterAvatarURL = ""
 			}
 
 			gamers = append(gamers, gamer)
@@ -176,9 +176,9 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			SenderID: findLastMessage.SenderID,
 			Message:  findLastMessage.Message,
 			GameInfo: types.GameInfo{
-				CharaterID:        gamerInfo.CharacterID,
-				CharaterName:      gamerInfo.CharaterName,
-				CharaterAvatarURL: gamerInfo.CharaterAvatarURL,
+				CharacterID:        gamerInfo.CharacterID,
+				CharacterName:      gamerInfo.CharacterName,
+				CharacterAvatarURL: gamerInfo.CharacterAvatarURL,
 			},
 			CreatedAt: findLastMessage.CreatedAt,
 		}
@@ -247,9 +247,9 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 			Birth:   user.Birth,
 			Address: user.Address,
 			GameInfo: types.GameInfo{
-				CharaterID:        gamerInfo.CharacterID,
-				CharaterName:      gamerInfo.CharaterName,
-				CharaterAvatarURL: gamerInfo.CharaterAvatarURL,
+				CharacterID:        gamerInfo.CharacterID,
+				CharacterName:      gamerInfo.CharacterName,
+				CharacterAvatarURL: gamerInfo.CharacterAvatarURL,
 			},
 		}
 
