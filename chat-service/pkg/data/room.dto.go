@@ -6,22 +6,13 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/types"
 )
 
-type GameRoomDetailResponse struct {
+type RoomDetailResponse struct {
 	ID           string        `bson:"id" json:"id"` // UUID 사용
 	Type         int           `bson:"type" json:"type"`
 	Users        []types.Gamer `bson:"users" json:"users"`
 	CreatedAt    time.Time     `bson:"created_at" json:"created_at"`
 	FinishChatAt time.Time     `bson:"finish_chat_at" json:"finish_chat_at"`
 	ModifiedAt   time.Time     `bson:"modified_at" json:"modified_at"`
-}
-
-type CoupleRoomDetailResponse struct {
-	ID           string       `bson:"id" json:"id"` // UUID 사용
-	Type         int          `bson:"type" json:"type"`
-	Users        []types.User `bson:"users" json:"users"`
-	CreatedAt    time.Time    `bson:"created_at" json:"created_at"`
-	FinishChatAt time.Time    `bson:"finish_chat_at" json:"finish_chat_at"`
-	ModifiedAt   time.Time    `bson:"modified_at" json:"modified_at"`
 }
 
 type LastMessage struct {

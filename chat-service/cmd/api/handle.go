@@ -33,14 +33,21 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 			startTime = time.Now()
 			// TODO: 시간 수정 필요
 			finishTime = startTime.Add(5 * time.Minute)
+		} else {
+			log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
+			startTime = time.Now()
+			// TODO: 시간 수정 필요
+			finishTime = startTime.Add(10 * time.Minute)
+		}
 
-			// 나는 솔로 캐릭터 할당
-			male := 0
-			female := 0
+		// 나는 솔로 캐릭터 할당
+		male := 0
+		female := 0
 
-			for _, user := range matchEvent.MatchedUsers {
-				var gamer data.GamerInfo
+		for _, user := range matchEvent.MatchedUsers {
+			var gamer data.GamerInfo
 
+			if matchEvent.MatchType == types.MATCH_GAME {
 				gamer.UserID = user.ID
 				if user.Gender == types.MALE {
 					gamer.CharacterID = male
@@ -51,14 +58,13 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 				}
 
 				gamer.AvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
-
-				gamers = append(gamers, gamer)
+			} else {
+				// 사용하지 않음
+				gamer.CharacterID = -1
+				gamer.AvatarURL = ""
 			}
-		} else {
-			log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
-			startTime = time.Now()
-			// TODO: 시간 수정 필요
-			finishTime = startTime.Add(10 * time.Minute)
+
+			gamers = append(gamers, gamer)
 		}
 
 		room := data.ChatRoom{
@@ -204,82 +210,52 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if room.Type == types.MATCH_COUPLE {
-		var userList []types.User
+	var gamerList []types.Gamer
 
-		for _, userID := range room.UserIDs {
-			user, err := getUserByUserID(strconv.Itoa(userID))
-			if err != nil {
-				log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
-				continue
-			}
-			if user == nil {
-				log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
-				continue
-			}
-
-			userList = append(userList, *user)
+	for _, userID := range room.UserIDs {
+		user, err := getUserByUserID(strconv.Itoa(userID))
+		if err != nil {
+			log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
+			continue
+		}
+		if user == nil {
+			log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
+			continue
 		}
 
-		payload := data.CoupleRoomDetailResponse{
-			ID:           room.ID,
-			Type:         room.Type,
-			Users:        userList,
-			CreatedAt:    room.CreatedAt,
-			FinishChatAt: room.FinishChatAt,
-			ModifiedAt:   room.ModifiedAt,
+		// room 내 해당 user의 정보
+		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(userID, roomID)
+		if err != nil {
+			log.Printf("Failed to GetUserGameInfoInRoom, user id: %d, room id: %s", userID, roomID)
+			continue
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(payload)
-	} else if room.Type == types.MATCH_GAME {
-		var gamerList []types.Gamer
-
-		for _, userID := range room.UserIDs {
-			user, err := getUserByUserID(strconv.Itoa(userID))
-			if err != nil {
-				log.Printf("Failed to get user, id: %d, err: %s", userID, err.Error())
-				continue
-			}
-			if user == nil {
-				log.Printf("Cannot find user in room, user id: %d, room id: %s", userID, roomID)
-				continue
-			}
-
-			// room 내 해당 user의 정보
-			gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(userID, roomID)
-			if err != nil {
-				log.Printf("Failed to GetUserGameInfoInRoom, user id: %d, room id: %s", userID, roomID)
-				continue
-			}
-
-			gamer := types.Gamer{
-				ID:                user.ID,
-				SnsType:           user.SnsType,
-				SnsID:             user.SnsID,
-				Name:              user.Name,
-				Gender:            user.Gender,
-				Birth:             user.Birth,
-				Address:           user.Address,
-				CharaterID:        gamerInfo.CharacterID,
-				CharaterAvatarURL: gamerInfo.AvatarURL,
-			}
-
-			gamerList = append(gamerList, gamer)
+		gamer := types.Gamer{
+			ID:                user.ID,
+			SnsType:           user.SnsType,
+			SnsID:             user.SnsID,
+			Name:              user.Name,
+			Gender:            user.Gender,
+			Birth:             user.Birth,
+			Address:           user.Address,
+			CharaterID:        gamerInfo.CharacterID,
+			CharaterAvatarURL: gamerInfo.AvatarURL,
 		}
 
-		payload := data.GameRoomDetailResponse{
-			ID:           room.ID,
-			Type:         room.Type,
-			Users:        gamerList,
-			CreatedAt:    room.CreatedAt,
-			FinishChatAt: room.FinishChatAt,
-			ModifiedAt:   room.ModifiedAt,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(payload)
+		gamerList = append(gamerList, gamer)
 	}
+
+	payload := data.RoomDetailResponse{
+		ID:           room.ID,
+		Type:         room.Type,
+		Users:        gamerList,
+		CreatedAt:    room.CreatedAt,
+		FinishChatAt: room.FinishChatAt,
+		ModifiedAt:   room.ModifiedAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(payload)
 }
 
 // 특정 방의 채팅 목록 조회
