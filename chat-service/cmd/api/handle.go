@@ -42,7 +42,6 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 				var gamer data.GamerInfo
 
 				gamer.UserID = user.ID
-				gamer.AvatarURL = ""
 				if user.Gender == types.MALE {
 					gamer.CharacterID = male
 					male++
@@ -50,6 +49,8 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 					gamer.CharacterID = female
 					female++
 				}
+
+				gamer.AvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
 
 				gamers = append(gamers, gamer)
 			}
