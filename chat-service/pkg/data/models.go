@@ -521,6 +521,12 @@ func (c *ChatRoom) GetUserGameInfoInRoom(userID int, roomID string) (*GamerInfo,
 		}
 	}
 
+	noGamer := GamerInfo{
+		UserID:             -1,
+		CharacterID:        -1,
+		CharacterName:      "",
+		CharacterAvatarURL: "",
+	}
 	// Return an error if the user is not found in the room
-	return nil, errors.New("user not found in the room")
+	return &noGamer, errors.New("user not found in the room")
 }
