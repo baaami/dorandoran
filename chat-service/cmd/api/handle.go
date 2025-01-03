@@ -164,10 +164,16 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 		}
 
 		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(findLastMessage.SenderID, room.ID)
-		if err.Error() == "user not found in the room" {
-			log.Printf("user not found in the room")
-		} else if err != nil {
-			log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", findLastMessage.SenderID, room.ID, err)
+		if err != nil {
+			if err.Error() == "user not found in the room" {
+				log.Printf("user not found in the room")
+			} else {
+				log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", findLastMessage.SenderID, room.ID, err)
+				continue
+			}
+		}
+		if gamerInfo == nil {
+			log.Printf("gamerinfo is nil")
 			continue
 		}
 
