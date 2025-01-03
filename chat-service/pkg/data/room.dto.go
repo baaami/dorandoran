@@ -16,11 +16,10 @@ type RoomDetailResponse struct {
 }
 
 type LastMessage struct {
-	SenderID    int       `json:"sender_id"`
-	GamerID     int       `json:"gamer_id"`
-	GamerAvatar string    `json:"gamer_avatar"`
-	Message     string    `json:"message"`
-	CreatedAt   time.Time `json:"created_at"`
+	SenderID  int            `json:"sender_id"`
+	Message   string         `json:"message"`
+	GameInfo  types.GameInfo `json:"game_info"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type ChatRoomLatestResponse struct {

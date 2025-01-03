@@ -57,9 +57,10 @@ type ChatRoom struct {
 
 // 사용자별 캐릭터 정보를 저장하는 구조체
 type GamerInfo struct {
-	UserID      int    `bson:"user_id" json:"user_id"`           // 사용자 ID
-	CharacterID int    `bson:"character_id" json:"character_id"` // 캐릭터 식별자 (0 ~ 5)
-	AvatarURL   string `bson:"avatar_url" json:"avatar_url"`     // 캐릭터 아바타 이미지 URL
+	UserID            int    `bson:"user_id" json:"user_id"`                           // 사용자 ID
+	CharacterID       int    `bson:"character_id" json:"character_id"`                 // 캐릭터 식별자 (0 ~ 5)
+	CharaterName      string `bson:"charater_avatar_name" json:"charater_avatar_name"` // 캐릭터 이름
+	CharaterAvatarURL string `bson:"charater_avatar_url" json:"charater_avatar_url"`   // 캐릭터 아바타 이미지 URL
 }
 
 // Push Message

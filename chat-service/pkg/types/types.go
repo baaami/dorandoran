@@ -42,13 +42,18 @@ type User struct {
 }
 
 type Gamer struct {
-	ID                int     `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType           int     `gorm:"index" json:"sns_type"`
-	SnsID             string  `gorm:"index" json:"sns_id"`
-	Name              string  `gorm:"size:100" json:"name"`
-	Gender            int     `json:"gender"`
-	Birth             string  `gorm:"size:20" json:"birth"`
-	Address           Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
-	CharaterID        int     `gorm:"index" json:"charater_id"`
-	CharaterAvatarURL string  `gorm:"size:256" json:"charater_avatar_url"`
+	ID       int      `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int      `gorm:"index" json:"sns_type"`
+	SnsID    string   `gorm:"index" json:"sns_id"`
+	Name     string   `gorm:"size:100" json:"name"`
+	Gender   int      `json:"gender"`
+	Birth    string   `gorm:"size:20" json:"birth"`
+	Address  Address  `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	GameInfo GameInfo `gorm:"embedded;embeddedPrefix:game_info_" json:"game_info"`
+}
+
+type GameInfo struct {
+	CharaterID        int    `gorm:"index" json:"charater_id"`
+	CharaterName      string `gorm:"size:64" json:"charater_name"`
+	CharaterAvatarURL string `gorm:"size:256" json:"charater_avatar_url"`
 }

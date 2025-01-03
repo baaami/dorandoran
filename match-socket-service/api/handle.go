@@ -69,12 +69,18 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 		return err
 	}
 
+	userFilter, err := GetMatchFilterInfo(userID)
+	if err != nil {
+		log.Printf("Failed to get GetMatchFilterInfo, user: %d", userID)
+		return err
+	}
+
 	waitingUser := types.WaitingUser{
 		ID:          user.ID,
 		Gender:      user.Gender,
 		Birth:       user.Birth,
 		Address:     types.Address(user.Address),
-		CoupleCount: 2,
+		CoupleCount: userFilter.CoupleCount,
 	}
 
 	// Check if user already exists in the Redis queue
@@ -278,4 +284,43 @@ func GetUserInfo(userID int) (*types.User, error) {
 	}
 
 	return &user, nil
+}
+
+// [Bridge user] 유저 필터 정보 조회
+func GetMatchFilterInfo(userID int) (*types.MatchFilter, error) {
+	var matchFilter types.MatchFilter
+
+	// Matching 필터 획득
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, "http://user-service/match/filter", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 사용자 ID를 요청의 헤더에 추가
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &matchFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &matchFilter, nil
 }

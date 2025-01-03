@@ -74,7 +74,7 @@ func (r *RedisClient) RemoveUserFromQueue(user types.WaitingUser) error {
 	}
 
 	// Iterate over all possible couple counts (2 to 6)
-	for coupleCount := 2; coupleCount <= 6; coupleCount++ {
+	for coupleCount := types.MATCH_COUNT_MIN; coupleCount <= types.MATCH_COUNT_MAX; coupleCount++ {
 		queueKey := fmt.Sprintf("%s_%d", genderQueuePrefix, coupleCount)
 
 		// Attempt to remove the user from the current queue
@@ -107,7 +107,7 @@ func (r *RedisClient) IsUserInQueue(user types.WaitingUser) (bool, string, error
 	}
 
 	// Iterate over all possible couple counts (2 to 6)
-	for coupleCount := 2; coupleCount <= 6; coupleCount++ {
+	for coupleCount := types.MATCH_COUNT_MIN; coupleCount <= types.MATCH_COUNT_MAX; coupleCount++ {
 		queueKey := fmt.Sprintf("%s_%d", genderQueuePrefix, coupleCount)
 
 		// Check if the user exists in the current queue

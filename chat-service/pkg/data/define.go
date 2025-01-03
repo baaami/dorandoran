@@ -22,6 +22,15 @@ const (
 	SangChul
 )
 
+var MaleNames = map[int]string{
+	YoungSoo:  "영수",
+	YoungHo:   "영호",
+	YoungSik:  "영식",
+	YoungChul: "영철",
+	KwangSoo:  "광수",
+	SangChul:  "상철",
+}
+
 const (
 	YoungSook = iota // 0부터 시작
 	JungSook
@@ -30,6 +39,15 @@ const (
 	OkSoon
 	HyunSook
 )
+
+var FemaleNames = map[int]string{
+	YoungSook: "영숙",
+	JungSook:  "정숙",
+	SoonJa:    "순자",
+	YoungJa:   "영자",
+	OkSoon:    "옥순",
+	HyunSook:  "현숙",
+}
 
 type Chat struct {
 	MessageId   primitive.ObjectID `bson:"_id" json:"message_id"`
@@ -60,9 +78,10 @@ type ChatRoom struct {
 
 // 사용자별 캐릭터 정보를 저장하는 구조체
 type GamerInfo struct {
-	UserID      int    `bson:"user_id" json:"user_id"`           // 사용자 ID
-	CharacterID int    `bson:"character_id" json:"character_id"` // 캐릭터 식별자 (0 ~ 5)
-	AvatarURL   string `bson:"avatar_url" json:"avatar_url"`     // 캐릭터 아바타 이미지 URL
+	UserID            int    `bson:"user_id" json:"user_id"`                           // 사용자 ID
+	CharacterID       int    `bson:"character_id" json:"character_id"`                 // 캐릭터 식별자 (0 ~ 5)
+	CharaterName      string `bson:"charater_avatar_name" json:"charater_avatar_name"` // 캐릭터 이름
+	CharaterAvatarURL string `bson:"charater_avatar_url" json:"charater_avatar_url"`   // 캐릭터 아바타 이미지 URL
 }
 
 type ChatListResponse struct {

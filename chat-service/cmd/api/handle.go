@@ -51,17 +51,19 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 				gamer.UserID = user.ID
 				if user.Gender == types.MALE {
 					gamer.CharacterID = male
+					gamer.CharaterName = data.MaleNames[male]
 					male++
 				} else {
 					gamer.CharacterID = female
+					gamer.CharaterName = data.FemaleNames[female]
 					female++
 				}
 
-				gamer.AvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
+				gamer.CharaterAvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
 			} else {
 				// 사용하지 않음
 				gamer.CharacterID = -1
-				gamer.AvatarURL = ""
+				gamer.CharaterAvatarURL = ""
 			}
 
 			gamers = append(gamers, gamer)
@@ -161,18 +163,24 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			unreadCount = 0
 		}
 
-		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(findLastMessage.SenderID, room.ID)
-		if err != nil {
-			log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", userID, room.ID, err)
-			continue
+		var gamerInfo *data.GamerInfo
+		if findLastMessage.SenderID != 0 {
+			gamerInfo, err = app.Models.ChatRoom.GetUserGameInfoInRoom(findLastMessage.SenderID, room.ID)
+			if err != nil {
+				log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", findLastMessage.SenderID, room.ID, err)
+				continue
+			}
 		}
 
 		lastMessage := data.LastMessage{
-			SenderID:    findLastMessage.SenderID,
-			Message:     findLastMessage.Message,
-			GamerID:     gamerInfo.UserID,
-			GamerAvatar: gamerInfo.AvatarURL,
-			CreatedAt:   findLastMessage.CreatedAt,
+			SenderID: findLastMessage.SenderID,
+			Message:  findLastMessage.Message,
+			GameInfo: types.GameInfo{
+				CharaterID:        gamerInfo.CharacterID,
+				CharaterName:      gamerInfo.CharaterName,
+				CharaterAvatarURL: gamerInfo.CharaterAvatarURL,
+			},
+			CreatedAt: findLastMessage.CreatedAt,
 		}
 
 		chatRoomResponse := data.ChatRoomLatestResponse{
@@ -231,15 +239,18 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		}
 
 		gamer := types.Gamer{
-			ID:                user.ID,
-			SnsType:           user.SnsType,
-			SnsID:             user.SnsID,
-			Name:              user.Name,
-			Gender:            user.Gender,
-			Birth:             user.Birth,
-			Address:           user.Address,
-			CharaterID:        gamerInfo.CharacterID,
-			CharaterAvatarURL: gamerInfo.AvatarURL,
+			ID:      user.ID,
+			SnsType: user.SnsType,
+			SnsID:   user.SnsID,
+			Name:    user.Name,
+			Gender:  user.Gender,
+			Birth:   user.Birth,
+			Address: user.Address,
+			GameInfo: types.GameInfo{
+				CharaterID:        gamerInfo.CharacterID,
+				CharaterName:      gamerInfo.CharaterName,
+				CharaterAvatarURL: gamerInfo.CharaterAvatarURL,
+			},
 		}
 
 		gamerList = append(gamerList, gamer)
