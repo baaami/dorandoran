@@ -254,15 +254,15 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 			}
 
 			gamer := types.Gamer{
-				ID:            user.ID,
-				SnsType:       user.SnsType,
-				SnsID:         user.SnsID,
-				Name:          user.Name,
-				Gender:        user.Gender,
-				Birth:         user.Birth,
-				Address:       user.Address,
-				GameID:        gamerInfo.CharacterID,
-				GameAvatarURL: gamerInfo.AvatarURL,
+				ID:                user.ID,
+				SnsType:           user.SnsType,
+				SnsID:             user.SnsID,
+				Name:              user.Name,
+				Gender:            user.Gender,
+				Birth:             user.Birth,
+				Address:           user.Address,
+				CharaterID:        gamerInfo.CharacterID,
+				CharaterAvatarURL: gamerInfo.AvatarURL,
 			}
 
 			gamerList = append(gamerList, gamer)
