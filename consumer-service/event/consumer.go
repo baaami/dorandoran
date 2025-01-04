@@ -172,8 +172,8 @@ func (consumer *Consumer) Listen(routingkeys []string) error {
 					continue
 				}
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
-				PushChatNotification(chatMsg)
 				handleChatAddPayload(chatMsg)
+				PushChatNotification(chatMsg)
 
 			// TODO: 사용하는 이벤트 타입인지??
 			case "chat.read":
