@@ -350,13 +350,15 @@ func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 			ExternalID: externalIDs,
 		},
 		TargetChannel: "push",
-		Headings: types.Headings{
-			Ko: "새로운 메시지가 있습니다.",
+		Headings: map[string]string{
+			"en": "New Message!",
 		},
-		Contents: types.Contents{
-			Ko: chatEventMsg.Message,
+		Contents: map[string]string{
+			"en": chatEventMsg.Message,
 		},
 	}
+
+	fmt.Printf("send message: %v", message)
 
 	// JSON 직렬화
 	payload, err := json.Marshal(message)

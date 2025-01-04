@@ -35,9 +35,9 @@ type IncludeAliases struct {
 
 // PushMessage 구조체
 type PushMessage struct {
-	AppID          string         `json:"app_id"`
-	IncludeAliases IncludeAliases `json:"include_aliases"`
-	TargetChannel  string         `json:"target_channel"`
-	Headings       Headings       `json:"headings"`
-	Contents       Contents       `json:"contents"`
+	AppID          string            `json:"app_id"`
+	IncludeAliases IncludeAliases    `json:"include_aliases"`
+	TargetChannel  string            `json:"target_channel"`
+	Headings       map[string]string `json:"headings"`
+	Contents       map[string]string `json:"contents"`
 }
