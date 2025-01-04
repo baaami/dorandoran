@@ -278,8 +278,55 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(payload)
 }
 
-// 게임방 내 캐릭터명 조회
+// 특정 방의 채팅 목록 조회
 func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
+	// URL에서 room ID 가져오기
+	roomID := chi.URLParam(r, "id")
+	if roomID == "" {
+		http.Error(w, "Room ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
+	page := r.URL.Query().Get("page")
+	pageNumber := 1
+	if page != "" {
+		if parsedPage, err := strconv.Atoi(page); err == nil {
+			pageNumber = parsedPage
+		}
+	}
+	// MongoDB에서 데이터 가져오기
+	messages, totalCount, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, data.PAGE_DEFAULT_SIZE)
+	if err != nil {
+		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
+		http.Error(w, "Failed to fetch chat messages", http.StatusInternalServerError)
+		return
+	}
+
+	// 총 페이지 수 및 hasNextPage 계산
+	totalPages := int((totalCount + int64(data.PAGE_DEFAULT_SIZE) - 1) / int64(data.PAGE_DEFAULT_SIZE)) // 올림 계산
+	hasNextPage := pageNumber < totalPages
+
+	// 응답 생성
+	response := data.ChatListResponse{
+		Data:        messages,
+		CurrentPage: pageNumber,
+		NextPage:    pageNumber + 1,
+		HasNextPage: hasNextPage,
+		TotalPages:  totalPages,
+	}
+
+	// JSON 응답 전송
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode response: %v", err)
+		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
+		return
+	}
+}
+
+// 게임방 내 캐릭터명 조회
+func (app *Config) getCharacterNameByRoomID(w http.ResponseWriter, r *http.Request) {
 	xUserID := r.Header.Get("X-User-ID")
 	if xUserID == "" {
 		http.Error(w, "User ID is required", http.StatusUnauthorized)

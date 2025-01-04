@@ -45,7 +45,7 @@ func (app *Config) routes() http.Handler {
 	mux.Delete("/all/{id}", app.deleteChatByRoomID) // by roomid
 
 	// 게임방 내 캐릭터명 조회
-	mux.Get("/character/name/{id}", app.getChatMsgListByRoomID) // by roomid
+	mux.Get("/character/name/{id}", app.getCharacterNameByRoomID) // by roomid
 
 	return mux
 }
