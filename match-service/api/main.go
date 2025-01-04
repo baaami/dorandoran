@@ -7,6 +7,7 @@ import (
 
 	"github.com/baaami/dorandoran/match-service/pkg/event"
 	"github.com/baaami/dorandoran/match-service/pkg/redis"
+	"github.com/baaami/dorandoran/match-service/pkg/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -44,7 +45,7 @@ func main() {
 	for {
 		select {
 		case <-ticker.C:
-			for coupleCount := 2; coupleCount <= 6; coupleCount++ {
+			for coupleCount := types.MATCH_COUNT_MIN; coupleCount <= types.MATCH_COUNT_MAX; coupleCount++ {
 				err := redisClient.MonitorAndMatchUsers(coupleCount, emitter)
 				if err != nil {
 					log.Printf("Error while monitoring queue for %d: %v", coupleCount, err)

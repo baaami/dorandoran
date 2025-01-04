@@ -12,7 +12,7 @@ func SessionMiddleware(redisClient *redis.RedisClient) func(http.Handler) http.H
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// 로그인의 경우에는 인증을 하지 않음
-			if strings.HasPrefix(r.URL.Path, "/auth") {
+			if strings.HasPrefix(r.URL.Path, "/auth") || strings.HasPrefix(r.URL.Path, "/profile") {
 				next.ServeHTTP(w, r)
 				return
 			}

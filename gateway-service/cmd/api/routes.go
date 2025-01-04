@@ -31,6 +31,9 @@ func (app *Config) routes(redisClient *redis.RedisClient) http.Handler {
 	mux.Handle("/ws/match", app.proxySocketServer("ws://match-socket-service"))
 	mux.Handle("/ws/chat", app.proxySocketServer("ws://chat-socket-service"))
 
+	// 프로필 이미지
+	mux.Get("/profile", app.profileHandler)
+
 	// 매칭
 	mux.Handle("/match/*", http.HandlerFunc(app.proxyService()))
 

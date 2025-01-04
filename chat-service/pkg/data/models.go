@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -72,7 +73,7 @@ func (cr *ChatReader) Insert(reader ChatReader) error {
 	return nil
 }
 
-// 해당 room에서 before 시간 이전에 존재한 읽지 않은 메시지 리스트
+// 채팅방에서 before 시간 이전에 존재하는읽지 않은 메시지 리스트
 func (c *Chat) GetUnreadMessagesBefore(roomID string, before time.Time, userID int) ([]Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -493,4 +494,39 @@ func (c *Chat) GetLastMessageByRoomID(roomID string) (*Chat, error) {
 	}
 
 	return &lastMessage, nil
+}
+
+// 사용자가 특정 채팅방에서 가지고 있는 GamerInfo를 반환하는 함수
+func (c *ChatRoom) GetUserGameInfoInRoom(userID int, roomID string) (*GamerInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("rooms")
+
+	// Find the room by its ID
+	var room ChatRoom
+	err := collection.FindOne(ctx, bson.M{"id": roomID}).Decode(&room)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, errors.New("room not found")
+		}
+		log.Println("Error finding room:", err)
+		return nil, err
+	}
+
+	// Search for the GamerInfo of the specified user
+	for _, gamer := range room.Gamers {
+		if gamer.UserID == userID {
+			return &gamer, nil
+		}
+	}
+
+	noGamer := GamerInfo{
+		UserID:             -1,
+		CharacterID:        -1,
+		CharacterName:      "",
+		CharacterAvatarURL: "",
+	}
+	// Return an error if the user is not found in the room
+	return &noGamer, errors.New("user not found in the game")
 }

@@ -13,12 +13,11 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/data"
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/baaami/dorandoran/chat/pkg/types"
-	common "github.com/baaami/dorandoran/common/user"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// 매칭 성공 시 게임방 생성 루틴
+// 방 생성
 func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 	for matchEvent := range chatRoomCreateChan {
 		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
@@ -26,6 +25,8 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 
 		var startTime time.Time
 		var finishTime time.Time
+
+		var gamers []data.GamerInfo
 
 		if matchEvent.MatchType == types.MATCH_GAME {
 			log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
@@ -39,10 +40,40 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 			finishTime = startTime.Add(10 * time.Minute)
 		}
 
+		// 나는 솔로 캐릭터 할당
+		male := 0
+		female := 0
+
+		for _, user := range matchEvent.MatchedUsers {
+			var gamer data.GamerInfo
+
+			if matchEvent.MatchType == types.MATCH_GAME {
+				gamer.UserID = user.ID
+				if user.Gender == types.MALE {
+					gamer.CharacterID = male
+					gamer.CharacterName = data.MaleNames[male]
+					male++
+				} else {
+					gamer.CharacterID = female
+					gamer.CharacterName = data.FemaleNames[female]
+					female++
+				}
+
+				gamer.CharacterAvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
+			} else {
+				// 사용하지 않음
+				gamer.CharacterID = -1
+				gamer.CharacterAvatarURL = ""
+			}
+
+			gamers = append(gamers, gamer)
+		}
+
 		room := data.ChatRoom{
 			ID:           chatRoomID,
 			Type:         matchEvent.MatchType,
 			UserIDs:      extractUserIDs(matchEvent.MatchedUsers),
+			Gamers:       gamers,
 			CreatedAt:    startTime,
 			FinishChatAt: finishTime,
 			ModifiedAt:   startTime,
@@ -92,7 +123,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 	}
 }
 
-// 특정 유저의 채팅방 목록 조회
+// 채팅방 목록 조회
 func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	xUserID := r.Header.Get("X-User-ID")
 	if xUserID == "" {
@@ -132,9 +163,28 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			unreadCount = 0
 		}
 
+		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(findLastMessage.SenderID, room.ID)
+		if err != nil {
+			if err.Error() == "user not found in the game" {
+				log.Printf("user not found in the game")
+			} else {
+				log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", findLastMessage.SenderID, room.ID, err)
+				continue
+			}
+		}
+		if gamerInfo == nil {
+			log.Printf("gamerinfo is nil")
+			continue
+		}
+
 		lastMessage := data.LastMessage{
-			SenderID:  findLastMessage.SenderID,
-			Message:   findLastMessage.Message,
+			SenderID: findLastMessage.SenderID,
+			Message:  findLastMessage.Message,
+			GameInfo: types.GameInfo{
+				CharacterID:        gamerInfo.CharacterID,
+				CharacterName:      gamerInfo.CharacterName,
+				CharacterAvatarURL: gamerInfo.CharacterAvatarURL,
+			},
 			CreatedAt: findLastMessage.CreatedAt,
 		}
 
@@ -158,7 +208,7 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// Room ID로 채팅방 상세 정보 조회
+// 채팅방 상세 정보 조회
 func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	roomID := chi.URLParam(r, "id")
 
@@ -173,7 +223,7 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var userList []common.User
+	var gamerList []types.Gamer
 
 	for _, userID := range room.UserIDs {
 		user, err := getUserByUserID(strconv.Itoa(userID))
@@ -186,13 +236,39 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		userList = append(userList, *user)
+		// room 내 해당 user의 정보
+		gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(userID, roomID)
+		if err != nil {
+			if err.Error() == "user not found in the game" {
+				log.Printf("user not found in the game")
+			} else {
+				log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", user.ID, room.ID, err)
+				continue
+			}
+		}
+
+		gamer := types.Gamer{
+			ID:      user.ID,
+			SnsType: user.SnsType,
+			SnsID:   user.SnsID,
+			Name:    user.Name,
+			Gender:  user.Gender,
+			Birth:   user.Birth,
+			Address: user.Address,
+			GameInfo: types.GameInfo{
+				CharacterID:        gamerInfo.CharacterID,
+				CharacterName:      gamerInfo.CharacterName,
+				CharacterAvatarURL: gamerInfo.CharacterAvatarURL,
+			},
+		}
+
+		gamerList = append(gamerList, gamer)
 	}
 
-	payload := data.ChatRoomDetailResponse{
+	payload := data.RoomDetailResponse{
 		ID:           room.ID,
 		Type:         room.Type,
-		Users:        userList,
+		Users:        gamerList,
 		CreatedAt:    room.CreatedAt,
 		FinishChatAt: room.FinishChatAt,
 		ModifiedAt:   room.ModifiedAt,
@@ -202,8 +278,22 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(payload)
 }
 
-// 특정 방의 채팅 목록 조회
+// 게임방 내 캐릭터명 조회
 func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request) {
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		log.Printf("User ID is required")
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		return
+	}
+
 	// URL에서 room ID 가져오기
 	roomID := chi.URLParam(r, "id")
 	if roomID == "" {
@@ -211,40 +301,20 @@ func (app *Config) getChatMsgListByRoomID(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 쿼리 매개변수로 페이지 번호와 페이지 크기 가져오기
-	page := r.URL.Query().Get("page")
-	pageNumber := 1
-
-	if page != "" {
-		if parsedPage, err := strconv.Atoi(page); err == nil {
-			pageNumber = parsedPage
-		}
-	}
-
-	// MongoDB에서 데이터 가져오기
-	messages, totalCount, err := app.Models.Chat.GetByRoomIDWithPagination(roomID, pageNumber, data.PAGE_DEFAULT_SIZE)
+	gamerInfo, err := app.Models.ChatRoom.GetUserGameInfoInRoom(userID, roomID)
 	if err != nil {
-		log.Printf("Failed to GetByRoomIDWithPagination, err: %v", err)
-		http.Error(w, "Failed to fetch chat messages", http.StatusInternalServerError)
-		return
-	}
-
-	// 총 페이지 수 및 hasNextPage 계산
-	totalPages := int((totalCount + int64(data.PAGE_DEFAULT_SIZE) - 1) / int64(data.PAGE_DEFAULT_SIZE)) // 올림 계산
-	hasNextPage := pageNumber < totalPages
-
-	// 응답 생성
-	response := data.ChatListResponse{
-		Data:        messages,
-		CurrentPage: pageNumber,
-		NextPage:    pageNumber + 1,
-		HasNextPage: hasNextPage,
-		TotalPages:  totalPages,
+		if err.Error() == "user not found in the game" {
+			log.Printf("user not found in the game")
+		} else {
+			log.Printf("Failed to GetUserGameInfoInRoom, user %d in room %s, err: %v", userID, roomID, err)
+			http.Error(w, "failed to GetUserGameInfoInRoom", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// JSON 응답 전송
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(*gamerInfo); err != nil {
 		log.Printf("Failed to encode response: %v", err)
 		http.Error(w, "Failed to encode chat messages", http.StatusInternalServerError)
 		return
@@ -528,7 +598,7 @@ func (app *Config) deleteChatByRoomID(w http.ResponseWriter, r *http.Request) {
 }
 
 // [Bridge user] 회원 정보 획득
-func getUserByUserID(userID string) (*common.User, error) {
+func getUserByUserID(userID string) (*types.User, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
@@ -562,7 +632,7 @@ func getUserByUserID(userID string) (*common.User, error) {
 	}
 
 	// 응답 본문에서 유저 정보 디코딩
-	var user common.User
+	var user types.User
 
 	// 응답 본문 로깅 추가
 	body, err := io.ReadAll(resp.Body)

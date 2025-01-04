@@ -5,6 +5,11 @@ const (
 	MATCH_COUPLE
 )
 
+const (
+	MATCH_COUNT_MIN = 1
+	MATCH_COUNT_MAX = 6
+)
+
 type Address struct {
 	City     string `gorm:"size:100" json:"city"`
 	District string `gorm:"size:100" json:"district"`

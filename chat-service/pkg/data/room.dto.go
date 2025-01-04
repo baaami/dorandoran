@@ -3,22 +3,27 @@ package data
 import (
 	"time"
 
-	common "github.com/baaami/dorandoran/common/user"
+	"github.com/baaami/dorandoran/chat/pkg/types"
 )
 
-type ChatRoomDetailResponse struct {
+type RoomDetailResponse struct {
 	ID           string        `bson:"id" json:"id"` // UUID 사용
 	Type         int           `bson:"type" json:"type"`
-	Users        []common.User `bson:"users" json:"users"`
+	Users        []types.Gamer `bson:"users" json:"users"`
 	CreatedAt    time.Time     `bson:"created_at" json:"created_at"`
 	FinishChatAt time.Time     `bson:"finish_chat_at" json:"finish_chat_at"`
 	ModifiedAt   time.Time     `bson:"modified_at" json:"modified_at"`
 }
 
+type RoomCharacterNameResponse struct {
+	name string `json:"name"`
+}
+
 type LastMessage struct {
-	SenderID  int       `json:"sender_id"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+	SenderID  int            `json:"sender_id"`
+	Message   string         `json:"message"`
+	GameInfo  types.GameInfo `json:"game_info"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type ChatRoomLatestResponse struct {
