@@ -356,6 +356,7 @@ func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 		Contents: map[string]string{
 			"en": chatEventMsg.Message,
 		},
+		AppUrl: fmt.Sprintf("randomChat://game-room/%s", chatEventMsg.RoomID),
 	}
 
 	fmt.Printf("send message: %v", message)

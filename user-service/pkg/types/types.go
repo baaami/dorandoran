@@ -40,4 +40,5 @@ type PushMessage struct {
 	TargetChannel  string            `json:"target_channel"`
 	Headings       map[string]string `json:"headings"`
 	Contents       map[string]string `json:"contents"`
+	AppUrl         string            `json:"app_url"`
 }
