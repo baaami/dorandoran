@@ -387,6 +387,6 @@ func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 		return fmt.Errorf("unexpected status: %s", resp.Status)
 	}
 
-	fmt.Println("Notification sent successfully!")
+	fmt.Printf("Notification sent successfully!, external id list: %v", externalIDs)
 	return nil
 }
