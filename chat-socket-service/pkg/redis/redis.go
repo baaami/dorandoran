@@ -102,6 +102,42 @@ func (r *RedisClient) GetActiveUserIDs(roomID string) ([]int, error) {
 	return activeUsers, nil
 }
 
+// Room의 비활성 사용자 ID 리스트를 반환
+func (r *RedisClient) GetInActiveUserIDs(roomID string) ([]int, error) {
+	// Step 1: Room의 사용자 ID 리스트 가져오기
+	// TODO: MongoDB 시작 시 Redis와 동기화 작업이 필요함
+	roomKey := fmt.Sprintf("room:%s", roomID)
+	userIDs, err := r.Client.SMembers(ctx, roomKey).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users for room %s: %v", roomID, err)
+	}
+
+	log.Printf("ROOM (%s) MEMBER in Redis, users: %v", roomID, userIDs)
+
+	// Step 2: 활성 사용자 필터링
+	inactiveUsers := []int{}
+	for _, sUserID := range userIDs {
+		activeKey := "client:active"
+		active, err := r.Client.HGet(ctx, activeKey, sUserID).Result()
+		if err == redis.Nil && active != "unique-server-id" {
+			userID, err := strconv.Atoi(sUserID)
+			if err != nil {
+				log.Printf("sUserID is not number: %s", sUserID)
+				continue
+			}
+
+			// 활성 사용자 추가
+			inactiveUsers = append(inactiveUsers, userID)
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to check active status for user %s: %v", sUserID, err)
+		}
+	}
+
+	log.Printf("INACTIVE USER in Redis, users: %v", inactiveUsers)
+
+	return inactiveUsers, nil
+}
+
 // Room 내 존재하는 user의 ID 리스트 반환
 func (r *RedisClient) GetRoomUserIDs(roomID string) ([]string, error) {
 	// Step 1: Room의 사용자 ID 리스트 가져오기

@@ -129,6 +129,13 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID int) {
 		return
 	}
 
+	// 비활성 사용자 ID 리스트 가져오기
+	inactiveUserIDs, err := app.RedisClient.GetInActiveUserIDs(broadCastMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to get active users for room %s: %v", broadCastMsg.RoomID, err)
+		return
+	}
+
 	// 방에 접속해있는 사용자 ID 리스트 가져오기
 	joinedUserIDs, err := app.RedisClient.GetJoinedUser(broadCastMsg.RoomID)
 	if err != nil {
@@ -148,7 +155,7 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID int) {
 	}
 
 	// Broadcast to the room
-	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs); err != nil {
+	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs, inactiveUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
 }
@@ -307,16 +314,17 @@ func joinIDs(ids []string) string {
 	return strings.Join(ids, "_")
 }
 
-func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds []int) error {
+func (app *Config) BroadcastToRoom(chatMsg *types.Chat, joinedUserIDs, activeUserIds, inactiveUserIds []int) error {
 	chatEvent := types.ChatEvent{
-		MessageId:   chatMsg.MessageId,
-		Type:        chatMsg.Type,
-		RoomID:      chatMsg.RoomID,
-		SenderID:    chatMsg.SenderID,
-		Message:     chatMsg.Message,
-		UnreadCount: chatMsg.UnreadCount,
-		ReaderIds:   joinedUserIDs,
-		CreatedAt:   chatMsg.CreatedAt,
+		MessageId:       chatMsg.MessageId,
+		Type:            chatMsg.Type,
+		RoomID:          chatMsg.RoomID,
+		SenderID:        chatMsg.SenderID,
+		Message:         chatMsg.Message,
+		UnreadCount:     chatMsg.UnreadCount,
+		InactiveUserIds: inactiveUserIds,
+		ReaderIds:       joinedUserIDs,
+		CreatedAt:       chatMsg.CreatedAt,
 	}
 
 	// RabbitMQ에 메시지 푸시
@@ -603,6 +611,13 @@ func (app *Config) handleRoomLeaveMessage(payload json.RawMessage) error {
 		return err
 	}
 
+	// 비활성 사용자 ID 리스트 가져오기
+	inactiveUserIDs, err := app.RedisClient.GetInActiveUserIDs(roomLeave.RoomID)
+	if err != nil {
+		log.Printf("Failed to get active users for room %s: %v", roomLeave.RoomID, err)
+		return err
+	}
+
 	// 방에 접속해있는 사용자 ID 리스트 가져오기
 	joinedUserIDs, err := app.RedisClient.GetJoinedUser(roomLeave.RoomID)
 	if err != nil {
@@ -622,7 +637,7 @@ func (app *Config) handleRoomLeaveMessage(payload json.RawMessage) error {
 	}
 
 	// Broadcast to the room
-	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs); err != nil {
+	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs, inactiveUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
 

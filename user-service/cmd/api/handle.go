@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/baaami/dorandoran/user/cmd/data"
+	"github.com/baaami/dorandoran/user/pkg/types"
+	"github.com/samber/lo"
 )
 
 // [TEST 전용] 존재하는 유저 리스트 획득
@@ -303,4 +307,86 @@ func (app *Config) updateMatchFilter(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(matchFilter)
+}
+
+func (app *Config) pushChat(w http.ResponseWriter, r *http.Request) {
+	var chatEventMsg types.ChatEvent
+	err := json.NewDecoder(r.Body).Decode(&chatEventMsg)
+	if err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// 비활성 사용자들에게만 푸쉬알림 전송
+	err = pushNotification(chatEventMsg.InactiveUserIds, chatEventMsg)
+	if err != nil {
+		log.Printf("Failed to pushNotification, user id list: %v, err: %s", chatEventMsg.InactiveUserIds, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
+	appID := os.Getenv("ONESIGNAL_APP_ID")
+	apiKey := os.Getenv("ONESIGNAL_API_KEY")
+
+	if appID == "" || apiKey == "" {
+		return fmt.Errorf("app id, app key is invalid, appid: %s, apikey: %s", appID, apiKey)
+	}
+
+	// OneSignal API URL
+	url := "https://onesignal.com/api/v1/notifications"
+
+	// samber/lo를 사용하여 userIDList를 string 배열로 변환
+	externalIDs := lo.Map(userIDList, func(id int, _ int) string {
+		return strconv.Itoa(id)
+	})
+
+	// PushMessage 구조체 초기화
+	message := types.PushMessage{
+		AppID: appID,
+		IncludeAliases: types.IncludeAliases{
+			ExternalID: externalIDs,
+		},
+		TargetChannel: "push",
+		Headings: types.Headings{
+			Ko: "새로운 메시지가 있습니다.",
+		},
+		Contents: types.Contents{
+			Ko: chatEventMsg.Message,
+		},
+	}
+
+	// JSON 직렬화
+	payload, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	// HTTP 요청 생성
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// HTTP 헤더 설정
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Basic %s", apiKey))
+
+	// HTTP 요청 전송
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 응답 상태 확인
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	fmt.Println("Notification sent successfully!")
+	return nil
 }

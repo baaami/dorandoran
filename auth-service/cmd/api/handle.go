@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -111,7 +111,7 @@ func GetKaKaoUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 	}
 
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	var kakaoResponse map[string]interface{}
 	json.Unmarshal(body, &kakaoResponse)
@@ -207,7 +207,7 @@ func GetNaverUserInfoByAccessToken(accessToken string) (map[string]interface{}, 
 	}
 
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	var naverResponse map[string]interface{}
 	json.Unmarshal(body, &naverResponse)
@@ -259,7 +259,7 @@ func GetExistUserByUserSrv(snsType int, snsID string) (User, error) {
 	var user User
 
 	// 응답 본문 로깅 추가
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to read response body: %v", err)
 	}

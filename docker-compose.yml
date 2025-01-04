@@ -21,6 +21,9 @@ services:
       dockerfile: ./user-service.dockerfile
     container_name: user-service
     restart: always
+    environment:
+      ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
+      ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
     deploy:
       mode: replicated
       replicas: 1

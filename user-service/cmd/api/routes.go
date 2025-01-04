@@ -35,6 +35,9 @@ func (app *Config) routes() http.Handler {
 	mux.Get("/match/filter", app.findMatchFilter)
 	mux.Patch("/match/filter", app.updateMatchFilter)
 
+	// 회원들에게 푸쉬 알림 전송
+	mux.Post("/push/chat", app.pushChat)
+
 	return mux
 }
 

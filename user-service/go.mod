@@ -3,9 +3,10 @@ module github.com/baaami/dorandoran/user
 go 1.22.5
 
 require (
-	github.com/baaami/dorandoran/common v0.0.0-20241109060800-870b80b6ea88
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
+	github.com/samber/lo v1.47.0
+	go.mongodb.org/mongo-driver v1.17.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
 )
@@ -15,5 +16,5 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
 )
