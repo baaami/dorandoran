@@ -23,6 +23,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
 		chatRoomID := matchEvent.MatchId
 
+		var seq int64
 		var startTime time.Time
 		var finishTime time.Time
 
@@ -33,11 +34,15 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 			startTime = time.Now()
 			// TODO: 시간 수정 필요
 			finishTime = startTime.Add(5 * time.Minute)
+
+			seq, _ = app.Models.ChatRoom.GetNextSequence("chatRoomSeq")
 		} else {
 			log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
 			startTime = time.Now()
 			// TODO: 시간 수정 필요
 			finishTime = startTime.Add(10 * time.Minute)
+
+			seq = 0
 		}
 
 		// 나는 솔로 캐릭터 할당
@@ -71,6 +76,7 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 
 		room := data.ChatRoom{
 			ID:           chatRoomID,
+			Seq:          seq,
 			Type:         matchEvent.MatchType,
 			UserIDs:      extractUserIDs(matchEvent.MatchedUsers),
 			Gamers:       gamers,
@@ -188,9 +194,11 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: findLastMessage.CreatedAt,
 		}
 
+		roomName := getRoomName(room, userID)
+
 		chatRoomResponse := data.ChatRoomLatestResponse{
 			ID:          room.ID,
-			RoomName:    "채팅방 이름",  // 필요시 동적으로 추가
+			RoomName:    roomName,  // 필요시 동적으로 추가
 			RoomType:    room.Type, // 0: 게임방, 1: 커플방
 			LastMessage: lastMessage,
 			UnreadCount: unreadCount,
@@ -206,6 +214,38 @@ func (app *Config) getChatRoomList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 	w.WriteHeader(http.StatusOK)
+}
+
+func getRoomName(room data.ChatRoom, userID int) string {
+	var roomName string
+
+	if room.Type == types.MATCH_GAME {
+		// 게임방의 경우 기수를 이름에 할당
+		roomName = fmt.Sprintf("%d기", room.Seq)
+	} else {
+		// 커플방의 경우 상대방 이름을 할당
+		var partnerID int
+
+		// 자신의 ID가 아닌 다른 사용자 ID를 partnerID에 할당
+		for _, id := range room.UserIDs {
+			if id != userID {
+				partnerID = id
+				break
+			}
+		}
+
+		user, err := getUserByUserID(strconv.Itoa(partnerID))
+		if err != nil {
+			log.Printf("Failed to getUserByUserID, userID: %d, err: %s", partnerID, err.Error())
+			roomName = fmt.Sprintf("%d기 커플방", room.Seq)
+			return roomName
+		}
+
+		// 상대방 ID로 원하는 작업 수행 (예: 이름 가져오기)
+		roomName = user.Name
+	}
+
+	return roomName
 }
 
 // 채팅방 상세 정보 조회

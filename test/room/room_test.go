@@ -21,7 +21,7 @@ import (
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
 	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
-	RoomID          = "20241228131933_1_3_2_4" // 테스트용 RoomID
+	RoomID          = "20250103131126_1_3_5_7_2_4_6_8" // 테스트용 RoomID
 )
 
 type WebSocketMessage struct {

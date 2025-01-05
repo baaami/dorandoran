@@ -291,6 +291,29 @@ func (c *Chat) DeleteChatByRoomID(roomID string) error {
 	return nil
 }
 
+// 다음 채팅방 기수 획득
+func (c *ChatRoom) GetNextSequence(sequenceName string) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	countersCollection := client.Database("chat_db").Collection("counters")
+
+	filter := bson.M{"_id": sequenceName}
+	update := bson.M{"$inc": bson.M{"seq": 1}}
+	options := options.FindOneAndUpdate().SetReturnDocument(options.After).SetUpsert(true)
+
+	var result struct {
+		Seq int64 `bson:"seq"`
+	}
+	err := countersCollection.FindOneAndUpdate(ctx, filter, update, options).Decode(&result)
+	if err != nil {
+		log.Printf("Error generating sequence for %s: %v", sequenceName, err)
+		return 0, err
+	}
+
+	return result.Seq, nil
+}
+
 // 새로운 채팅방 삽입
 func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

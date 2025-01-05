@@ -33,6 +33,7 @@ type ChatRoom struct {
 	Type         int         `bson:"type" json:"type"`
 	UserIDs      []int       `bson:"user_ids" json:"user_ids"`
 	Gamers       []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
+	Seq          int64       `bson:"seq" json:"seq"`       // 자동 증가 필드
 	CreatedAt    time.Time   `bson:"created_at" json:"created_at"`
 	FinishChatAt time.Time   `bson:"finish_chat_at" json:"finish_chat_at"`
 	ModifiedAt   time.Time   `bson:"modified_at" json:"modified_at"`
