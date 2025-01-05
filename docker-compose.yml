@@ -10,7 +10,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
     ports:
-      - "2719:80"
+      - '2719:80'
     deploy:
       mode: replicated
       replicas: 1
@@ -116,27 +116,29 @@ services:
       MYSQL_DATABASE: users
       MYSQL_ROOT_PASSWORD: sample
     ports:
-      - "3306:3306"
+      - '3306:3306'
     deploy:
       mode: replicated
       replicas: 1
+    volumes:
+      - ./db-data/mysql/:/var/lib/mysql/
 
   mongo:
-    image: "mongo:4.2.16-bionic"
+    image: 'mongo:4.2.16-bionic'
     container_name: mongo
     ports:
-      - "27017:27017"
+      - '27017:27017'
     environment:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: sample
 
   rabbitmq:
-    image: "rabbitmq:3.9-management-alpine"
+    image: 'rabbitmq:3.9-management-alpine'
     container_name: rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672" # RabbitMQ Management Plugin 포트
+      - '5672:5672'
+      - '15672:15672' # RabbitMQ Management Plugin 포트
     deploy:
       mode: replicated
       replicas: 1
@@ -153,15 +155,15 @@ services:
     environment:
       REDIS_PASSWORD: admin
     ports:
-      - "6379:6379"
+      - '6379:6379'
     command: [
-        "redis-server",
-        "--requirepass",
-        "admin",
-        "--save",
-        "", # RDB 영속성 비활성화
-        "--appendonly",
-        "no", # AOF 영속성 비활성화
+        'redis-server',
+        '--requirepass',
+        'admin',
+        '--save',
+        '', # RDB 영속성 비활성화
+        '--appendonly',
+        'no', # AOF 영속성 비활성화
       ]
     # volumes:
     #   - ./db-data/redis:/data # Redis 데이터 저장소 마운트
