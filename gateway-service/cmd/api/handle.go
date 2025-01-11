@@ -156,20 +156,25 @@ func forwardMessages(src, dest *websocket.Conn) {
 		messageType, msg, err := src.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
-				log.Printf("Unexpected WebSocket close error")
+				log.Printf("Unexpected WebSocket close error: %v", err)
 			} else {
-				log.Printf("WebSocket connection closed by client")
+				log.Printf("WebSocket connection closed by %v", src.RemoteAddr())
 			}
-			break
+			break // 루프 종료
 		}
 
 		// 메시지 쓰기
 		err = dest.WriteMessage(messageType, msg)
 		if err != nil {
 			log.Printf("Error forwarding WebSocket message: %v", err)
-			break
+			break // 루프 종료
 		}
 	}
+
+	// 연결 종료 시 반대쪽 WebSocket도 닫음
+	dest.Close()
+	src.Close()
+	log.Printf("Closed WebSocket connection between %v and %v", src.RemoteAddr(), dest.RemoteAddr())
 }
 
 func (app *Config) profileHandler(w http.ResponseWriter, r *http.Request) {

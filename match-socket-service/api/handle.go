@@ -87,17 +87,17 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 	exists, queueName, err := app.RedisClient.IsUserInQueue(waitingUser)
 	if err != nil {
 		log.Printf("Error checking user %d in queue: %v", userID, err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to check user in queue")
+		return err
 	}
 	if exists {
 		log.Printf("User %d is already in the matching queue (%s)", userID, queueName)
-		return echo.NewHTTPError(http.StatusConflict, "User already in matching queue")
+		return err
 	}
 
 	// 매칭 서버에 사용자 등록
 	if err := app.RegisterMatchClient(conn, waitingUser); err != nil {
 		log.Printf("Failed to register user %d to queue: %v", waitingUser.ID, err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to register user in matching queue")
+		return err
 	}
 
 	defer func() {
@@ -122,7 +122,7 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 				app.sendMatchFailureMessage(conn)
 			}
 
-			return echo.NewHTTPError(http.StatusGatewayTimeout, "Failed to match time out")
+			return err
 		default:
 			_, _, err := conn.ReadMessage()
 			if err != nil {
@@ -135,7 +135,7 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 				} else {
 					log.Println("WebSocket connection closed by client")
 				}
-				return echo.NewHTTPError(http.StatusOK, "WebSocket connection closed by client")
+				return err
 			}
 		}
 	}

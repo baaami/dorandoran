@@ -64,7 +64,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 
 	// Ping-Pong 메커니즘 추가
 	go func() {
-		ticker := time.NewTicker(2 * time.Second) // 5초마다 Ping 메시지 전송
+		ticker := time.NewTicker(2 * time.Second)
 		defer wg.Done()
 		defer ticker.Stop()
 
@@ -82,11 +82,11 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 				}
 				log.Printf("Sent ping to user %d", userID)
 
-				// 2초 안에 pong 수신 확인
+				// 5초 안에 pong 수신 확인
 				select {
 				case <-app.PongChannel:
 					log.Printf("Pong received from user %d", userID)
-				case <-time.After(2 * time.Second):
+				case <-time.After(5 * time.Second):
 					log.Printf("Pong not received within 2 seconds for user %d", userID)
 					conn.Close()
 					return
@@ -122,6 +122,7 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				} else {
 					log.Printf("WebSocket connection closed by client")
 				}
+				conn.Close()
 				return
 			}
 
