@@ -17,9 +17,10 @@ import (
 const webPort = 80
 
 type Config struct {
-	ChatClients  sync.Map                    // key: userID, value: *Client
-	ChatEmitter  *event.Emitter              // RabbitMQ Producer
-	RedisClient  *redis.RedisClient          // Redis 정보 관리
+	ChatClients  sync.Map           // key: userID, value: *Client
+	ChatEmitter  *event.Emitter     // RabbitMQ Producer
+	RedisClient  *redis.RedisClient // Redis 정보 관리
+	PongChannel  chan bool
 	EventChannel chan types.WebSocketMessage // RabbitMQ 메시지 소비용 채널
 }
 

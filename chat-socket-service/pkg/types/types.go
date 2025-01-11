@@ -91,6 +91,8 @@ type ChatEvent struct {
 }
 
 const (
+	MessageKindPing               = "ping"
+	MessageKindPong               = "pong"
 	MessageKindMessage            = "message"
 	MessageKindJoin               = "join"
 	MessageKindLeave              = "leave"

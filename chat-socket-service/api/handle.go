@@ -58,7 +58,40 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
-	wg.Add(1) // 두 개의 고루틴 (listenChatEvent, pingPump)
+	wg.Add(2)
+
+	// Ping-Pong 메커니즘 추가
+	go func() {
+		ticker := time.NewTicker(2 * time.Second) // 5초마다 Ping 메시지 전송
+		defer wg.Done()
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("Ping-Pong goroutine exiting due to context cancellation")
+				return
+			case <-ticker.C:
+				// Ping 메시지 생성 및 전송
+				pingMessage := types.WebSocketMessage{Kind: types.MessageKindPing, Payload: nil}
+				if err := conn.WriteJSON(pingMessage); err != nil {
+					log.Printf("Failed to send ping to user %d: %v", userID, err)
+					return
+				}
+				log.Printf("Sent ping to user %d", userID)
+
+				// 2초 안에 pong 수신 확인
+				select {
+				case <-app.PongChannel:
+					log.Printf("Pong received from user %d", userID)
+				case <-time.After(2 * time.Second):
+					log.Printf("Pong not received within 2 seconds for user %d", userID)
+					conn.Close()
+					return
+				}
+			}
+		}
+	}()
 
 	// 메시지 처리 고루틴
 	go func() {
@@ -77,6 +110,7 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("Context canceled, exiting listenChatEvent for user %d", userID)
 			return // 컨텍스트가 취소되면 고루틴 종료
 		default:
 			_, msg, err := conn.ReadMessage()
@@ -96,6 +130,12 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 			}
 
 			switch wsMsg.Kind {
+			case types.MessageKindPong:
+				select {
+				case app.PongChannel <- true:
+				default:
+					log.Println("Pong received but no ping waiting")
+				}
 			case types.MessageKindMessage:
 				app.handleBroadCastMessage(wsMsg.Payload, userID)
 			case types.MessageKindJoin:
