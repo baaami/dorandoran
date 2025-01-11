@@ -56,6 +56,8 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 		conn.Close()
 	}()
 
+	app.PongChannel = make(chan bool, 10)
+
 	// WaitGroup을 사용하여 모든 고루틴이 종료될 때까지 대기
 	var wg sync.WaitGroup
 	wg.Add(2)
