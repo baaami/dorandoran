@@ -104,7 +104,6 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 		if err := app.UnRegisterMatchClient(waitingUser); err != nil {
 			log.Printf("Failed to remove user %d from queue: %v", userID, err)
 		}
-		conn.Close()
 	}()
 
 	for {

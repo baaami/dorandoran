@@ -42,6 +42,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 		log.Printf("Failed to upgrade connection: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "WebSocket upgrade failed")
 	}
+	defer conn.Close()
 
 	xUserID := c.Request().Header.Get("X-User-ID")
 	userID, err := strconv.Atoi(xUserID)
@@ -53,7 +54,6 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 	app.RegisterChatClient(conn, userID)
 	defer func() {
 		app.UnRegisterChatClient(userID)
-		conn.Close()
 	}()
 
 	app.PongChannel = make(chan bool, 10)
@@ -64,14 +64,14 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 
 	// Ping-Pong 메커니즘 추가
 	go func() {
-		ticker := time.NewTicker(2 * time.Second)
+		ticker := time.NewTicker(3 * time.Second)
 		defer wg.Done()
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("Ping-Pong goroutine exiting due to context cancellation")
+				log.Printf("Ping-Pong cancellation for user: %d", userID)
 				return
 			case <-ticker.C:
 				// Ping 메시지 생성 및 전송
@@ -87,8 +87,8 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 				case <-app.PongChannel:
 					log.Printf("Pong received from user %d", userID)
 				case <-time.After(5 * time.Second):
-					log.Printf("Pong not received within 2 seconds for user %d", userID)
-					conn.Close()
+					log.Printf("Pong not received within 7 seconds for user %d", userID)
+					cancel()
 					return
 				}
 			}
@@ -98,7 +98,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 	// 메시지 처리 고루틴
 	go func() {
 		defer wg.Done()
-		app.listenChatEvent(ctx, conn, userID)
+		app.listenChatEvent(ctx, cancel, conn, userID)
 	}()
 
 	// 모든 고루틴이 종료될 때까지 대기
@@ -108,7 +108,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 }
 
 // 메시지 읽기 처리
-func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, userID int) {
+func (app *Config) listenChatEvent(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, userID int) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -120,9 +120,9 @@ func (app *Config) listenChatEvent(ctx context.Context, conn *websocket.Conn, us
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 					log.Printf("Unexpected WebSocket close error")
 				} else {
-					log.Printf("WebSocket connection closed by client")
+					log.Printf("WebSocket connection closed by client, user: %d", userID)
 				}
-				conn.Close()
+				cancel()
 				return
 			}
 
@@ -563,8 +563,6 @@ func (app *Config) UnRegisterChatClient(userID int) {
 		// Redis에서 활성 사용자 제거
 		if err := app.RedisClient.UnregisterActiveUser(userID); err != nil {
 			log.Printf("Failed to unregister active user %d in Redis: %v", userID, err)
-		} else {
-			log.Printf("User %d unregistered as active", userID)
 		}
 
 		log.Printf("User %d unregistered chat server", userID)
@@ -573,7 +571,7 @@ func (app *Config) UnRegisterChatClient(userID int) {
 
 func (c *Client) writePump() {
 	defer func() {
-		log.Printf("[INFO] writePump for user %v exited", c.Conn.RemoteAddr())
+		log.Printf("writePump for user %v exited", c.Conn.RemoteAddr())
 	}()
 
 	for {
