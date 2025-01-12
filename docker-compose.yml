@@ -15,6 +15,38 @@ services:
       mode: replicated
       replicas: 1
 
+  match-socket-service:
+    build:
+      context: ./match-socket-service
+      dockerfile: ./match-socket-service.dockerfile
+    container_name: match-socket-service
+    restart: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: admin
+    ports:
+      - '2720:80'
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  chat-socket-service:
+    build:
+      context: ./chat-socket-service
+      dockerfile: ./chat-socket-service.dockerfile
+    container_name: chat-socket-service
+    restart: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: admin
+    ports:
+      - '2721:80'
+    deploy:
+      mode: replicated
+      replicas: 1
+
   user-service:
     build:
       context: ./user-service
@@ -80,34 +112,6 @@ services:
       mode: replicated
       replicas: 1
 
-  match-socket-service:
-    build:
-      context: ./match-socket-service
-      dockerfile: ./match-socket-service.dockerfile
-    container_name: match-socket-service
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  chat-socket-service:
-    build:
-      context: ./chat-socket-service
-      dockerfile: ./chat-socket-service.dockerfile
-    container_name: chat-socket-service
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin
-    deploy:
-      mode: replicated
-      replicas: 1
-
   mysql:
     image: mysql:8
     container_name: mysql
@@ -156,14 +160,15 @@ services:
       REDIS_PASSWORD: admin
     ports:
       - '6379:6379'
-    command: [
+    command:
+      [
         'redis-server',
         '--requirepass',
         'admin',
         '--save',
         '', # RDB 영속성 비활성화
         '--appendonly',
-        'no', # AOF 영속성 비활성화
-      ]
+        'no'
+      ] # AOF 영속성 비활성화
     # volumes:
     #   - ./db-data/redis:/data # Redis 데이터 저장소 마운트

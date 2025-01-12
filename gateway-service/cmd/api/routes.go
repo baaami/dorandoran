@@ -27,10 +27,6 @@ func (app *Config) routes(redisClient *redis.RedisClient) http.Handler {
 	// 세션 검증 미들웨어 추가
 	mux.Use(middleware.SessionMiddleware(redisClient))
 
-	// WebSocket 프록시 라우팅
-	mux.Handle("/ws/match", app.proxySocketServer("ws://match-socket-service"))
-	mux.Handle("/ws/chat", app.proxySocketServer("ws://chat-socket-service"))
-
 	// 프로필 이미지
 	mux.Get("/profile", app.profileHandler)
 

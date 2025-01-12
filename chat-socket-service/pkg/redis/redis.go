@@ -42,6 +42,26 @@ func NewRedisClient() (*RedisClient, error) {
 	return &RedisClient{Client: client}, nil
 }
 
+// GetSession: Redis에서 세션 조회
+func (r *RedisClient) GetUserBySessionID(sessionID string) (int, error) {
+	sUserID, err := r.Client.Get(ctx, sessionID).Result()
+	if err == redis.Nil {
+		log.Printf("sessionID is not exist in DB")
+		return 0, fmt.Errorf("session not found")
+	} else if err != nil {
+		log.Printf("Get Session Error, %s", err.Error())
+		return 0, err
+	}
+
+	userID, err := strconv.Atoi(sUserID)
+	if err != nil {
+		log.Printf("Failed to Atoi, user id: %s", sUserID)
+		return 0, nil
+	}
+
+	return userID, nil
+}
+
 // 활성 사용자 등록
 func (r *RedisClient) RegisterActiveUser(userID int, serverID string) error {
 	return r.Client.HSet(ctx, "client:active", strconv.Itoa(userID), serverID).Err()

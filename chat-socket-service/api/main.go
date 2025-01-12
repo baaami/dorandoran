@@ -102,7 +102,7 @@ func main() {
 	log.Printf("Starting server on port %d", webPort)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", webPort),
-		Handler: app.routes(),
+		Handler: app.routes(redisClient),
 	}
 
 	if err := srv.ListenAndServe(); err != nil {

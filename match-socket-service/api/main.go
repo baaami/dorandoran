@@ -77,7 +77,7 @@ func main() {
 	// HTTP 서버 설정
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", webPort),
-		Handler: app.routes(),
+		Handler: app.routes(redisClient),
 	}
 
 	// 서버 시작

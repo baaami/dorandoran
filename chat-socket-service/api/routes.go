@@ -5,9 +5,12 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
+
+	_middleware "github.com/baaami/dorandoran/chat-socket-service/pkg/middleware"
+	"github.com/baaami/dorandoran/chat-socket-service/pkg/redis"
 )
 
-func (app *Config) routes() http.Handler {
+func (app *Config) routes(redisClient *redis.RedisClient) http.Handler {
 	e := echo.New()
 
 	// CORS 설정
@@ -19,6 +22,8 @@ func (app *Config) routes() http.Handler {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	e.Use(_middleware.SessionMiddleware(redisClient))
 
 	// Define WebSocket route for matching
 	e.GET("/ws/chat", app.HandleChatSocket)
