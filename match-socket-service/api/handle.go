@@ -122,7 +122,7 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 				app.sendMatchFailureMessage(conn)
 			}
 
-			return err
+			return nil
 		default:
 			_, _, err := conn.ReadMessage()
 			if err != nil {
@@ -133,9 +133,9 @@ func (app *Config) HandleMatchSocket(c echo.Context) error {
 					app.sendMatchFailureMessage(conn)
 					continue
 				} else {
-					log.Println("WebSocket connection closed by client")
+					log.Printf("WebSocket connection closed by client, user id: %d", userID)
 				}
-				return err
+				return nil
 			}
 		}
 	}

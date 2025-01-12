@@ -17,7 +17,7 @@ import (
 
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
-	WS_MATCH_URL    = "ws://localhost:2719/ws/match"
+	WS_MATCH_URL    = "ws://localhost:2720/ws/match"
 )
 
 type Address struct {

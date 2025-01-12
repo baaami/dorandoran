@@ -20,8 +20,8 @@ import (
 
 const (
 	API_GATEWAY_URL = "http://localhost:2719"
-	WS_CHAT_URL     = "ws://localhost:2719/ws/chat"
-	RoomID          = "20250103131126_1_3_5_7_2_4_6_8" // 테스트용 RoomID
+	WS_CHAT_URL     = "ws://localhost:2721/ws/chat"
+	RoomID          = "20250112123230_3_5_1_7_4_6_8_2" // 테스트용 RoomID
 )
 
 type WebSocketMessage struct {
@@ -175,6 +175,22 @@ func receiveChats(t *testing.T, conn *websocket.Conn, userID string, wg *sync.Wa
 			continue
 		}
 
+		// "ping" 메시지를 처리하고 "pong" 응답 전송
+		if webSocketMsg.Kind == "ping" {
+			pongMsg := WebSocketMessage{
+				Kind:    "pong",
+				Payload: nil,
+			}
+			err = conn.WriteJSON(pongMsg)
+			if err != nil {
+				log.Printf("[ERROR] Failed to send pong message for User %s: %v", userID, err)
+			} else {
+				log.Printf("[INFO] User %s sent pong message", userID)
+			}
+			continue // 다른 메시지를 처리하지 않고 다음 반복으로 넘어감
+		}
+
+		// 다른 메시지를 처리
 		var chatMsg Chat
 		err = json.Unmarshal(webSocketMsg.Payload, &chatMsg)
 		if err != nil {

@@ -47,7 +47,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 	userID, err := strconv.Atoi(xUserID)
 	if err != nil {
 		log.Printf("User ID is not number, xUserID: %s", xUserID)
-		return err
+		return nil
 	}
 
 	app.RegisterChatClient(conn, userID)
