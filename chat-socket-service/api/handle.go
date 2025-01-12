@@ -23,6 +23,7 @@ import (
 type Client struct {
 	Conn *websocket.Conn
 	Send chan interface{}
+	Ctx  context.Context
 }
 
 func (app *Config) HandleChatSocket(c echo.Context) error {
@@ -51,7 +52,7 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 		return nil
 	}
 
-	app.RegisterChatClient(conn, userID)
+	app.RegisterChatClient(ctx, conn, userID)
 	defer func() {
 		app.UnRegisterChatClient(userID)
 	}()
@@ -62,37 +63,10 @@ func (app *Config) HandleChatSocket(c echo.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Ping-Pong 메커니즘 추가
+	// Ping-Pong 메커니즘
 	go func() {
-		ticker := time.NewTicker(3 * time.Second)
 		defer wg.Done()
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				log.Printf("Ping-Pong cancellation for user: %d", userID)
-				return
-			case <-ticker.C:
-				// Ping 메시지 생성 및 전송
-				pingMessage := types.WebSocketMessage{Kind: types.MessageKindPing, Payload: nil}
-				if err := conn.WriteJSON(pingMessage); err != nil {
-					log.Printf("Failed to send ping to user %d: %v", userID, err)
-					return
-				}
-				log.Printf("Sent ping to user %d", userID)
-
-				// 5초 안에 pong 수신 확인
-				select {
-				case <-app.PongChannel:
-					log.Printf("Pong received from user %d", userID)
-				case <-time.After(5 * time.Second):
-					log.Printf("Pong not received within 7 seconds for user %d", userID)
-					cancel()
-					return
-				}
-			}
-		}
+		app.pingPongHandler(ctx, cancel, conn, userID)
 	}()
 
 	// 메시지 처리 고루틴
@@ -153,6 +127,40 @@ func (app *Config) listenChatEvent(ctx context.Context, cancel context.CancelFun
 				app.handleFinalChoiceMessage(wsMsg.Payload, userID)
 			default:
 				log.Printf("Unknown Message: %s", wsMsg.Kind)
+			}
+		}
+	}
+}
+
+func (app *Config) pingPongHandler(ctx context.Context, cancel context.CancelFunc, conn *websocket.Conn, userID int) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Ping-Pong exiting due to context cancellation")
+			return
+		case <-ticker.C:
+			// Ping 메시지 생성 및 전송
+			pingMessage := types.WebSocketMessage{Kind: types.MessageKindPing, Payload: nil}
+			if err := conn.WriteJSON(pingMessage); err != nil {
+				log.Printf("Failed to send ping to user %d: %v", userID, err)
+				// 컨텍스트 종료
+				cancel()
+				return
+			}
+			log.Printf("Sent ping to user %d", userID)
+
+			// 5초 안에 pong 수신 확인
+			select {
+			case <-app.PongChannel:
+				log.Printf("Pong received from user %d", userID)
+			case <-time.After(7 * time.Second):
+				log.Printf("Pong not received within timeout for user %d", userID)
+				// 컨텍스트 종료
+				cancel()
+				return
 			}
 		}
 	}
@@ -528,9 +536,10 @@ func (app *Config) JoinRoom(roomID string, userID int) {
 	}
 }
 
-func (app *Config) RegisterChatClient(conn *websocket.Conn, userID int) {
+func (app *Config) RegisterChatClient(ctx context.Context, conn *websocket.Conn, userID int) {
 	client := &Client{
 		Conn: conn,
+		Ctx:  ctx,
 		Send: make(chan interface{}, 256),
 	}
 
@@ -575,17 +584,22 @@ func (c *Client) writePump() {
 	}()
 
 	for {
-		message, ok := <-c.Send
-		if !ok {
-			// 채널이 닫힌 경우 연결을 닫습니다.
-			c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+		select {
+		case <-c.Ctx.Done(): // 컨텍스트가 취소되었는지 확인
+			log.Printf("Writer exiting due to context cancellation")
 			return
-		}
+		case message, ok := <-c.Send:
+			if !ok {
+				// 채널이 닫힌 경우 연결을 닫습니다.
+				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
 
-		// 메시지를 전송합니다.
-		if err := c.Conn.WriteJSON(message); err != nil {
-			log.Printf("Failed to write message: %v", err)
-			return
+			// 메시지를 전송합니다.
+			if err := c.Conn.WriteJSON(message); err != nil {
+				log.Printf("Failed to write message: %v", err)
+				return
+			}
 		}
 	}
 }
