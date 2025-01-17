@@ -85,7 +85,7 @@ func main() {
 	// RoomManager 초기화
 	roomManager := manager.NewRoomManager(redisClient, emitter, models)
 
-	chatRoomChan := make(chan types.MatchEvent)
+	eventChannel := make(chan types.MatchEvent)
 
 	// Config 구조체 초기화
 	app := Config{
@@ -112,7 +112,7 @@ func main() {
 
 	go func() {
 		log.Println("Starting RabbitMQ consumer for matching events")
-		if err := consumer.Listen(handlers, chatRoomChan); err != nil {
+		if err := consumer.Listen(handlers, eventChannel); err != nil {
 			log.Printf("Failed to start RabbitMQ consumer: %v", err)
 			os.Exit(1)
 		}
@@ -120,7 +120,7 @@ func main() {
 
 	go func() {
 		log.Println("Starting ChatRoom creator routine")
-		app.createRoom(chatRoomChan)
+		app.createRoom(eventChannel)
 	}()
 
 	// 웹 서버 시작

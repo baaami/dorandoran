@@ -393,3 +393,18 @@ func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 	fmt.Printf("Notification sent successfully!, external id list: %v", externalIDs)
 	return nil
 }
+
+func (app *Config) decreaseGamePointByGameStart(eventChannel <-chan types.MatchEvent) {
+	for matchEvent := range eventChannel {
+		if matchEvent.MatchType != types.MATCH_GAME {
+			continue
+		}
+
+		for _, user := range matchEvent.MatchedUsers {
+			err := app.Models.DecreaseGamePoint(user.ID, types.ONE_GAME_POINT)
+			if err != nil {
+				log.Printf("Failed to DecreaseGamePoint, user: %d, err: %s", user.ID, err.Error())
+			}
+		}
+	}
+}

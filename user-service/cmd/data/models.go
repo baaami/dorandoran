@@ -14,13 +14,14 @@ type Address struct {
 }
 
 type User struct {
-	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType int     `gorm:"index" json:"sns_type"`
-	SnsID   string  `gorm:"index" json:"sns_id"`
-	Name    string  `gorm:"size:100" json:"name"`
-	Gender  int     `json:"gender"`
-	Birth   string  `gorm:"size:20" json:"birth"`
-	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType   int     `gorm:"index" json:"sns_type"`
+	SnsID     string  `gorm:"index" json:"sns_id"`
+	Name      string  `gorm:"size:100" json:"name"`
+	Gender    int     `json:"gender"`
+	Birth     string  `gorm:"size:20" json:"birth"`
+	Address   Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	GamePoint int     `json:"game_point"`
 }
 
 type MatchFilter struct {
@@ -131,4 +132,26 @@ func (s *UserService) GetMatchFilterByUserID(userID int) (*MatchFilter, error) {
 		return nil, err
 	}
 	return &filter, nil
+}
+
+func (s *UserService) IncreaseGamePoint(userID int, points int) error {
+	if points <= 0 {
+		return errors.New("points to increase must be greater than zero")
+	}
+	if err := s.DB.Model(&User{}).Where("id = ?", userID).Update("game_point", gorm.Expr("game_point + ?", points)).Error; err != nil {
+		log.Printf("Failed to increase game points for user ID %d: %v", userID, err)
+		return err
+	}
+	return nil
+}
+
+func (s *UserService) DecreaseGamePoint(userID int, points int) error {
+	if points <= 0 {
+		return errors.New("points to decrease must be greater than zero")
+	}
+	if err := s.DB.Model(&User{}).Where("id = ? AND game_point >= ?", userID, points).Update("game_point", gorm.Expr("game_point - ?", points)).Error; err != nil {
+		log.Printf("Failed to decrease game points for user ID %d: %v", userID, err)
+		return err
+	}
+	return nil
 }
