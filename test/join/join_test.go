@@ -56,13 +56,14 @@ type Address struct {
 }
 
 type User struct {
-	ID      int     `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType int     `gorm:"index" json:"sns_type"`
-	SnsID   string  `gorm:"index" json:"sns_id"`
-	Name    string  `gorm:"size:100" json:"name"`
-	Gender  int     `json:"gender"`
-	Birth   string  `gorm:"size:20" json:"birth"`
-	Address Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType   int     `gorm:"index" json:"sns_type"`
+	SnsID     string  `gorm:"index" json:"sns_id"`
+	Name      string  `gorm:"size:100" json:"name"`
+	Gender    int     `json:"gender"`
+	Birth     string  `gorm:"size:20" json:"birth"`
+	Address   Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	GamePoint int     `json:"game_point"`
 }
 
 // 로그인 API를 호출하여 세션 ID와 유저 ID를 발급받는 함수

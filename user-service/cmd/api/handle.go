@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/baaami/dorandoran/user/cmd/data"
+	"github.com/baaami/dorandoran/user/pkg/dto"
 	"github.com/baaami/dorandoran/user/pkg/types"
 	"github.com/samber/lo"
 )
@@ -327,6 +328,42 @@ func (app *Config) pushChat(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (app *Config) pointChargeHander(w http.ResponseWriter, r *http.Request) {
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		log.Printf("User ID is required")
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		return
+	}
+
+	var gamePoint dto.GamePointRequest
+
+	err = json.NewDecoder(r.Body).Decode(&gamePoint)
+	if err != nil {
+		log.Printf("Body: %v, err: %s", gamePoint, err.Error())
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	err = app.Models.IncreaseGamePoint(userID, gamePoint.Point)
+	if err != nil {
+		log.Printf("Failed to increase game point, user: %d, point: %d", userID, gamePoint.Point)
+		http.Error(w, fmt.Sprintf("Failed to increase game point, user: %d, point: %d", userID, gamePoint.Point), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Charge [%d: %d]", userID, gamePoint.Point)
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 	appID := os.Getenv("ONESIGNAL_APP_ID")
 	apiKey := os.Getenv("ONESIGNAL_API_KEY")
@@ -392,4 +429,19 @@ func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 
 	fmt.Printf("Notification sent successfully!, external id list: %v", externalIDs)
 	return nil
+}
+
+func (app *Config) decreaseGamePointByGameStart(eventChannel <-chan types.MatchEvent) {
+	for matchEvent := range eventChannel {
+		if matchEvent.MatchType != types.MATCH_GAME {
+			continue
+		}
+
+		for _, user := range matchEvent.MatchedUsers {
+			err := app.Models.DecreaseGamePoint(user.ID, types.ONE_GAME_POINT)
+			if err != nil {
+				log.Printf("Failed to DecreaseGamePoint, user: %d, err: %s", user.ID, err.Error())
+			}
+		}
+	}
 }

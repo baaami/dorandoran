@@ -5,6 +5,7 @@ go 1.22.5
 require (
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/samber/lo v1.47.0
 	go.mongodb.org/mongo-driver v1.17.1
 	gorm.io/driver/mysql v1.5.7

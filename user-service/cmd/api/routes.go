@@ -38,6 +38,9 @@ func (app *Config) routes() http.Handler {
 	// 회원들에게 푸쉬 알림 전송
 	mux.Post("/push/chat", app.pushChat)
 
+	// 게임 포인트
+	mux.Post("/point/charge", app.pointChargeHander)
+
 	return mux
 }
 

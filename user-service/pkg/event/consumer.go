@@ -3,22 +3,17 @@ package event
 import (
 	"encoding/json"
 	"fmt"
-
 	"log"
 
-	"github.com/baaami/dorandoran/chat/pkg/types"
+	"github.com/baaami/dorandoran/user/pkg/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
-
-// MessageHandler 타입 정의
-type MessageHandler func(payload EventPayload, eventChannel chan<- types.MatchEvent) error
 
 type Consumer struct {
 	conn      *amqp.Connection
 	exchanges []ExchangeConfig
 }
 
-// NewConsumer 함수: RabbitMQ Consumer 초기화
 func NewConsumer(conn *amqp.Connection, exchanges []ExchangeConfig) (*Consumer, error) {
 	consumer := &Consumer{
 		conn:      conn,
@@ -34,7 +29,6 @@ func NewConsumer(conn *amqp.Connection, exchanges []ExchangeConfig) (*Consumer, 
 	return consumer, nil
 }
 
-// setup 함수: 모든 Exchange 선언
 func (c *Consumer) setup() error {
 	channel, err := c.conn.Channel()
 	if err != nil {
@@ -60,7 +54,8 @@ func (c *Consumer) setup() error {
 	return nil
 }
 
-// Listen 함수: 메시지 소비 및 핸들러 호출
+type MessageHandler func(payload EventPayload, eventChannel chan<- types.MatchEvent) error
+
 func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<- types.MatchEvent) error {
 	channel, err := c.conn.Channel()
 	if err != nil {
@@ -70,7 +65,7 @@ func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<
 
 	// Queue 선언
 	queue, err := channel.QueueDeclare(
-		"chat_match_queue", // Unique한 Queue 이름
+		"user_match_queue", // Unique한 Queue 이름
 		true,               // Durable (영구적)
 		false,              // Auto-delete
 		false,              // Exclusive
@@ -136,10 +131,9 @@ func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<
 		}
 	}()
 
-	select {} // Block forever
+	select {}
 }
 
-// Match 이벤트 핸들러
 func MatchEventHandler(payload EventPayload, eventChannel chan<- types.MatchEvent) error {
 	var matchEvent types.MatchEvent
 	err := json.Unmarshal(payload.Data, &matchEvent)
