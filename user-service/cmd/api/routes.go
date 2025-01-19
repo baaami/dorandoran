@@ -39,7 +39,7 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/push/chat", app.pushChat)
 
 	// 게임 포인트
-	mux.Post("/point/charge", app.pointChargeHander)
+	mux.Patch("/point/charge", app.pointChargeHander)
 
 	return mux
 }
