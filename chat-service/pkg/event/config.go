@@ -43,4 +43,5 @@ const (
 	ExchangeAppTopic               = "app_topic"
 	ExchangeChatRoomCreateEvents   = "chat_room_create_events"
 	ExchangeCoupleRoomCreateEvents = "couple_room_create_events"
+	ExchangeMatchEvents            = "match_events"
 )

@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/baaami/dorandoran/user/cmd/data"
+	"github.com/baaami/dorandoran/user/pkg/dto"
 	"github.com/baaami/dorandoran/user/pkg/types"
 	"github.com/samber/lo"
 )
@@ -323,6 +324,42 @@ func (app *Config) pushChat(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to pushNotification, user id list: %v, err: %s", chatEventMsg.InactiveUserIds, err.Error())
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (app *Config) pointChargeHander(w http.ResponseWriter, r *http.Request) {
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		log.Printf("User ID is required")
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		log.Printf("User ID is not number, xUserID: %s", xUserID)
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		return
+	}
+
+	var gamePoint dto.GamePointRequest
+
+	err = json.NewDecoder(r.Body).Decode(&gamePoint)
+	if err != nil {
+		log.Printf("Body: %v, err: %s", gamePoint, err.Error())
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	err = app.Models.IncreaseGamePoint(userID, gamePoint.Point)
+	if err != nil {
+		log.Printf("Failed to increase game point, user: %d, point: %d", userID, gamePoint.Point)
+		http.Error(w, fmt.Sprintf("Failed to increase game point, user: %d, point: %d", userID, gamePoint.Point), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Charge [%d: %d]", userID, gamePoint.Point)
 
 	w.WriteHeader(http.StatusOK)
 }

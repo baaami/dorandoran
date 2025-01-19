@@ -70,12 +70,12 @@ func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<
 
 	// Queue 선언
 	queue, err := channel.QueueDeclare(
-		"match_queue", // Queue 이름
-		true,          // Durable (영구적)
-		false,         // Auto-delete
-		false,         // Exclusive
-		false,         // No-wait
-		nil,           // Arguments
+		"chat_match_queue", // Unique한 Queue 이름
+		true,               // Durable (영구적)
+		false,              // Auto-delete
+		false,              // Exclusive
+		false,              // No-wait
+		nil,                // Arguments
 	)
 	if err != nil {
 		return fmt.Errorf("failed to declare queue: %v", err)
