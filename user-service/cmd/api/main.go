@@ -56,9 +56,7 @@ func main() {
 
 	eventChannel := make(chan types.MatchEvent)
 
-	consumerExchanges := []event.ExchangeConfig{
-		{Name: "match_events", Type: "fanout"},
-	}
+	consumerExchanges := []event.ExchangeConfig{}
 
 	consumer, err := event.NewConsumer(rabbitConn, consumerExchanges)
 	if err != nil {
