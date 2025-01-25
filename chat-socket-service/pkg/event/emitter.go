@@ -108,6 +108,14 @@ func (e *Emitter) PushRoomJoinToQueue(roomJoinMsg types.RoomJoinEvent) error {
 	return e.publish("app_topic", "room.join", payload)
 }
 
+func (e *Emitter) PushFinalChoiceTimeoutToQueue(finalChoiceTimeoutMsg types.FinalChoiceTimeoutEvent) error {
+	payload := types.EventPayload{
+		EventType: EventTypeFinalChoiceTimeout,
+		Data:      toJSON(finalChoiceTimeoutMsg),
+	}
+	return e.publish("app_topic", EventTypeFinalChoiceTimeout, payload)
+}
+
 // Helper 함수: 데이터를 JSON 형식으로 변환
 func toJSON(data interface{}) json.RawMessage {
 	bytes, err := json.Marshal(data)

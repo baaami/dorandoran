@@ -15,13 +15,14 @@ type RoutingConfig struct {
 
 // Event Types
 const (
-	EventTypeChat             = "chat"
-	EventTypeChatLatest       = "chat.latest"
-	EventTypeRoomLeave        = "room.leave"
-	EventTypeRoomCreate       = "room.create"
-	EventTypeCoupleRoomCreate = "couple.room.create"
-	EventTypeRoomTimeout      = "room.timeout"
-	EventTypeRoomRemainTime   = "room.remain.time"
+	EventTypeChat               = "chat"
+	EventTypeChatLatest         = "chat.latest"
+	EventTypeRoomLeave          = "room.leave"
+	EventTypeRoomCreate         = "room.create"
+	EventTypeCoupleRoomCreate   = "couple.room.create"
+	EventTypeRoomTimeout        = "room.timeout"
+	EventTypeFinalChoiceTimeout = "final.choice.timeout"
+	EventTypeRoomRemainTime     = "room.remain.time"
 )
 
 // Exchange Names
@@ -34,4 +35,12 @@ const (
 type RoomLeaveEvent struct {
 	LeaveUserID int    `json:"leave_user_id"`
 	RoomID      string `json:"room_id"`
+}
+
+type RoomTimeoutEvent struct {
+	RoomID string `json:"room_id"`
+}
+
+type FinalChoiceEvent struct {
+	RoomID string `json:"room_id"`
 }

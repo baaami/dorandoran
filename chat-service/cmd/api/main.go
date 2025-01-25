@@ -123,6 +123,8 @@ func main() {
 		app.createRoom(eventChannel)
 	}()
 
+	go app.RoomManager.MonitorRoomTimeouts()
+
 	// 웹 서버 시작
 	log.Println("Starting Chat Service on port", webPort)
 	srv := &http.Server{

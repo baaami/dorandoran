@@ -35,7 +35,6 @@ type Models struct {
 func (c *Chat) Insert(entry Chat) (primitive.ObjectID, error) {
 	collection := client.Database("chat_db").Collection("messages")
 
-	// Insert the chat message into the collection
 	result, err := collection.InsertOne(context.TODO(), Chat{
 		MessageId:   entry.MessageId,
 		Type:        entry.Type,
@@ -320,11 +319,6 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 	defer cancel()
 
 	collection := client.Database("chat_db").Collection("rooms")
-
-	room.CreatedAt = time.Now()
-	room.ModifiedAt = room.CreatedAt
-
-	room.FinishChatAt = room.CreatedAt.Add(time.Hour)
 
 	_, err := collection.InsertOne(ctx, room)
 	if err != nil {

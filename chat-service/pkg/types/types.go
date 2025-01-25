@@ -10,6 +10,12 @@ const (
 	FEMALE
 )
 
+const (
+	RoomStatusGameIng = iota
+	RoomStatusChoiceIng
+	RoomStatusChoiceComplete
+)
+
 type Address struct {
 	City     string `gorm:"size:100" json:"city"`
 	District string `gorm:"size:100" json:"district"`

@@ -17,6 +17,12 @@ const (
 	MATCH_COUPLE
 )
 
+const (
+	RoomStatusGameIng = iota
+	RoomStatusChoiceIng
+	RoomStatusChoiceComplete
+)
+
 type Chat struct {
 	MessageId   primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
 	Type        string             `bson:"type" json:"type"`
@@ -36,6 +42,7 @@ type ChatMessage struct {
 type ChatRoom struct {
 	ID           string      `bson:"id" json:"id"` // UUID 사용
 	Type         int         `bson:"type" json:"type"`
+	Status       int         `bson:"status" json:"status"`
 	UserIDs      []int       `bson:"user_ids" json:"user_ids"`
 	Gamers       []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
 	Seq          int64       `bson:"seq" json:"seq"`       // 자동 증가 필드
@@ -100,6 +107,7 @@ const (
 	MessageKindChatLastest        = "chat_latest"
 	MessageKindRoomRemaining      = "room_remaining"
 	MessageKindRoomTimeout        = "room_timeout"
+	MessageKindFinalChoiceTimeout = "final_choice_timeout"
 	MessageKindFinalChoiceStart   = "final_choice_start"
 	MessageKindFinalChoice        = "final_choice"
 	MessageKindFinalChoiceResult  = "final_choice_result"
@@ -147,6 +155,10 @@ type RoomJoinEvent struct {
 	RoomID string    `bson:"room_id" json:"room_id"`
 	UserID int       `bson:"user_id" json:"user_id"`
 	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
+type FinalChoiceTimeoutEvent struct {
+	RoomID string `bson:"room_id" json:"room_id"`
 }
 
 type Address struct {

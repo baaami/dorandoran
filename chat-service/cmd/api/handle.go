@@ -102,7 +102,8 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 			continue
 		}
 
-		// 채팅방 타임아웃 설정
+		app.RoomManager.RedisClient.SetRoomStatus(room.ID, types.RoomStatusGameIng)
+
 		app.RoomManager.SetRoomTimeout(room.ID, time.Until(room.FinishChatAt))
 
 		log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)

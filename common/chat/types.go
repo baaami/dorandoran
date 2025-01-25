@@ -48,6 +48,7 @@ type Chat struct {
 type ChatRoom struct {
 	ID           string      `bson:"id" json:"id"` // UUID 사용
 	Type         int         `bson:"type" json:"type"`
+	Status       int         `bson:"status" json:"status"`
 	UserIDs      []int       `bson:"user_ids" json:"user_ids"`
 	Gamers       []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
 	Seq          int64       `bson:"seq" json:"seq"`       // 자동 증가 필드

@@ -119,10 +119,8 @@ func (app *Config) listenChatEvent(ctx context.Context, cancel context.CancelFun
 				app.handleJoinMessage(wsMsg.Payload, userID)
 			case types.MessageKindLeave:
 				app.handleLeaveMessage(wsMsg.Payload, userID)
-				// 게임방 타임아웃
 			case types.MessageKindRoomTimeout:
 				app.handleRoomTimeoutMessage(wsMsg.Payload, userID)
-				// 최종 선택 메시지
 			case types.MessageKindFinalChoice:
 				app.handleFinalChoiceMessage(wsMsg.Payload, userID)
 			default:
@@ -205,17 +203,21 @@ func (app *Config) handleBroadCastMessage(payload json.RawMessage, userID int) {
 		CreatedAt:   now,
 	}
 
-	// Broadcast to the room
 	if err := app.BroadcastToRoom(&chat, joinedUserIDs, activeUserIDs, inactiveUserIDs); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 	}
 }
 
-// TODO: 최종 선택을 시작하기 위한 조건을 명확히 해야한다.
-// -> 모든 클라이언트에서 timeout이 발생 OR Backend에서 timeout이 발생한 방이 모든 클라이언트에게 timeout을 받지 못했을 경우 3초간 대기 후 최종 선택을 강제 시작한다.
-// TODO: Backend에서 timeout이 발생한 방이 존재하고 n초 지났을 때 최종 선택을 시작하도록 한다.
-// TODO: or 모든 클라이언트에서 timeout이 발생하였을 때 최종 선택을 시작하도록 한다.
 func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
+	status, err := app.RedisClient.GetRoomStatus(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get room(%s) status, err: %v", roomID, err)
+	}
+
+	if status != types.RoomStatusGameIng {
+		return nil
+	}
+
 	message := types.WebSocketMessage{
 		Kind: types.MessageKindFinalChoiceStart,
 	}
@@ -229,12 +231,30 @@ func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
 
 	log.Printf("Broadcasted final_choice_start event to room %s", roomID)
 
+	err = app.RedisClient.SetRoomStatus(roomID, types.RoomStatusChoiceIng)
+	if err != nil {
+		return fmt.Errorf("failed to set room(%s) status, err: %v", roomID, err)
+	}
+
+	// TODO: final choice timer를 시작해야함
+	err = app.RedisClient.SetFinalChoiceTimeout(roomID, time.Until(time.Now().Add(10*time.Second)))
+	if err != nil {
+		return fmt.Errorf("failed to SetFinalChoiceTimeout. room: %s, err: %v", roomID, err)
+	}
+
 	return nil
 }
 
-// TODO: 최종 선택 완료 후 현황을 공개하기 위한 조건을 명확히 해야한다.
-// -> 모든 클라이언트에서 최종 선택 메시지 송신 OR Backend에서 최종 선택 시간이 timeout된 후 모든 클라이언트에게 최종 선택을 받지 못했을 경우 5초간 대기 후 최종 선택을 공개한다.
 func (app *Config) BroadcastFinalChoices(roomID string) error {
+	status, err := app.RedisClient.GetRoomStatus(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get room(%s) status, err: %v", roomID, err)
+	}
+
+	if status != types.RoomStatusChoiceIng {
+		return nil
+	}
+
 	// Redis에서 선택 결과 조회
 	finalChoiceResults, err := app.RedisClient.GetAllChoices(roomID)
 	if err != nil {
@@ -306,6 +326,12 @@ func (app *Config) BroadcastFinalChoices(roomID string) error {
 	app.RedisClient.ClearFinalChoiceRoom(roomID)
 
 	log.Printf("Broadcasted final choices to room %s", roomID)
+
+	err = app.RedisClient.ClearRoomStatus(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to clear room status, room: %s, err: %v", roomID, err)
+	}
+
 	return nil
 }
 
@@ -604,24 +630,31 @@ func (c *Client) writePump() {
 	}
 }
 
-// RabbitMQ 소비자로부터 발생한 이벤트 처리 함수
-func (app *Config) SendSocketByChatEvents() {
+func (app *Config) SendSocketByMQ() {
 	for event := range app.EventChannel {
 		switch event.Kind {
 		case types.MessageKindChatLastest:
-			if err := app.handleChatLatestMessage(event.Payload); err != nil {
+			if err := app.handleChatLatestEvent(event.Payload); err != nil {
 				log.Printf("Failed to handle chat.latest event: %v", err)
 			}
 		case types.MessageKindLeave:
-			if err := app.handleRoomLeaveMessage(event.Payload); err != nil {
+			if err := app.handleRoomLeaveEvent(event.Payload); err != nil {
 				log.Printf("Failed to handle room.leave event: %v", err)
 			}
+		case types.MessageKindRoomTimeout:
+			if err := app.handleRoomTimeoutEvent(event.Payload); err != nil {
+				log.Printf("Failed to handle room.timeout event: %v", err)
+			}
+		case types.MessageKindFinalChoiceTimeout:
+			if err := app.handleFinalChoiceTimeoutEvent(event.Payload); err != nil {
+				log.Printf("Failed to handle final_choice_timeout event: %v", err)
+			}
 		case types.MessageKindMessage:
-			if err := app.handleChatMessage(event.Payload); err != nil {
+			if err := app.handleChatEvent(event.Payload); err != nil {
 				log.Printf("Failed to handle chat event: %v", err)
 			}
 		case types.MessageKindCoupleMatchSuccess:
-			if err := app.handleCoupleMatchSuccessMessage(event.Payload); err != nil {
+			if err := app.handleCoupleMatchSuccessEvent(event.Payload); err != nil {
 				log.Printf("Failed to handle chat event: %v", err)
 			}
 		default:
@@ -631,7 +664,7 @@ func (app *Config) SendSocketByChatEvents() {
 }
 
 // RabbitMQ 소비자로부터 발생한 chat.latest 이벤트 처리 함수
-func (app *Config) handleChatLatestMessage(payload json.RawMessage) error {
+func (app *Config) handleChatLatestEvent(payload json.RawMessage) error {
 	var chatLatest types.ChatLatestEvent
 	if err := json.Unmarshal(payload, &chatLatest); err != nil {
 		return fmt.Errorf("failed to unmarshal chat.latest payload: %w", err)
@@ -651,7 +684,7 @@ func (app *Config) handleChatLatestMessage(payload json.RawMessage) error {
 	return nil
 }
 
-func (app *Config) handleRoomLeaveMessage(payload json.RawMessage) error {
+func (app *Config) handleRoomLeaveEvent(payload json.RawMessage) error {
 	var roomLeave event.RoomLeaveEvent
 	if err := json.Unmarshal(payload, &roomLeave); err != nil {
 		return fmt.Errorf("failed to unmarshal room leave payload: %w", err)
@@ -699,8 +732,36 @@ func (app *Config) handleRoomLeaveMessage(payload json.RawMessage) error {
 	return nil
 }
 
+func (app *Config) handleRoomTimeoutEvent(payload json.RawMessage) error {
+	var roomTimeout event.RoomTimeoutEvent
+	if err := json.Unmarshal(payload, &roomTimeout); err != nil {
+		return fmt.Errorf("failed to unmarshal room timeout payload: %w", err)
+	}
+
+	err := app.BroadcastFinalChoiceStart(roomTimeout.RoomID)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast final choice start, err: %s", err.Error())
+	}
+
+	return nil
+}
+
+func (app *Config) handleFinalChoiceTimeoutEvent(payload json.RawMessage) error {
+	var finalChoiceRoom event.FinalChoiceEvent
+	if err := json.Unmarshal(payload, &finalChoiceRoom); err != nil {
+		return fmt.Errorf("failed to unmarshal final choice room payload: %w", err)
+	}
+
+	err := app.BroadcastFinalChoices(finalChoiceRoom.RoomID)
+	if err != nil {
+		return fmt.Errorf("failed to broadcast final choice room, err: %s", err.Error())
+	}
+
+	return nil
+}
+
 // RabbitMQ 소비자로부터 발생한 chat 이벤트 처리 함수
-func (app *Config) handleChatMessage(payload json.RawMessage) error {
+func (app *Config) handleChatEvent(payload json.RawMessage) error {
 	var chatMsg types.ChatEvent
 	if err := json.Unmarshal(payload, &chatMsg); err != nil {
 		return fmt.Errorf("failed to unmarshal chat payload: %w", err)
@@ -720,7 +781,7 @@ func (app *Config) handleChatMessage(payload json.RawMessage) error {
 	return nil
 }
 
-func (app *Config) handleCoupleMatchSuccessMessage(payload json.RawMessage) error {
+func (app *Config) handleCoupleMatchSuccessEvent(payload json.RawMessage) error {
 	var chatRoom types.ChatRoom
 	if err := json.Unmarshal(payload, &chatRoom); err != nil {
 		return fmt.Errorf("failed to unmarshal chat payload: %w", err)
