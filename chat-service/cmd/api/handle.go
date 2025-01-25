@@ -75,14 +75,15 @@ func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
 		}
 
 		room := data.ChatRoom{
-			ID:           chatRoomID,
-			Seq:          seq,
-			Type:         matchEvent.MatchType,
-			UserIDs:      extractUserIDs(matchEvent.MatchedUsers),
-			Gamers:       gamers,
-			CreatedAt:    startTime,
-			FinishChatAt: finishTime,
-			ModifiedAt:   startTime,
+			ID:                  chatRoomID,
+			Seq:                 seq,
+			Type:                matchEvent.MatchType,
+			UserIDs:             extractUserIDs(matchEvent.MatchedUsers),
+			Gamers:              gamers,
+			CreatedAt:           startTime,
+			FinishChatAt:        finishTime,
+			FinishFinalChoiceAt: finishTime.Add(30 * time.Second),
+			ModifiedAt:          startTime,
 		}
 
 		// MongoDB에 채팅방 삽입
@@ -307,12 +308,14 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload := data.RoomDetailResponse{
-		ID:           room.ID,
-		Type:         room.Type,
-		Users:        gamerList,
-		CreatedAt:    room.CreatedAt,
-		FinishChatAt: room.FinishChatAt,
-		ModifiedAt:   room.ModifiedAt,
+		ID:                  room.ID,
+		Type:                room.Type,
+		Status:              room.Status,
+		Users:               gamerList,
+		CreatedAt:           room.CreatedAt,
+		FinishChatAt:        room.FinishChatAt,
+		FinishFinalChoiceAt: room.FinishFinalChoiceAt,
+		ModifiedAt:          room.ModifiedAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

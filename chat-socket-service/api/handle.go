@@ -236,8 +236,12 @@ func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
 		return fmt.Errorf("failed to set room(%s) status, err: %v", roomID, err)
 	}
 
-	// TODO: final choice timer를 시작해야함
-	err = app.RedisClient.SetFinalChoiceTimeout(roomID, time.Until(time.Now().Add(10*time.Second)))
+	roomDetail, err := GetRoomDetail(roomID)
+	if err != nil {
+		return fmt.Errorf("failed to get room(%s), err: %v", roomID, err)
+	}
+
+	err = app.RedisClient.SetFinalChoiceTimeout(roomID, time.Until(roomDetail.FinishFinalChoiceAt))
 	if err != nil {
 		return fmt.Errorf("failed to SetFinalChoiceTimeout. room: %s, err: %v", roomID, err)
 	}
@@ -807,7 +811,7 @@ func (app *Config) handleCoupleMatchSuccessEvent(payload json.RawMessage) error 
 	for _, userID := range chatRoom.UserIDs {
 		err := app.sendMessageToUser(userID, wsMessage)
 		if err != nil {
-			log.Printf("failed to sendMessageToUser, userID: %s", userID)
+			log.Printf("failed to sendMessageToUser, userID: %d", userID)
 			continue
 		}
 	}
@@ -815,7 +819,7 @@ func (app *Config) handleCoupleMatchSuccessEvent(payload json.RawMessage) error 
 	return nil
 }
 
-// [Bridge user] 유저 정보 조회
+// [Bridge]
 func GetWaitingUserInfo(userID string) (*types.WaitingUser, error) {
 	var user types.User
 
@@ -860,4 +864,40 @@ func GetWaitingUserInfo(userID string) (*types.WaitingUser, error) {
 	}
 
 	return &waitingUser, nil
+}
+
+// [Bridge]
+func GetRoomDetail(roomID string) (*types.RoomDetailResponse, error) {
+	var chatRoomDetail types.RoomDetailResponse
+
+	// Matching 필터 획득
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://chat-service/room/%s", roomID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &chatRoomDetail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &chatRoomDetail, nil
 }

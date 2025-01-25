@@ -140,7 +140,19 @@ func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<
 }
 
 // Match 이벤트 핸들러
-func MatchEventHandler(payload EventPayload, eventChannel chan<- types.MatchEvent) error {
+func MatchEventHandler(payload EventPayload, eventChannel chan<- interface{}) error {
+	var matchEvent types.MatchEvent
+	err := json.Unmarshal(payload.Data, &matchEvent)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal MatchEvent: %v", err)
+	}
+
+	log.Printf("Processed MatchEvent: MatchID=%s, MatchedUsers=%v", matchEvent.MatchId, matchEvent.MatchedUsers)
+	eventChannel <- matchEvent
+	return nil
+}
+
+func RoomTimeoutHandler(payload EventPayload, eventChannel chan<- interface{}) error {
 	var matchEvent types.MatchEvent
 	err := json.Unmarshal(payload.Data, &matchEvent)
 	if err != nil {
