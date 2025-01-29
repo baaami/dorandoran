@@ -311,6 +311,8 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 		ID:                  room.ID,
 		Type:                room.Type,
 		Status:              room.Status,
+		Seq:                 int(room.Seq),
+		RoomName:            fmt.Sprintf("%d기", room.Seq),
 		Users:               gamerList,
 		CreatedAt:           room.CreatedAt,
 		FinishChatAt:        room.FinishChatAt,
