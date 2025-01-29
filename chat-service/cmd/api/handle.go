@@ -32,7 +32,7 @@ func (app *Config) createRoom(matchEvent types.MatchEvent) error {
 		log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
 		// TODO: 시간 수정 필요
-		finishTime = startTime.Add(10 * time.Second)
+		finishTime = startTime.Add(10 * time.Minute)
 
 		seq, _ = app.Models.ChatRoom.GetNextSequence("chatRoomSeq")
 	} else {
