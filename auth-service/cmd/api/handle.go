@@ -27,6 +27,7 @@ type User struct {
 	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType   int     `gorm:"index" json:"sns_type"`
 	SnsID     string  `gorm:"index" json:"sns_id"`
+	Status    int     `json:"status"`
 	Name      string  `gorm:"size:100" json:"name"`
 	Gender    int     `json:"gender"`
 	Birth     string  `gorm:"size:20" json:"birth"`
@@ -282,6 +283,7 @@ func RegisterNewUser(snsType int, snsID string) (User, error) {
 	newUser := User{
 		SnsType:   snsType, // Kakao SNS 유형
 		SnsID:     snsID,   // Kakao 사용자 ID
+		Status:    types.USER_STATUS_STANDBY,
 		GamePoint: types.DEFAULT_GAME_POINT,
 	}
 

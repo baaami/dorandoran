@@ -33,7 +33,8 @@ type RoomTimeoutEvent struct {
 }
 
 type FinalChoiceTimeoutEvent struct {
-	RoomID string `bson:"room_id" json:"room_id"`
+	RoomID  string `bson:"room_id" json:"room_id"`
+	UserIDs []int  `bson:"user_ids" json:"user_ids"`
 }
 
 // Event Types

@@ -11,6 +11,11 @@ const (
 	MATCH_COUPLE
 )
 
+const (
+	USER_STATUS_STANDBY = iota
+	USER_STATUS_GAME_ING
+)
+
 const ONE_GAME_POINT = 5
 
 type Address struct {

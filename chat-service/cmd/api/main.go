@@ -99,8 +99,7 @@ func main() {
 	routingConfigs := []event.RoutingConfig{
 		{
 			Exchange: event.ExchangeConfig{Name: event.ExchangeAppTopic, Type: "topic"},
-			Keys: []string{"room.timeout", "final.choice.timeout",
-				event.EventTypeRoomTimeout, event.EventTypeFinalChoiceTimeout},
+			Keys:     []string{event.EventTypeRoomTimeout, event.EventTypeFinalChoiceTimeout},
 		},
 		{
 			Exchange: event.ExchangeConfig{Name: event.ExchangeMatchEvents, Type: "fanout"},

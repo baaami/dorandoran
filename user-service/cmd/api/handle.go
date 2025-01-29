@@ -11,6 +11,7 @@ import (
 
 	"github.com/baaami/dorandoran/user/cmd/data"
 	"github.com/baaami/dorandoran/user/pkg/dto"
+	"github.com/baaami/dorandoran/user/pkg/event"
 	"github.com/baaami/dorandoran/user/pkg/types"
 	"github.com/samber/lo"
 )
@@ -431,17 +432,59 @@ func pushNotification(userIDList []int, chatEventMsg types.ChatEvent) error {
 	return nil
 }
 
-func (app *Config) decreaseGamePointByGameStart(eventChannel <-chan types.MatchEvent) {
-	for matchEvent := range eventChannel {
-		if matchEvent.MatchType != types.MATCH_GAME {
-			continue
-		}
+func (app *Config) InitUserInfoByGame(matchEvent types.MatchEvent) {
+	if matchEvent.MatchType != types.MATCH_GAME {
+		return
+	}
 
-		for _, user := range matchEvent.MatchedUsers {
-			err := app.Models.DecreaseGamePoint(user.ID, types.ONE_GAME_POINT)
-			if err != nil {
-				log.Printf("Failed to DecreaseGamePoint, user: %d, err: %s", user.ID, err.Error())
-			}
+	for _, user := range matchEvent.MatchedUsers {
+		err := app.Models.UpdateUserStatus(user.ID, types.USER_STATUS_GAME_ING)
+		if err != nil {
+			log.Printf("Failed to UpdateUserStatus, user: %d, err: %s", user.ID, err.Error())
 		}
 	}
+}
+
+func (app *Config) EventPayloadHandler() {
+	for eventPayload := range app.EventChannel {
+		log.Printf("eventPayload.EventType: %s", eventPayload.EventType)
+		switch eventPayload.EventType {
+		case event.EventTypeMatch:
+			app.handleEventMatch(eventPayload.Data)
+		case event.EventTypeFinalChoiceTimeout:
+			app.handleEventFinalChoiceTimeout(eventPayload.Data)
+		}
+	}
+}
+
+func (app *Config) handleEventMatch(data json.RawMessage) error {
+	var matchEvent types.MatchEvent
+	err := json.Unmarshal(data, &matchEvent)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal MatchEvent: %v", err)
+	}
+
+	log.Printf("Processed MatchEvent: MatchID=%s, MatchedUsers=%v", matchEvent.MatchId, matchEvent.MatchedUsers)
+
+	app.InitUserInfoByGame(matchEvent)
+	return nil
+}
+
+func (app *Config) handleEventFinalChoiceTimeout(data json.RawMessage) error {
+	var finalChoiceTimeout event.FinalChoiceTimeoutEvent
+	err := json.Unmarshal(data, &finalChoiceTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal FinalChoiceTimeout: %v", err)
+	}
+
+	// 타임아웃이 발생한 room에 존재하는 user id list get
+	for _, id := range finalChoiceTimeout.UserIDs {
+		err := app.Models.UpdateUserStatus(id, types.USER_STATUS_STANDBY)
+		if err != nil {
+			log.Printf("failed to UpdateUserStatus, user: %d", id)
+			continue
+		}
+	}
+
+	return nil
 }

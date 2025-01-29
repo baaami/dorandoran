@@ -423,9 +423,22 @@ func (r *RedisClient) MonitorFinalTimeouts() {
 				continue // 아직 만료되지 않은 방은 스킵
 			}
 
+			userIds, err := r.GetRoomUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to GetRoomUserIDs, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			roomTotalUserIds, err := ConvertStringSliceToIntSlice(userIds)
+			if err != nil {
+				log.Printf("Failed to ConvertStringSliceToIntSlice, room: %s, err: %v", roomID, err)
+				continue
+			}
+
 			// 만료된 방에 대해 timeout 이벤트 발행
 			err = r.Emitter.PushFinalChoiceTimeoutToQueue(types.FinalChoiceTimeoutEvent{
-				RoomID: roomID,
+				RoomID:  roomID,
+				UserIDs: roomTotalUserIds,
 			})
 			if err != nil {
 				log.Printf("Failed to push final choice timeout, room: %s, err: %v", roomID, err)
@@ -438,4 +451,16 @@ func (r *RedisClient) MonitorFinalTimeouts() {
 			}
 		}
 	}
+}
+
+func ConvertStringSliceToIntSlice(strSlice []string) ([]int, error) {
+	var intSlice []int
+	for _, str := range strSlice {
+		num, err := strconv.Atoi(str)
+		if err != nil {
+			return nil, err // 변환 실패 시 에러 반환
+		}
+		intSlice = append(intSlice, num)
+	}
+	return intSlice, nil
 }

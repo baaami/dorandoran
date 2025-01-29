@@ -17,6 +17,7 @@ type User struct {
 	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType   int     `gorm:"index" json:"sns_type"`
 	SnsID     string  `gorm:"index" json:"sns_id"`
+	Status    int     `json:"status"`
 	Name      string  `gorm:"size:100" json:"name"`
 	Gender    int     `json:"gender"`
 	Birth     string  `gorm:"size:20" json:"birth"`
@@ -98,6 +99,20 @@ func (s *UserService) UpdateUser(user User) error {
 	if err := s.DB.Model(&User{ID: user.ID}).Updates(user).Error; err != nil {
 		log.Printf("Failed to update user ID %d: %v", user.ID, err)
 		return err
+	}
+	return nil
+}
+
+// 유저 상태 업데이트
+func (s *UserService) UpdateUserStatus(userID int, newStatus int) error {
+	result := s.DB.Model(&User{}).Where("id = ?", userID).Update("status", newStatus)
+	if result.Error != nil {
+		log.Printf("Failed to update status for user ID %d: %v", userID, result.Error)
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("No user found with ID %d to update status", userID)
+		return errors.New("user not found")
 	}
 	return nil
 }

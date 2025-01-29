@@ -16,3 +16,31 @@ type EventPayload struct {
 	EventType string          `json:"event_type"`
 	Data      json.RawMessage `json:"data"`
 }
+
+type RoomTimeoutEvent struct {
+	RoomID string `json:"room_id"`
+}
+
+type FinalChoiceTimeoutEvent struct {
+	RoomID  string `bson:"room_id" json:"room_id"`
+	UserIDs []int  `bson:"user_ids" json:"user_ids"`
+}
+
+// Event Types
+const (
+	EventTypeChat               = "chat"
+	EventTypeMatch              = "match"
+	EventTypeChatLatest         = "chat.latest"
+	EventTypeRoomLeave          = "room.leave"
+	EventTypeRoomCreate         = "room.create"
+	EventTypeCoupleRoomCreate   = "couple.room.create"
+	EventTypeRoomTimeout        = "room.timeout"
+	EventTypeRoomRemainTime     = "room.remain.time"
+	EventTypeFinalChoiceTimeout = "final.choice.timeout"
+)
+
+// Exchange Names
+const (
+	ExchangeAppTopic    = "app_topic"
+	ExchangeMatchEvents = "match_events"
+)

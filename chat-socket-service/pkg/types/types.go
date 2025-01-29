@@ -187,7 +187,8 @@ type RoomJoinEvent struct {
 }
 
 type FinalChoiceTimeoutEvent struct {
-	RoomID string `bson:"room_id" json:"room_id"`
+	RoomID  string `bson:"room_id" json:"room_id"`
+	UserIDs []int  `bson:"user_ids" json:"user_ids"`
 }
 
 type Address struct {
@@ -215,6 +216,7 @@ type User struct {
 	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
 	SnsType   int     `gorm:"index" json:"sns_type"`
 	SnsID     string  `gorm:"index" json:"sns_id"`
+	Status    int     `json:"status"`
 	Name      string  `gorm:"size:100" json:"name"`
 	Gender    int     `json:"gender"`
 	Birth     string  `gorm:"size:20" json:"birth"`
