@@ -39,3 +39,13 @@ func NewRedisClient() (*RedisClient, error) {
 	log.Println("Successfully connected to Redis")
 	return &RedisClient{Client: client}, nil
 }
+
+func (r *RedisClient) SetRoomStatus(roomID string, status int) error {
+	statusKey := fmt.Sprintf("room_status:%s", roomID)
+	err := r.Client.Set(ctx, statusKey, status, 0).Err() // 만료 시간 없음
+	if err != nil {
+		return fmt.Errorf("failed to set status for room %s: %v", roomID, err)
+	}
+	log.Printf("Set status for room %s to %d", roomID, status)
+	return nil
+}

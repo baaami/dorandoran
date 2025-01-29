@@ -35,7 +35,6 @@ type Models struct {
 func (c *Chat) Insert(entry Chat) (primitive.ObjectID, error) {
 	collection := client.Database("chat_db").Collection("messages")
 
-	// Insert the chat message into the collection
 	result, err := collection.InsertOne(context.TODO(), Chat{
 		MessageId:   entry.MessageId,
 		Type:        entry.Type,
@@ -321,11 +320,6 @@ func (c *ChatRoom) InsertRoom(room *ChatRoom) error {
 
 	collection := client.Database("chat_db").Collection("rooms")
 
-	room.CreatedAt = time.Now()
-	room.ModifiedAt = room.CreatedAt
-
-	room.FinishChatAt = room.CreatedAt.Add(time.Hour)
-
 	_, err := collection.InsertOne(ctx, room)
 	if err != nil {
 		log.Println("Error inserting new room:", err)
@@ -552,4 +546,34 @@ func (c *ChatRoom) GetUserGameInfoInRoom(userID int, roomID string) (*GamerInfo,
 	}
 	// Return an error if the user is not found in the room
 	return &noGamer, errors.New("user not found in the game")
+}
+
+func (c *ChatRoom) UpdateChatRoomStage(roomID string, stage int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := client.Database("chat_db").Collection("rooms")
+
+	filter := bson.M{"id": roomID}
+
+	update := bson.M{
+		"$set": bson.M{
+			"stage":       stage,
+			"modified_at": time.Now(),
+		},
+	}
+
+	result, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error updating stage for room %s: %v", roomID, err)
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		log.Printf("No room found with ID %s to update stage", roomID)
+		return errors.New("room not found")
+	}
+
+	log.Printf("Successfully updated stage for room %s to %d", roomID, stage)
+	return nil
 }

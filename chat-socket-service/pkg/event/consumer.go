@@ -150,6 +150,38 @@ func RoomLeaveHandler(payload types.EventPayload, eventChannel chan<- types.WebS
 	eventChannel <- wsMessage
 }
 
+// event: room.timeout
+func RoomTimeoutHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
+	var roomTimeout RoomTimeoutEvent
+	if err := json.Unmarshal(payload.Data, &roomTimeout); err != nil {
+		log.Printf("Failed to unmarshal room.timeout event: %v", err)
+		return
+	}
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindRoomTimeout,
+		Payload: json.RawMessage(payload.Data),
+	}
+	eventChannel <- wsMessage
+}
+
+// event: final.choice.timeout
+func FinalChoiceTimeoutHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
+	var roomTimeout RoomTimeoutEvent
+	if err := json.Unmarshal(payload.Data, &roomTimeout); err != nil {
+		log.Printf("Failed to unmarshal room.timeout event: %v", err)
+		return
+	}
+
+	log.Printf("[TEST] FinalChoiceTimeoutHandler Event Occur!!")
+
+	wsMessage := types.WebSocketMessage{
+		Kind:    types.MessageKindFinalChoiceTimeout,
+		Payload: json.RawMessage(payload.Data),
+	}
+	eventChannel <- wsMessage
+}
+
 // event: room.couple.create
 func CreateCoupleRoomHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
 	var coupleRoomEvent types.ChatRoom

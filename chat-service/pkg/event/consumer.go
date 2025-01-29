@@ -6,23 +6,22 @@ import (
 
 	"log"
 
-	"github.com/baaami/dorandoran/chat/pkg/types"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 // MessageHandler 타입 정의
-type MessageHandler func(payload EventPayload, eventChannel chan<- types.MatchEvent) error
+type MessageHandler func(payload EventPayload, eventChannel chan<- EventPayload) error
 
 type Consumer struct {
-	conn      *amqp.Connection
-	exchanges []ExchangeConfig
+	conn           *amqp.Connection
+	routingConfigs []RoutingConfig
 }
 
 // NewConsumer 함수: RabbitMQ Consumer 초기화
-func NewConsumer(conn *amqp.Connection, exchanges []ExchangeConfig) (*Consumer, error) {
+func NewConsumer(conn *amqp.Connection, routingConfigs []RoutingConfig) (*Consumer, error) {
 	consumer := &Consumer{
-		conn:      conn,
-		exchanges: exchanges,
+		conn:           conn,
+		routingConfigs: routingConfigs,
 	}
 
 	err := consumer.setup()
@@ -42,112 +41,87 @@ func (c *Consumer) setup() error {
 	}
 	defer channel.Close()
 
-	for _, exchange := range c.exchanges {
-		err := channel.ExchangeDeclare(
-			exchange.Name,
-			exchange.Type,
-			true,  // Durable
-			false, // Auto-deleted
-			false, // Internal
-			false, // No-wait
-			nil,   // Arguments
-		)
+	// 모든 Exchanges 선언
+	for _, config := range c.routingConfigs {
+		err := DeclareExchange(channel, config.Exchange)
 		if err != nil {
-			return fmt.Errorf("failed to declare exchange %s: %v", exchange.Name, err)
+			log.Printf("Failed to declare exchange %s: %v", config.Exchange.Name, err)
+			return err
 		}
-		log.Printf("Declared exchange: %s", exchange.Name)
 	}
 	return nil
 }
 
 // Listen 함수: 메시지 소비 및 핸들러 호출
-func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<- types.MatchEvent) error {
+func (c *Consumer) Listen(handlers map[string]MessageHandler, eventChannel chan<- EventPayload) error {
 	channel, err := c.conn.Channel()
 	if err != nil {
-		return fmt.Errorf("failed to open channel: %v", err)
+		return err
 	}
 	defer channel.Close()
 
-	// Queue 선언
-	queue, err := channel.QueueDeclare(
-		"chat_match_queue", // Unique한 Queue 이름
-		true,               // Durable (영구적)
-		false,              // Auto-delete
-		false,              // Exclusive
-		false,              // No-wait
-		nil,                // Arguments
-	)
-	if err != nil {
-		return fmt.Errorf("failed to declare queue: %v", err)
-	}
-
-	// Queue와 Exchange 바인딩
-	for _, exchange := range c.exchanges {
-		err := channel.QueueBind(
-			queue.Name, // Queue 이름
-			"",         // Routing Key (fanout은 무시)
-			exchange.Name,
-			false, // No-wait
-			nil,   // Arguments
-		)
+	for _, config := range c.routingConfigs {
+		queue, err := channel.QueueDeclare("chat_queue", false, false, true, false, nil)
 		if err != nil {
-			return fmt.Errorf("failed to bind queue to exchange %s: %v", exchange.Name, err)
+			return err
 		}
-		log.Printf("Queue %s bound to exchange %s", queue.Name, exchange.Name)
-	}
 
-	// 메시지 소비
-	messages, err := channel.Consume(
-		queue.Name, // Queue
-		"",         // Consumer
-		true,       // Auto-ack
-		false,      // Exclusive
-		false,      // No-local
-		false,      // No-wait
-		nil,        // Args
-	)
-	if err != nil {
-		return fmt.Errorf("failed to start consuming messages: %v", err)
-	}
-
-	log.Printf("Listening for messages on exchanges: %v", c.exchanges)
-
-	// 메시지 처리
-	go func() {
-		for msg := range messages {
-			log.Printf("Received a message: %s", string(msg.Body))
-
-			// EventPayload 파싱
-			var payload EventPayload
-			err := json.Unmarshal(msg.Body, &payload)
-			if err != nil {
-				log.Printf("Failed to parse message as EventPayload: %v", err)
-				continue
-			}
-
-			// 핸들러 호출
-			if handler, exists := handlers[payload.EventType]; exists {
-				if err := handler(payload, eventChannel); err != nil {
-					log.Printf("Error handling event %s: %v", payload.EventType, err)
+		// topic exchnage
+		if config.Exchange.Type == "topic" {
+			for _, key := range config.Keys {
+				err := channel.QueueBind(queue.Name, key, config.Exchange.Name, false, nil)
+				if err != nil {
+					log.Printf("Failed to bind queue %s to routing key %s: %v", queue.Name, key, err)
+					return err
 				}
-			} else {
-				log.Printf("No handler found for event type: %s", payload.EventType)
+			}
+		} else if config.Exchange.Type == "fanout" {
+			// fanout exchnage
+			err := channel.QueueBind(queue.Name, "", config.Exchange.Name, false, nil)
+			if err != nil {
+				log.Printf("Failed to bind queue %s to routing key %s: %v", queue.Name, "", err)
+				return err
 			}
 		}
-	}()
 
+		messages, err := channel.Consume(queue.Name, "", true, false, false, false, nil)
+		if err != nil {
+			return err
+		}
+
+		go func() {
+			for d := range messages {
+				var payload EventPayload
+				if err := json.Unmarshal(d.Body, &payload); err != nil {
+					log.Printf("Failed to unmarshal message: %v", err)
+					continue
+				}
+
+				log.Printf("Received Event Type: %s", payload.EventType)
+
+				if handler, ok := handlers[payload.EventType]; ok {
+					handler(payload, eventChannel)
+				} else {
+					log.Printf("No handler for event type: %s", payload.EventType)
+				}
+			}
+		}()
+	}
 	select {} // Block forever
 }
 
 // Match 이벤트 핸들러
-func MatchEventHandler(payload EventPayload, eventChannel chan<- types.MatchEvent) error {
-	var matchEvent types.MatchEvent
-	err := json.Unmarshal(payload.Data, &matchEvent)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal MatchEvent: %v", err)
-	}
+func MatchEventHandler(payload EventPayload, eventChannel chan<- EventPayload) error {
+	eventChannel <- payload
+	return nil
+}
 
-	log.Printf("Processed MatchEvent: MatchID=%s, MatchedUsers=%v", matchEvent.MatchId, matchEvent.MatchedUsers)
-	eventChannel <- matchEvent
+func RoomTimeoutHandler(payload EventPayload, eventChannel chan<- EventPayload) error {
+	eventChannel <- payload
+	return nil
+}
+
+func FinalChoiceTimeoutHandler(payload EventPayload, eventChannel chan<- EventPayload) error {
+	eventChannel <- payload
 	return nil
 }

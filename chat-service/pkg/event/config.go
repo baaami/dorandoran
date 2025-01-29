@@ -7,6 +7,11 @@ type ExchangeConfig struct {
 	Type string
 }
 
+type RoutingConfig struct {
+	Exchange ExchangeConfig
+	Keys     []string
+}
+
 // EventPayload 구조체 정의
 type EventPayload struct {
 	EventType string          `json:"event_type"`
@@ -27,15 +32,21 @@ type RoomTimeoutEvent struct {
 	RoomID string `json:"room_id"`
 }
 
+type FinalChoiceTimeoutEvent struct {
+	RoomID string `bson:"room_id" json:"room_id"`
+}
+
 // Event Types
 const (
-	EventTypeChat             = "chat"
-	EventTypeChatLatest       = "chat.latest"
-	EventTypeRoomLeave        = "room.leave"
-	EventTypeRoomCreate       = "room.create"
-	EventTypeCoupleRoomCreate = "couple.room.create"
-	EventTypeRoomTimeout      = "room.timeout"
-	EventTypeRoomRemainTime   = "room.remain.time"
+	EventTypeChat               = "chat"
+	EventTypeMatch              = "match"
+	EventTypeChatLatest         = "chat.latest"
+	EventTypeRoomLeave          = "room.leave"
+	EventTypeRoomCreate         = "room.create"
+	EventTypeCoupleRoomCreate   = "couple.room.create"
+	EventTypeRoomTimeout        = "room.timeout"
+	EventTypeRoomRemainTime     = "room.remain.time"
+	EventTypeFinalChoiceTimeout = "final.choice.timeout"
 )
 
 // Exchange Names

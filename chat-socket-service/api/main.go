@@ -25,13 +25,6 @@ type Config struct {
 }
 
 func main() {
-	// Redis 연결
-	redisClient, err := redis.NewRedisClient()
-	if err != nil {
-		log.Fatalf("Failed to initialize Redis client: %v", err)
-		os.Exit(1)
-	}
-
 	// RabbitMQ 연결
 	rabbitConn, err := connect()
 	if err != nil {
@@ -46,27 +39,32 @@ func main() {
 		{Name: "match_events", Type: "fanout"},
 	}
 
-	// RabbitMQ Emitter 생성
-	chatEmitter, err := event.NewEmitter(rabbitConn, exchanges)
+	emitter, err := event.NewEmitter(rabbitConn, exchanges)
 	if err != nil {
 		log.Fatalf("Failed to create RabbitMQ emitter: %v", err)
 		os.Exit(1)
 	}
 
-	// 채널 생성: 이벤트 전달용
+	// Redis 연결
+	redisClient, err := redis.NewRedisClient(emitter)
+	if err != nil {
+		log.Fatalf("Failed to initialize Redis client: %v", err)
+		os.Exit(1)
+	}
+
 	chatEventChannel := make(chan types.WebSocketMessage, 100)
 
 	app := &Config{
 		RedisClient:  redisClient,
-		ChatEmitter:  chatEmitter,
+		ChatEmitter:  emitter,
 		EventChannel: chatEventChannel,
 	}
 
-	// RoutingConfig 설정
 	routingConfigs := []event.RoutingConfig{
 		{
 			Exchange: event.ExchangeConfig{Name: event.ExchangeAppTopic, Type: "topic"},
-			Keys:     []string{"chat", "chat.latest", "room.leave"},
+			Keys: []string{"chat", "chat.latest", "room.leave",
+				event.EventTypeRoomTimeout, event.EventTypeFinalChoiceTimeout},
 		},
 		{
 			Exchange: event.ExchangeConfig{Name: event.ExchangeCoupleRoomCreateEvents, Type: "fanout"},
@@ -74,21 +72,20 @@ func main() {
 		},
 	}
 
-	// Consumer 생성
 	chatConsumer, err := event.NewConsumer(rabbitConn, routingConfigs)
 	if err != nil {
 		log.Fatalf("Failed to create RabbitMQ consumer: %v", err)
 	}
 
-	// key: event type, value: handler function
 	handlers := map[string]event.MessageHandler{
-		event.EventTypeChat:             event.ChatMessageHandler,      // 채팅 메시지 핸들러
-		event.EventTypeChatLatest:       event.ChatLatestHandler,       // 최신 채팅 핸들러
-		event.EventTypeCoupleRoomCreate: event.CreateCoupleRoomHandler, // 커플 방 생성 핸들러
-		event.EventTypeRoomLeave:        event.RoomLeaveHandler,
+		event.EventTypeChat:               event.ChatMessageHandler,
+		event.EventTypeChatLatest:         event.ChatLatestHandler,
+		event.EventTypeCoupleRoomCreate:   event.CreateCoupleRoomHandler,
+		event.EventTypeRoomLeave:          event.RoomLeaveHandler,
+		event.EventTypeRoomTimeout:        event.RoomTimeoutHandler,
+		event.EventTypeFinalChoiceTimeout: event.FinalChoiceTimeoutHandler,
 	}
 
-	// RabbitMQ Consumer Listen 고루틴 실행
 	go func() {
 		log.Println("Starting RabbitMQ consumer for events")
 		if err := chatConsumer.Listen(handlers, chatEventChannel); err != nil {
@@ -96,7 +93,9 @@ func main() {
 		}
 	}()
 
-	go app.SendSocketByChatEvents()
+	go app.SendSocketByMQ()
+
+	go app.RedisClient.MonitorFinalTimeouts()
 
 	// HTTP 서버 시작
 	log.Printf("Starting server on port %d", webPort)

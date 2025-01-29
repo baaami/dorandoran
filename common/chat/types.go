@@ -46,14 +46,16 @@ type Chat struct {
 }
 
 type ChatRoom struct {
-	ID           string      `bson:"id" json:"id"` // UUID 사용
-	Type         int         `bson:"type" json:"type"`
-	UserIDs      []int       `bson:"user_ids" json:"user_ids"`
-	Gamers       []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
-	Seq          int64       `bson:"seq" json:"seq"`       // 자동 증가 필드
-	CreatedAt    time.Time   `bson:"created_at" json:"created_at"`
-	FinishChatAt time.Time   `bson:"finish_chat_at" json:"finish_chat_at"`
-	ModifiedAt   time.Time   `bson:"modified_at" json:"modified_at"`
+	ID                  string      `bson:"id" json:"id"` // UUID 사용
+	Type                int         `bson:"type" json:"type"`
+	Status              int         `bson:"status" json:"status"`
+	UserIDs             []int       `bson:"user_ids" json:"user_ids"`
+	Gamers              []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
+	Seq                 int64       `bson:"seq" json:"seq"`       // 자동 증가 필드
+	CreatedAt           time.Time   `bson:"created_at" json:"created_at"`
+	FinishChatAt        time.Time   `bson:"finish_chat_at" json:"finish_chat_at"`
+	FinishFinalChoiceAt time.Time   `bson:"finish_final_choice_at" json:"finish_final_choice_at"`
+	ModifiedAt          time.Time   `bson:"modified_at" json:"modified_at"`
 }
 
 // 사용자별 캐릭터 정보를 저장하는 구조체

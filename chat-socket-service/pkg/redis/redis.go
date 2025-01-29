@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
+	"github.com/baaami/dorandoran/chat-socket-service/pkg/event"
 	"github.com/baaami/dorandoran/chat-socket-service/pkg/types"
 	"github.com/go-redis/redis/v8"
 )
@@ -14,11 +16,11 @@ import (
 var ctx = context.Background()
 
 type RedisClient struct {
-	Client *redis.Client
+	Client  *redis.Client
+	Emitter *event.Emitter
 }
 
-// NewRedisClient: Redis 연결을 생성하는 함수
-func NewRedisClient() (*RedisClient, error) {
+func NewRedisClient(emitter *event.Emitter) (*RedisClient, error) {
 	// 환경 변수에서 Redis 설정 가져오기
 	redisHost := os.Getenv("REDIS_HOST")
 	redisPort := os.Getenv("REDIS_PORT")
@@ -39,10 +41,9 @@ func NewRedisClient() (*RedisClient, error) {
 	}
 
 	log.Println("Successfully connected to Redis")
-	return &RedisClient{Client: client}, nil
+	return &RedisClient{Client: client, Emitter: emitter}, nil
 }
 
-// GetSession: Redis에서 세션 조회
 func (r *RedisClient) GetUserBySessionID(sessionID string) (int, error) {
 	sUserID, err := r.Client.Get(ctx, sessionID).Result()
 	if err == redis.Nil {
@@ -62,17 +63,14 @@ func (r *RedisClient) GetUserBySessionID(sessionID string) (int, error) {
 	return userID, nil
 }
 
-// 활성 사용자 등록
 func (r *RedisClient) RegisterActiveUser(userID int, serverID string) error {
 	return r.Client.HSet(ctx, "client:active", strconv.Itoa(userID), serverID).Err()
 }
 
-// 활성 사용자 제거
 func (r *RedisClient) UnregisterActiveUser(userID int) error {
 	return r.Client.HDel(ctx, "client:active", strconv.Itoa(userID)).Err()
 }
 
-// 사용자 활성 상태 확인
 func (r *RedisClient) IsUserActive(userID int) (bool, error) {
 	serverID, err := r.Client.HGet(ctx, "client:active", strconv.Itoa(userID)).Result()
 	if err == redis.Nil {
@@ -84,7 +82,6 @@ func (r *RedisClient) IsUserActive(userID int) (bool, error) {
 	return serverID != "", nil
 }
 
-// Room의 활성 사용자 ID 리스트를 반환
 func (r *RedisClient) GetActiveUserIDs(roomID string) ([]int, error) {
 	// Step 1: Room의 사용자 ID 리스트 가져오기
 	// TODO: MongoDB 시작 시 Redis와 동기화 작업이 필요함
@@ -122,7 +119,6 @@ func (r *RedisClient) GetActiveUserIDs(roomID string) ([]int, error) {
 	return activeUsers, nil
 }
 
-// Room의 비활성 사용자 ID 리스트를 반환
 func (r *RedisClient) GetInActiveUserIDs(roomID string) ([]int, error) {
 	// Step 1: Room의 사용자 ID 리스트 가져오기
 	// TODO: MongoDB 시작 시 Redis와 동기화 작업이 필요함
@@ -158,7 +154,6 @@ func (r *RedisClient) GetInActiveUserIDs(roomID string) ([]int, error) {
 	return inactiveUsers, nil
 }
 
-// Room 내 존재하는 user의 ID 리스트 반환
 func (r *RedisClient) GetRoomUserIDs(roomID string) ([]string, error) {
 	// Step 1: Room의 사용자 ID 리스트 가져오기
 	roomKey := fmt.Sprintf("room:%s", roomID)
@@ -211,7 +206,6 @@ func (r *RedisClient) GetJoinedUser(roomID string) ([]int, error) {
 	return userIDs, nil
 }
 
-// Room Timeout 사용자 추가
 func (r *RedisClient) AddTimeoutUser(roomID string, userID int) error {
 	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
 	err := r.Client.SAdd(ctx, timeoutKey, strconv.Itoa(userID)).Err()
@@ -222,7 +216,6 @@ func (r *RedisClient) AddTimeoutUser(roomID string, userID int) error {
 	return nil
 }
 
-// Room Timeout된 사용자 개수 취합
 func (r *RedisClient) GetTimeoutUserCount(roomID string) (int64, error) {
 	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
 	count, err := r.Client.SCard(ctx, timeoutKey).Result()
@@ -299,4 +292,150 @@ func (r *RedisClient) ClearFinalChoiceRoom(roomID string) error {
 	}
 	log.Printf("Cleared final choice data for room %s", roomID)
 	return nil
+}
+
+func (r *RedisClient) SetRoomStatus(roomID string, status int) error {
+	statusKey := fmt.Sprintf("room_status:%s", roomID)
+	err := r.Client.Set(ctx, statusKey, status, 0).Err() // 만료 시간 없음
+	if err != nil {
+		return fmt.Errorf("failed to set status for room %s: %v", roomID, err)
+	}
+	log.Printf("Set status for room %s to %d", roomID, status)
+	return nil
+}
+
+func (r *RedisClient) GetRoomStatus(roomID string) (int, error) {
+	statusKey := fmt.Sprintf("room_status:%s", roomID)
+	statusStr, err := r.Client.Get(ctx, statusKey).Result()
+	if err == redis.Nil {
+		return 0, fmt.Errorf("status not found for room %s", roomID) // 상태가 없으면 에러 반환
+	} else if err != nil {
+		return 0, fmt.Errorf("failed to get status for room %s: %v", roomID, err)
+	}
+
+	status, convErr := strconv.Atoi(statusStr)
+	if convErr != nil {
+		return 0, fmt.Errorf("failed to convert status for room %s: %v", roomID, convErr)
+	}
+
+	log.Printf("Get status for room %s: %d", roomID, status)
+	return status, nil
+}
+
+func (r *RedisClient) ClearRoomStatus(roomID string) error {
+	statusKey := fmt.Sprintf("room_status:%s", roomID)
+	err := r.Client.Del(ctx, statusKey).Err()
+	if err != nil {
+		return fmt.Errorf("failed to clear status for room %s: %v", roomID, err)
+	}
+	log.Printf("Cleared status for room %s", roomID)
+	return nil
+}
+
+func (r *RedisClient) SetFinalChoiceTimeout(roomID string, duration time.Duration) error {
+	ctx := context.Background()
+
+	// 방 Timeout 목록에 추가
+	err := r.Client.Set(ctx, roomID, duration.Seconds(), duration).Err()
+	if err != nil {
+		log.Printf("Failed to set room timeout for RoomID %s: %v", roomID, err)
+		return err
+	}
+
+	// 방 목록에 추가
+	err = r.Client.SAdd(ctx, "rooms:choice", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to add RoomID  d%s to rooms choice: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("Final Choice timeout set for RoomID %s: %v seconds", roomID, duration.Seconds())
+	return nil
+}
+
+func (r *RedisClient) RemoveChoiceRoomFromRedis(roomID string) error {
+	ctx := context.Background()
+
+	// Redis에서 방 제거
+	err := r.Client.Del(ctx, roomID).Err()
+	if err != nil {
+		log.Printf("Failed to delete room %s from Redis: %v", roomID, err)
+		return err
+	}
+
+	// 방 목록에서도 제거
+	err = r.Client.SRem(ctx, "rooms:choice", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to remove RoomID %s from rooms choice: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("RoomID %s removed from Redis", roomID)
+	return nil
+}
+
+func (r *RedisClient) GetChoiceRoomRemainingTime(roomID string) (int, error) {
+	ctx := context.Background()
+
+	ttl, err := r.Client.TTL(ctx, roomID).Result()
+	if err != nil {
+		log.Printf("Failed to get remaining time for RoomID %s: %v", roomID, err)
+		return 0, err
+	}
+
+	if ttl <= 0 {
+		log.Printf("RoomID %s has no remaining time or is expired", roomID)
+		return 0, nil // 타임아웃이 만료된 경우
+	}
+
+	return int(ttl.Seconds()), nil
+}
+
+func (r *RedisClient) GetAllChoiceRoomsFromRedis() ([]string, error) {
+	ctx := context.Background()
+
+	// Redis에서 방 목록 가져오기
+	roomIDs, err := r.Client.SMembers(ctx, "rooms:choice").Result()
+	if err != nil {
+		log.Printf("Failed to get room choice from Redis: %v", err)
+		return nil, err
+	}
+
+	return roomIDs, nil
+}
+
+func (r *RedisClient) MonitorFinalTimeouts() {
+	ticker := time.NewTicker(1 * time.Second) // 최대 1초 내에 이벤트 감지
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Redis에 저장된 모든 방 ID 가져오기
+		rooms, err := r.GetAllChoiceRoomsFromRedis()
+		if err != nil {
+			log.Printf("Failed to fetch rooms for timeout monitoring: %v", err)
+			continue
+		}
+
+		for _, roomID := range rooms {
+			// 남은 시간이 0 이하인지 확인
+			remainingTime, err := r.GetChoiceRoomRemainingTime(roomID)
+			if err != nil || remainingTime > 0 {
+				continue // 아직 만료되지 않은 방은 스킵
+			}
+
+			// 만료된 방에 대해 timeout 이벤트 발행
+			err = r.Emitter.PushFinalChoiceTimeoutToQueue(types.FinalChoiceTimeoutEvent{
+				RoomID: roomID,
+			})
+			if err != nil {
+				log.Printf("Failed to push final choice timeout, room: %s, err: %v", roomID, err)
+			}
+
+			// Redis에서 방 삭제
+			err = r.RemoveChoiceRoomFromRedis(roomID)
+			if err != nil {
+				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
+			}
+		}
+	}
 }

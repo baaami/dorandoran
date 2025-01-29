@@ -18,115 +18,117 @@ import (
 )
 
 // 방 생성
-func (app *Config) createRoom(chatRoomCreateChan <-chan types.MatchEvent) {
-	for matchEvent := range chatRoomCreateChan {
-		// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
-		chatRoomID := matchEvent.MatchId
+func (app *Config) createRoom(matchEvent types.MatchEvent) error {
+	// Create a unique ChatRoom ID (e.g., UUID or timestamp-based ID)
+	chatRoomID := matchEvent.MatchId
 
-		var seq int64
-		var startTime time.Time
-		var finishTime time.Time
+	var seq int64
+	var startTime time.Time
+	var finishTime time.Time
 
-		var gamers []data.GamerInfo
+	var gamers []data.GamerInfo
 
-		if matchEvent.MatchType == types.MATCH_GAME {
-			log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
-			startTime = time.Now()
-			// TODO: 시간 수정 필요
-			finishTime = startTime.Add(5 * time.Minute)
+	if matchEvent.MatchType == types.MATCH_GAME {
+		log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
+		startTime = time.Now()
+		// TODO: 시간 수정 필요
+		finishTime = startTime.Add(10 * time.Minute)
 
-			seq, _ = app.Models.ChatRoom.GetNextSequence("chatRoomSeq")
-		} else {
-			log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
-			startTime = time.Now()
-			// TODO: 시간 수정 필요
-			finishTime = startTime.Add(10 * time.Minute)
+		seq, _ = app.Models.ChatRoom.GetNextSequence("chatRoomSeq")
+	} else {
+		log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
+		startTime = time.Now()
+		// TODO: 시간 수정 필요
+		finishTime = startTime.Add(10 * time.Minute)
 
-			seq = 0
-		}
-
-		// 나는 솔로 캐릭터 할당
-		male := 0
-		female := 0
-
-		for _, user := range matchEvent.MatchedUsers {
-			var gamer data.GamerInfo
-
-			if matchEvent.MatchType == types.MATCH_GAME {
-				gamer.UserID = user.ID
-				if user.Gender == types.MALE {
-					gamer.CharacterID = male
-					gamer.CharacterName = data.MaleNames[male]
-					male++
-				} else {
-					gamer.CharacterID = female
-					gamer.CharacterName = data.FemaleNames[female]
-					female++
-				}
-
-				gamer.CharacterAvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
-			} else {
-				// 사용하지 않음
-				gamer.CharacterID = -1
-				gamer.CharacterAvatarURL = ""
-			}
-
-			gamers = append(gamers, gamer)
-		}
-
-		room := data.ChatRoom{
-			ID:           chatRoomID,
-			Seq:          seq,
-			Type:         matchEvent.MatchType,
-			UserIDs:      extractUserIDs(matchEvent.MatchedUsers),
-			Gamers:       gamers,
-			CreatedAt:    startTime,
-			FinishChatAt: finishTime,
-			ModifiedAt:   startTime,
-		}
-
-		// MongoDB에 채팅방 삽입
-		err := app.Models.ChatRoom.InsertRoom(&room)
-		if err != nil {
-			log.Printf("Failed to insert chat room to MongoDB: %v", err)
-			continue
-		}
-
-		ctx := context.Background()
-		roomKey := fmt.Sprintf("room:%s", room.ID)
-
-		// Redis에 채팅방 정보 생성
-		err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, IntToStringArray(room.UserIDs)).Err()
-		if err != nil {
-			log.Printf("Failed to add room in redis, err: %s", err.Error())
-			continue
-		}
-
-		// 채팅방 타임아웃 설정
-		app.RoomManager.SetRoomTimeout(room.ID, time.Until(room.FinishChatAt))
-
-		log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)
-
-		if matchEvent.MatchType == types.MATCH_GAME {
-			// 채팅방 생성 이벤트 발행
-			err = app.Emitter.PublishChatRoomCreateEvent(room)
-			if err != nil {
-				log.Printf("Failed to publish chat room event: %v", err)
-				continue
-			}
-
-			log.Printf("Published chat room event for room ID: %s", room.ID)
-		} else {
-			// 커플방 생성 이벤트 발행
-			err = app.Emitter.PublishCoupleRoomCreateEvent(room)
-			if err != nil {
-				log.Printf("Failed to publish chat room event: %v", err)
-				continue
-			}
-
-			log.Printf("Published chat room event for room ID: %s", room.ID)
-		}
+		seq = 0
 	}
+
+	// 나는 솔로 캐릭터 할당
+	male := 0
+	female := 0
+
+	for _, user := range matchEvent.MatchedUsers {
+		var gamer data.GamerInfo
+
+		if matchEvent.MatchType == types.MATCH_GAME {
+			gamer.UserID = user.ID
+			if user.Gender == types.MALE {
+				gamer.CharacterID = male
+				gamer.CharacterName = data.MaleNames[male]
+				male++
+			} else {
+				gamer.CharacterID = female
+				gamer.CharacterName = data.FemaleNames[female]
+				female++
+			}
+
+			gamer.CharacterAvatarURL = fmt.Sprintf("/profile?gender=%d&character_id=%d", user.Gender, gamer.CharacterID)
+		} else {
+			// 사용하지 않음
+			gamer.CharacterID = -1
+			gamer.CharacterAvatarURL = ""
+		}
+
+		gamers = append(gamers, gamer)
+	}
+
+	room := data.ChatRoom{
+		ID:                  chatRoomID,
+		Seq:                 seq,
+		Type:                matchEvent.MatchType,
+		UserIDs:             extractUserIDs(matchEvent.MatchedUsers),
+		Gamers:              gamers,
+		CreatedAt:           startTime,
+		FinishChatAt:        finishTime,
+		FinishFinalChoiceAt: finishTime.Add(30 * time.Second),
+		ModifiedAt:          startTime,
+	}
+
+	// MongoDB에 채팅방 삽입
+	err := app.Models.ChatRoom.InsertRoom(&room)
+	if err != nil {
+		log.Printf("Failed to insert chat room to MongoDB: %v", err)
+		return err
+	}
+
+	ctx := context.Background()
+	roomKey := fmt.Sprintf("room:%s", room.ID)
+
+	// Redis에 채팅방 정보 생성
+	err = app.RoomManager.RedisClient.Client.SAdd(ctx, roomKey, IntToStringArray(room.UserIDs)).Err()
+	if err != nil {
+		log.Printf("Failed to add room in redis, err: %s", err.Error())
+		return err
+	}
+
+	app.RoomManager.RedisClient.SetRoomStatus(room.ID, types.RoomStatusGameIng)
+
+	app.RoomManager.SetRoomTimeout(room.ID, time.Until(room.FinishChatAt))
+
+	log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)
+
+	if matchEvent.MatchType == types.MATCH_GAME {
+		// 채팅방 생성 이벤트 발행
+		err = app.Emitter.PublishChatRoomCreateEvent(room)
+		if err != nil {
+			log.Printf("Failed to publish chat room event: %v", err)
+			return err
+		}
+
+		log.Printf("Published chat room event for room ID: %s", room.ID)
+	} else {
+		// 커플방 생성 이벤트 발행
+		err = app.Emitter.PublishCoupleRoomCreateEvent(room)
+		if err != nil {
+			log.Printf("Failed to publish chat room event: %v", err)
+			return err
+		}
+
+		log.Printf("Published chat room event for room ID: %s", room.ID)
+	}
+
+	return nil
 }
 
 // 채팅방 목록 조회
@@ -306,12 +308,14 @@ func (app *Config) getChatRoomByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	payload := data.RoomDetailResponse{
-		ID:           room.ID,
-		Type:         room.Type,
-		Users:        gamerList,
-		CreatedAt:    room.CreatedAt,
-		FinishChatAt: room.FinishChatAt,
-		ModifiedAt:   room.ModifiedAt,
+		ID:                  room.ID,
+		Type:                room.Type,
+		Status:              room.Status,
+		Users:               gamerList,
+		CreatedAt:           room.CreatedAt,
+		FinishChatAt:        room.FinishChatAt,
+		FinishFinalChoiceAt: room.FinishFinalChoiceAt,
+		ModifiedAt:          room.ModifiedAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -743,4 +747,57 @@ func extractUserIDs(users []types.WaitingUser) []int {
 		ids[i] = user.ID
 	}
 	return ids
+}
+
+func (app *Config) EventPayloadHandler() {
+	for eventPayload := range app.EventChannel {
+		switch eventPayload.EventType {
+		case event.EventTypeMatch:
+			app.handleEventMatch(eventPayload.Data)
+		case event.EventTypeRoomTimeout:
+			app.handleEventRoomTimeout(eventPayload.Data)
+		case event.EventTypeFinalChoiceTimeout:
+			app.handleEventFinalChoiceTimeout(eventPayload.Data)
+		}
+	}
+}
+
+func (app *Config) handleEventMatch(data json.RawMessage) error {
+	var matchEvent types.MatchEvent
+	err := json.Unmarshal(data, &matchEvent)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal MatchEvent: %v", err)
+	}
+
+	log.Printf("Processed MatchEvent: MatchID=%s, MatchedUsers=%v", matchEvent.MatchId, matchEvent.MatchedUsers)
+
+	err = app.createRoom(matchEvent)
+	if err != nil {
+		return fmt.Errorf("failed to create room, err: %s", err.Error())
+	}
+	return nil
+}
+
+func (app *Config) handleEventRoomTimeout(data json.RawMessage) error {
+	var roomTimeoutEvent event.RoomTimeoutEvent
+	err := json.Unmarshal(data, &roomTimeoutEvent)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal RoomTimeoutEvent: %v", err)
+	}
+
+	app.Models.ChatRoom.UpdateChatRoomStage(roomTimeoutEvent.RoomID, types.RoomStatusChoiceIng)
+
+	return nil
+}
+
+func (app *Config) handleEventFinalChoiceTimeout(data json.RawMessage) error {
+	var finalChoiceTimeout event.RoomTimeoutEvent
+	err := json.Unmarshal(data, &finalChoiceTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal FinalChoiceTimeout: %v", err)
+	}
+
+	app.Models.ChatRoom.UpdateChatRoomStage(finalChoiceTimeout.RoomID, types.RoomStatusChoiceComplete)
+
+	return nil
 }

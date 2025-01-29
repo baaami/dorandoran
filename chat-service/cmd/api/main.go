@@ -12,7 +12,6 @@ import (
 	"github.com/baaami/dorandoran/chat/pkg/event"
 	"github.com/baaami/dorandoran/chat/pkg/manager"
 	"github.com/baaami/dorandoran/chat/pkg/redis"
-	"github.com/baaami/dorandoran/chat/pkg/types"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -27,10 +26,11 @@ const (
 var client *mongo.Client
 
 type Config struct {
-	Models      data.Models
-	Rabbit      *amqp.Connection
-	Emitter     *event.Emitter
-	RoomManager *manager.RoomManager
+	Models       data.Models
+	Rabbit       *amqp.Connection
+	Emitter      *event.Emitter
+	RoomManager  *manager.RoomManager
+	EventChannel chan event.EventPayload
 }
 
 func main() {
@@ -85,21 +85,30 @@ func main() {
 	// RoomManager 초기화
 	roomManager := manager.NewRoomManager(redisClient, emitter, models)
 
-	eventChannel := make(chan types.MatchEvent)
+	eventChannel := make(chan event.EventPayload, 10)
 
 	// Config 구조체 초기화
 	app := Config{
-		Models:      models,
-		Rabbit:      rabbitConn,
-		Emitter:     emitter,
-		RoomManager: roomManager,
+		Models:       models,
+		Rabbit:       rabbitConn,
+		Emitter:      emitter,
+		RoomManager:  roomManager,
+		EventChannel: eventChannel,
 	}
 
-	consumerExchanges := []event.ExchangeConfig{
-		{Name: "match_events", Type: "fanout"},
+	routingConfigs := []event.RoutingConfig{
+		{
+			Exchange: event.ExchangeConfig{Name: event.ExchangeAppTopic, Type: "topic"},
+			Keys: []string{"room.timeout", "final.choice.timeout",
+				event.EventTypeRoomTimeout, event.EventTypeFinalChoiceTimeout},
+		},
+		{
+			Exchange: event.ExchangeConfig{Name: event.ExchangeMatchEvents, Type: "fanout"},
+			Keys:     []string{}, // fanout 타입은 라우팅 키가 필요 없음
+		},
 	}
 
-	consumer, err := event.NewConsumer(rabbitConn, consumerExchanges)
+	consumer, err := event.NewConsumer(rabbitConn, routingConfigs)
 	if err != nil {
 		log.Printf("Failed to make new match consumer: %v", err)
 		os.Exit(1)
@@ -107,21 +116,21 @@ func main() {
 
 	// 핸들러 설정
 	handlers := map[string]event.MessageHandler{
-		"match": event.MatchEventHandler,
+		event.EventTypeMatch:              event.MatchEventHandler,
+		event.EventTypeRoomTimeout:        event.RoomTimeoutHandler,
+		event.EventTypeFinalChoiceTimeout: event.FinalChoiceTimeoutHandler,
 	}
 
 	go func() {
-		log.Println("Starting RabbitMQ consumer for matching events")
 		if err := consumer.Listen(handlers, eventChannel); err != nil {
 			log.Printf("Failed to start RabbitMQ consumer: %v", err)
 			os.Exit(1)
 		}
 	}()
 
-	go func() {
-		log.Println("Starting ChatRoom creator routine")
-		app.createRoom(eventChannel)
-	}()
+	go app.RoomManager.MonitorRoomTimeouts()
+
+	go app.EventPayloadHandler()
 
 	// 웹 서버 시작
 	log.Println("Starting Chat Service on port", webPort)
