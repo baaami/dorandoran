@@ -167,13 +167,11 @@ func RoomTimeoutHandler(payload types.EventPayload, eventChannel chan<- types.We
 
 // event: final.choice.timeout
 func FinalChoiceTimeoutHandler(payload types.EventPayload, eventChannel chan<- types.WebSocketMessage) {
-	var roomTimeout RoomTimeoutEvent
-	if err := json.Unmarshal(payload.Data, &roomTimeout); err != nil {
+	var finalChoiceTimeout types.FinalChoiceTimeoutEvent
+	if err := json.Unmarshal(payload.Data, &finalChoiceTimeout); err != nil {
 		log.Printf("Failed to unmarshal room.timeout event: %v", err)
 		return
 	}
-
-	log.Printf("[TEST] FinalChoiceTimeoutHandler Event Occur!!")
 
 	wsMessage := types.WebSocketMessage{
 		Kind:    types.MessageKindFinalChoiceTimeout,

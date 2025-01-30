@@ -45,8 +45,6 @@ func (c *Consumer) setup() error {
 	return nil
 }
 
-type MessageHandler func(payload EventPayload, eventChannel chan<- EventPayload) error
-
 func (c *Consumer) Listen(eventChannel chan<- EventPayload) error {
 	channel, err := c.conn.Channel()
 	if err != nil {

@@ -108,9 +108,9 @@ type RoomRemainingEvent struct {
 }
 
 type RoomTimeoutEvent struct {
-	RoomID string `json:"room_id"`
+	RoomID          string `json:"room_id"`
+	InactiveUserIds []int  `json:"inactive_user_ids"`
 }
-
 type EventPayload struct {
 	EventType string          `json:"event_type"`
 	Data      json.RawMessage `json:"data"`
@@ -159,6 +159,10 @@ type UserChoice struct {
 type FinalChoiceResultMessage struct {
 	RoomID  string       `json:"room_id"`
 	Choices []UserChoice `json:"choices"`
+}
+
+type FinalChoiceStartMessage struct {
+	RoomID string `json:"room_id"`
 }
 
 type JoinRoomMessage struct {
@@ -215,17 +219,17 @@ type MatchEvent struct {
 }
 
 type User struct {
-	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType   int     `gorm:"index" json:"sns_type"`
-	SnsID     string  `gorm:"index" json:"sns_id"`
-	Status    int     `json:"status"`
-	Name      string  `gorm:"size:100" json:"name"`
-	Gender    int     `json:"gender"`
-	Birth     string  `gorm:"size:20" json:"birth"`
-	Address   Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
-	GamePoint int     `json:"game_point"`
+	ID         int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType    int     `gorm:"index" json:"sns_type"`
+	SnsID      string  `gorm:"index" json:"sns_id"`
+	Name       string  `gorm:"size:100" json:"name"`
+	Gender     int     `json:"gender"`
+	Birth      string  `gorm:"size:20" json:"birth"`
+	Address    Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	GameStatus int     `gorm:"default:0" json:"game_status"`
+	GameRoomID string  `gorm:"size:100" json:"game_room_id"`
+	GamePoint  int     `json:"game_point"`
 }
-
 type Couple struct {
 	UserID1 int `json:"user_id_1"`
 	UserID2 int `json:"user_id_2"`

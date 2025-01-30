@@ -100,15 +100,19 @@ func (rm *RoomManager) GetAllRoomsFromRedis() ([]string, error) {
 	return roomIDs, nil
 }
 
-// Redis에서 만료된 방을 감지하고 RabbitMQ에 timeout 이벤트 발행
 func (rm *RoomManager) PushRoomTimeout(roomID string) error {
-	// RabbitMQ로 발행할 이벤트 생성
-	event := event.RoomTimeoutEvent{
-		RoomID: roomID,
+	inactiveUsers, err := rm.RedisClient.GetInActiveUserIDs(roomID)
+	if err != nil {
+		log.Printf("Failed to get inactive users, err: %s", err.Error())
+		return err
 	}
 
-	// RabbitMQ로 발행
-	err := rm.Emitter.PushRoomTimeout(event)
+	event := event.RoomTimeoutEvent{
+		RoomID:          roomID,
+		InactiveUserIds: inactiveUsers,
+	}
+
+	err = rm.Emitter.PushRoomTimeout(event)
 	if err != nil {
 		log.Printf("Failed to push timeout event for RoomID %s: %v", roomID, err)
 		return err
@@ -118,7 +122,6 @@ func (rm *RoomManager) PushRoomTimeout(roomID string) error {
 	return nil
 }
 
-// 만료된 방을 감지하고 timeout 이벤트를 발행하는 루프
 func (rm *RoomManager) MonitorRoomTimeouts() {
 	ticker := time.NewTicker(1 * time.Second) // 최대 1초 내에 이벤트 감지
 	defer ticker.Stop()
@@ -144,11 +147,11 @@ func (rm *RoomManager) MonitorRoomTimeouts() {
 				log.Printf("Failed to handle timeout for RoomID %s: %v", roomID, err)
 			}
 
-			// Redis에서 방 삭제
-			err = rm.RemoveRoomFromRedis(roomID)
-			if err != nil {
-				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
-			}
+			// TODO: Redis에서 최종 선택 완료 시 방 삭제
+			// err = rm.RemoveRoomFromRedis(roomID)
+			// if err != nil {
+			// 	log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
+			// }
 		}
 	}
 }

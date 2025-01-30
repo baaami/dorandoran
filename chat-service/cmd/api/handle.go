@@ -788,6 +788,9 @@ func (app *Config) handleEventRoomTimeout(data json.RawMessage) error {
 	}
 
 	app.Models.ChatRoom.UpdateChatRoomStatus(roomTimeoutEvent.RoomID, types.RoomStatusChoiceIng)
+	if err != nil {
+		return fmt.Errorf("failed to update chat room status, err: %s", err.Error())
+	}
 
 	return nil
 }
@@ -799,7 +802,15 @@ func (app *Config) handleEventFinalChoiceTimeout(data json.RawMessage) error {
 		return fmt.Errorf("failed to unmarshal FinalChoiceTimeout: %v", err)
 	}
 
-	app.Models.ChatRoom.UpdateChatRoomStatus(finalChoiceTimeout.RoomID, types.RoomStatusChoiceComplete)
+	err = app.Models.ChatRoom.UpdateChatRoomStatus(finalChoiceTimeout.RoomID, types.RoomStatusChoiceComplete)
+	if err != nil {
+		return fmt.Errorf("failed to update chat room status, err: %s", err.Error())
+	}
+
+	err = app.RoomManager.RemoveRoomFromRedis(finalChoiceTimeout.RoomID)
+	if err != nil {
+		return fmt.Errorf("failed to remove room from redis, err: %s", err.Error())
+	}
 
 	return nil
 }
