@@ -131,7 +131,7 @@ func handleRoomTimeoutEvent(jsonData json.RawMessage) error {
 	payload := onesignal.Payload{
 		PushUserList: roomTimeoutEvent.InactiveUserIds,
 		Header:       "Final Choice Start",
-		Content:      fmt.Sprintf("Final Choice Start in %s기", roomTimeoutEvent.RoomID),
+		Content:      "Final Choice Start",
 		Url:          fmt.Sprintf("randomChat://game-room/%s", roomTimeoutEvent.RoomID),
 	}
 
