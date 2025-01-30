@@ -161,6 +161,10 @@ type FinalChoiceResultMessage struct {
 	Choices []UserChoice `json:"choices"`
 }
 
+type FinalChoiceStartMessage struct {
+	RoomID string `json:"room_id"`
+}
+
 type JoinRoomMessage struct {
 	RoomID string `json:"room_id"`
 }

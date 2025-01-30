@@ -218,8 +218,14 @@ func (app *Config) BroadcastFinalChoiceStart(roomID string) error {
 		return nil
 	}
 
+	payload, err := json.Marshal(types.FinalChoiceStartMessage{RoomID: roomID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal FinalChoiceStartMessage, err: %s", err.Error())
+	}
+
 	message := types.WebSocketMessage{
-		Kind: types.MessageKindFinalChoiceStart,
+		Kind:    types.MessageKindFinalChoiceStart,
+		Payload: json.RawMessage(payload),
 	}
 
 	// Room 사용자에게 브로드캐스트
