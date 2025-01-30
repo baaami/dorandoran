@@ -14,17 +14,17 @@ type Address struct {
 }
 
 type User struct {
-	ID        int     `gorm:"primaryKey;autoIncrement" json:"id"`
-	SnsType   int     `gorm:"index" json:"sns_type"`
-	SnsID     string  `gorm:"index" json:"sns_id"`
-	Status    int     `json:"status"`
-	Name      string  `gorm:"size:100" json:"name"`
-	Gender    int     `json:"gender"`
-	Birth     string  `gorm:"size:20" json:"birth"`
-	Address   Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
-	GamePoint int     `json:"game_point"`
+	ID         int     `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType    int     `gorm:"index" json:"sns_type"`
+	SnsID      string  `gorm:"index" json:"sns_id"`
+	Name       string  `gorm:"size:100" json:"name"`
+	Gender     int     `json:"gender"`
+	Birth      string  `gorm:"size:20" json:"birth"`
+	Address    Address `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	GameStatus int     `gorm:"default:0" json:"game_status"`
+	GameRoomID string  `gorm:"size:100" json:"game_room_id"`
+	GamePoint  int     `json:"game_point"`
 }
-
 type MatchFilter struct {
 	UserID          int  `gorm:"primaryKey" json:"user_id"`
 	CoupleCount     int  `json:"couple_count"`
@@ -105,13 +105,27 @@ func (s *UserService) UpdateUser(user User) error {
 
 // 유저 상태 업데이트
 func (s *UserService) UpdateUserStatus(userID int, newStatus int) error {
-	result := s.DB.Model(&User{}).Where("id = ?", userID).Update("status", newStatus)
+	result := s.DB.Model(&User{}).Where("id = ?", userID).Update("game_status", newStatus)
 	if result.Error != nil {
-		log.Printf("Failed to update status for user ID %d: %v", userID, result.Error)
+		log.Printf("Failed to update game_status for user ID %d: %v", userID, result.Error)
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		log.Printf("No user found with ID %d to update status", userID)
+		log.Printf("No user found with ID %d to update game_status", userID)
+		return errors.New("user not found")
+	}
+	return nil
+}
+
+// 유저 현재 게임방 업데이트
+func (s *UserService) UpdateUserGameRoomID(userID int, gameRoomID string) error {
+	result := s.DB.Model(&User{}).Where("id = ?", userID).Update("game_room_id", gameRoomID)
+	if result.Error != nil {
+		log.Printf("Failed to update game_room_id for user ID %d: %v", userID, result.Error)
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("No user found with ID %d to update game_room_id", userID)
 		return errors.New("user not found")
 	}
 	return nil

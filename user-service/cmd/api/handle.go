@@ -442,6 +442,11 @@ func (app *Config) InitUserInfoByGame(matchEvent types.MatchEvent) {
 		if err != nil {
 			log.Printf("Failed to UpdateUserStatus, user: %d, err: %s", user.ID, err.Error())
 		}
+
+		err = app.Models.UpdateUserGameRoomID(user.ID, matchEvent.MatchId)
+		if err != nil {
+			log.Printf("Failed to UpdateUserGameRoomID, user: %d, err: %s", user.ID, err.Error())
+		}
 	}
 }
 
@@ -482,6 +487,12 @@ func (app *Config) handleEventFinalChoiceTimeout(data json.RawMessage) error {
 		err := app.Models.UpdateUserStatus(id, types.USER_STATUS_STANDBY)
 		if err != nil {
 			log.Printf("failed to UpdateUserStatus, user: %d", id)
+			continue
+		}
+
+		err = app.Models.UpdateUserGameRoomID(id, "")
+		if err != nil {
+			log.Printf("failed to UpdateUserGameRoomID, user: %d", id)
 			continue
 		}
 	}
