@@ -29,7 +29,8 @@ type RoomLeaveEvent struct {
 
 // RoomTimeoutEvent 정의
 type RoomTimeoutEvent struct {
-	RoomID string `json:"room_id"`
+	RoomID          string `json:"room_id"`
+	InactiveUserIds []int  `json:"inactive_user_ids"`
 }
 
 type FinalChoiceTimeoutEvent struct {

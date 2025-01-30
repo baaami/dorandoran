@@ -1,0 +1,16 @@
+POST http://localhost:2719/auth/kakao HTTP/1.1
+Content-Type: application/json
+
+{
+    "accessToken": "masterkey-2"
+}
+
+GET http://localhost:2719/chat/room/list HTTP/1.1
+Content-Type: application/json
+
+GET http://localhost:2719/chat/room HTTP/1.1
+Content-Type: application/json
+
+{
+    "accessToken": "masterkey-2"
+}

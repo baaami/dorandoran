@@ -108,9 +108,9 @@ type RoomRemainingEvent struct {
 }
 
 type RoomTimeoutEvent struct {
-	RoomID string `json:"room_id"`
+	RoomID          string `json:"room_id"`
+	InactiveUserIds []int  `json:"inactive_user_ids"`
 }
-
 type EventPayload struct {
 	EventType string          `json:"event_type"`
 	Data      json.RawMessage `json:"data"`

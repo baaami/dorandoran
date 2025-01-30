@@ -112,6 +112,19 @@ services:
       mode: replicated
       replicas: 1
 
+  push-service:
+    build:
+      context: ./push-service
+      dockerfile: ./push-service.dockerfile
+    container_name: push-service
+    restart: always
+    environment:
+      ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
+      ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
+    deploy:
+      mode: replicated
+      replicas: 1
+
   mysql:
     image: mysql:8
     container_name: mysql

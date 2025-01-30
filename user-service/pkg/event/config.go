@@ -18,9 +18,9 @@ type EventPayload struct {
 }
 
 type RoomTimeoutEvent struct {
-	RoomID string `json:"room_id"`
+	RoomID          string `json:"room_id"`
+	InactiveUserIds []int  `json:"inactive_user_ids"`
 }
-
 type FinalChoiceTimeoutEvent struct {
 	RoomID  string `bson:"room_id" json:"room_id"`
 	UserIDs []int  `bson:"user_ids" json:"user_ids"`

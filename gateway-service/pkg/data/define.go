@@ -68,7 +68,8 @@ type RoomRemainingEvent struct {
 }
 
 type RoomTimeoutEvent struct {
-	RoomID string `json:"room_id"`
+	RoomID          string `json:"room_id"`
+	InactiveUserIds []int  `json:"inactive_user_ids"`
 }
 
 const (
