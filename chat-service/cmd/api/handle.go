@@ -787,7 +787,7 @@ func (app *Config) handleEventRoomTimeout(data json.RawMessage) error {
 		return fmt.Errorf("failed to unmarshal RoomTimeoutEvent: %v", err)
 	}
 
-	app.Models.ChatRoom.UpdateChatRoomStage(roomTimeoutEvent.RoomID, types.RoomStatusChoiceIng)
+	app.Models.ChatRoom.UpdateChatRoomStatus(roomTimeoutEvent.RoomID, types.RoomStatusChoiceIng)
 
 	return nil
 }
@@ -799,7 +799,7 @@ func (app *Config) handleEventFinalChoiceTimeout(data json.RawMessage) error {
 		return fmt.Errorf("failed to unmarshal FinalChoiceTimeout: %v", err)
 	}
 
-	app.Models.ChatRoom.UpdateChatRoomStage(finalChoiceTimeout.RoomID, types.RoomStatusChoiceComplete)
+	app.Models.ChatRoom.UpdateChatRoomStatus(finalChoiceTimeout.RoomID, types.RoomStatusChoiceComplete)
 
 	return nil
 }

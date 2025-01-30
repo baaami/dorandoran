@@ -548,7 +548,7 @@ func (c *ChatRoom) GetUserGameInfoInRoom(userID int, roomID string) (*GamerInfo,
 	return &noGamer, errors.New("user not found in the game")
 }
 
-func (c *ChatRoom) UpdateChatRoomStage(roomID string, stage int) error {
+func (c *ChatRoom) UpdateChatRoomStatus(roomID string, status int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -558,22 +558,22 @@ func (c *ChatRoom) UpdateChatRoomStage(roomID string, stage int) error {
 
 	update := bson.M{
 		"$set": bson.M{
-			"stage":       stage,
+			"status":      status,
 			"modified_at": time.Now(),
 		},
 	}
 
 	result, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		log.Printf("Error updating stage for room %s: %v", roomID, err)
+		log.Printf("Error updating status for room %s: %v", roomID, err)
 		return err
 	}
 
 	if result.MatchedCount == 0 {
-		log.Printf("No room found with ID %s to update stage", roomID)
+		log.Printf("No room found with ID %s to update status", roomID)
 		return errors.New("room not found")
 	}
 
-	log.Printf("Successfully updated stage for room %s to %d", roomID, stage)
+	log.Printf("Successfully updated status for room %s to %d", roomID, status)
 	return nil
 }
