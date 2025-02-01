@@ -458,6 +458,8 @@ func (app *Config) EventPayloadHandler() {
 			app.handleEventMatch(eventPayload.Data)
 		case event.EventTypeFinalChoiceTimeout:
 			app.handleEventFinalChoiceTimeout(eventPayload.Data)
+		case event.EventTypeRoomLeave:
+			app.handleEventRoomLeave(eventPayload.Data)
 		}
 	}
 }
@@ -495,6 +497,28 @@ func (app *Config) handleEventFinalChoiceTimeout(data json.RawMessage) error {
 			log.Printf("failed to UpdateUserGameRoomID, user: %d", id)
 			continue
 		}
+	}
+
+	return nil
+}
+
+func (app *Config) handleEventRoomLeave(data json.RawMessage) error {
+	var roomLeave event.RoomLeaveEvent
+	err := json.Unmarshal(data, &roomLeave)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal RoomLeaveEvent: %v", err)
+	}
+
+	err = app.Models.UpdateUserStatus(roomLeave.LeaveUserID, types.USER_STATUS_STANDBY)
+	if err != nil {
+		log.Printf("failed to UpdateUserStatus, user: %d", roomLeave.LeaveUserID)
+		return err
+	}
+
+	err = app.Models.UpdateUserGameRoomID(roomLeave.LeaveUserID, "")
+	if err != nil {
+		log.Printf("failed to UpdateUserGameRoomID, user: %d", roomLeave.LeaveUserID)
+		return err
 	}
 
 	return nil
