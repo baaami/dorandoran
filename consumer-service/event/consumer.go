@@ -175,7 +175,6 @@ func (consumer *Consumer) Listen(routingkeys []string) error {
 				}
 				log.Printf("Chat Message Unmarshaled: %+v", chatMsg)
 				handleChatAddPayload(chatMsg)
-				PushChatNotification(chatMsg)
 
 			// TODO: 사용하는 이벤트 타입인지??
 			case "chat.read":
@@ -222,37 +221,6 @@ func (consumer *Consumer) Listen(routingkeys []string) error {
 
 	fmt.Printf("Waiting for messages [Exchange: app_topic, Queue: %s]\n", q.Name)
 	<-forever
-
-	return nil
-}
-
-// 비활성 사용자에게 채팅 푸쉬 알림을 전송
-func PushChatNotification(chatEventMsg ChatEvent) error {
-	jsonData, _ := json.MarshalIndent(&chatEventMsg, "", "\t")
-
-	chatServiceURL := "http://user-service/push/chat"
-
-	request, err := http.NewRequest(http.MethodPost, chatServiceURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Printf("Failed to create request: %v", err)
-		return err
-	}
-
-	request.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-
-	response, err := client.Do(request)
-	if err != nil {
-		log.Printf("Failed to send request: %v", err)
-		return err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		log.Printf("Failed to send chat message: %v", err)
-		return err
-	}
 
 	return nil
 }

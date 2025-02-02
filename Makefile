@@ -52,7 +52,7 @@ build_gateway:
 ## build_user: builds the user binary as a linux executable
 build_user:
 	@echo "Building user binary..."
-	cd user-service && env GOOS=linux CGO_ENABLED=0 go build -o ${USER_BINARY} ./cmd/api
+	cd services/user && env GOOS=linux CGO_ENABLED=0 go build -o ${USER_BINARY} ./cmd
 	@echo "Done!"
 
 ## build_chat: builds the chat binary as a linux executable

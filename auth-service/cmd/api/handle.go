@@ -85,7 +85,7 @@ func (app *Config) KakaoLoginHandler(c echo.Context) error {
 	if loginUser == (User{}) {
 		loginUser, err = RegisterNewUser(types.KAKAO, snsID)
 		if err != nil {
-			log.Printf("Failed to register new user")
+			log.Printf("Failed to register new user, err: %s", err.Error())
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register new user"})
 		}
 		sessionID = app.RedisClient.CreateSession(loginUser.ID)
@@ -181,7 +181,7 @@ func (app *Config) NaverLoginHandler(c echo.Context) error {
 	if loginUser == (User{}) {
 		loginUser, err = RegisterNewUser(types.NAVER, snsID)
 		if err != nil {
-			log.Printf("Failed to register new user")
+			log.Printf("Failed to register new user, err: %s", err.Error())
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register new user"})
 		}
 		sessionID = app.RedisClient.CreateSession(loginUser.ID)
