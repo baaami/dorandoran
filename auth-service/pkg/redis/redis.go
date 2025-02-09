@@ -93,10 +93,9 @@ func (r *RedisClient) GetUserBySessionID(sessionID string) (int, error) {
 		log.Printf("Failed to Atoi, user id: %s", sUserID)
 		return 0, nil
 	}
-	
+
 	return userID, nil
 }
-
 
 // GetSessionByUserID: 사용자 ID로 세션 ID 조회
 func (r *RedisClient) GetSessionByUserID(userID int) (string, error) {

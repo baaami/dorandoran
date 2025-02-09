@@ -12,3 +12,5 @@ match-socket-service/matchSocketApp
 chat-socket-service/chatSocketApp
 .env
 push-service/pushApp
+services/auth/authApp
+services/user/userApp

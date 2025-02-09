@@ -83,8 +83,7 @@ services:
 
   auth-service:
     build:
-      context: ./auth-service
-      dockerfile: ./auth-service.dockerfile
+      context: ./services/auth
     container_name: auth-service
     restart: always
     environment:
