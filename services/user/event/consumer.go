@@ -31,20 +31,25 @@ func (c *Consumer) StartListening() {
 	}
 
 	// Queue 생성 및 바인딩
-	queue, err := c.mqClient.DeclareQueue(mq.QueueUser, mq.ExchangeAppTopic, mq.RoutingKeyFinalChoiceTimeout)
+	queue, err := c.mqClient.DeclareQueue(mq.QueueUser, mq.ExchangeAppTopic, []string{mq.RoutingKeyFinalChoiceTimeout})
 	if err != nil {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueUser, mq.ExchangeAppTopic, err)
 	}
 
-	_, err = c.mqClient.DeclareQueue(mq.QueueUser, mq.ExchangeMatch, "")
+	_, err = c.mqClient.DeclareQueue(mq.QueueUser, mq.ExchangeMatch, []string{})
 	if err != nil {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueUser, mq.ExchangeMatch, err)
 	}
 
-	// 이벤트 리스닝 시작
-	go c.mqClient.ConsumeMessages(queue.Name, c.eventHandler.HandleFinalChoiceTimeout)
-	go c.mqClient.ConsumeMessages(queue.Name, c.eventHandler.HandleMatchEvent)
-	go c.mqClient.ConsumeMessages(queue.Name, c.eventHandler.HandleRoomLeave)
+	// 이벤트 핸들러 등록
+	handlers := mq.EventHandlerMap{
+		mq.EventTypeMatch:              c.eventHandler.HandleMatchEvent,
+		mq.EventTypeFinalChoiceTimeout: c.eventHandler.HandleFinalChoiceTimeout,
+		mq.EventTypeRoomLeave:          c.eventHandler.HandleRoomLeave,
+	}
+
+	// 메시지 소비 시작
+	c.mqClient.ConsumeMessages(queue.Name, handlers)
 
 	log.Println("✅ RabbitMQ Consumer Listening...")
 }

@@ -1,7 +1,9 @@
 package mq
 
 import (
+	"encoding/json"
 	"log"
+	eventtypes "solo/pkg/types/eventtype"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -10,6 +12,9 @@ type RabbitMQ struct {
 	Conn    *amqp.Connection
 	channel *amqp.Channel
 }
+
+// 이벤트 타입별 핸들러 맵
+type EventHandlerMap map[string]func(json.RawMessage)
 
 // ConnectToRabbitMQ: RabbitMQ 연결 설정
 func ConnectToRabbitMQ() (*RabbitMQ, error) {
@@ -42,7 +47,7 @@ func (mq *RabbitMQ) DeclareExchange(name, exchangeType string) error {
 }
 
 // DeclareQueue: Queue 생성 및 바인딩
-func (mq *RabbitMQ) DeclareQueue(queueName, exchangeName, routingKey string) (amqp.Queue, error) {
+func (mq *RabbitMQ) DeclareQueue(queueName, exchangeName string, routingKeys []string) (amqp.Queue, error) {
 	queue, err := mq.channel.QueueDeclare(
 		queueName, // queue name
 		true,      // durable
@@ -55,14 +60,16 @@ func (mq *RabbitMQ) DeclareQueue(queueName, exchangeName, routingKey string) (am
 		return queue, err
 	}
 
-	// Exchange와 Queue 바인딩
-	err = mq.channel.QueueBind(
-		queue.Name,   // queue name
-		routingKey,   // routing key
-		exchangeName, // exchange name
-		false,        // noWait
-		nil,          // arguments
-	)
+	for _, routingKey := range routingKeys {
+		// Exchange와 Queue 바인딩
+		err = mq.channel.QueueBind(
+			queue.Name,   // queue name
+			routingKey,   // routing key
+			exchangeName, // exchange name
+			false,        // noWait
+			nil,          // arguments
+		)
+	}
 
 	return queue, err
 }
@@ -81,8 +88,8 @@ func (mq *RabbitMQ) PublishMessage(exchange, routingKey string, body []byte) err
 	)
 }
 
-// ConsumeMessages: 메시지 소비
-func (mq *RabbitMQ) ConsumeMessages(queueName string, handler func([]byte)) error {
+// ConsumeMessages: 이벤트 타입별 핸들러 등록 및 실행
+func (mq *RabbitMQ) ConsumeMessages(queueName string, handlers EventHandlerMap) error {
 	msgs, err := mq.channel.Consume(
 		queueName, // queue name
 		"",        // consumer
@@ -96,11 +103,24 @@ func (mq *RabbitMQ) ConsumeMessages(queueName string, handler func([]byte)) erro
 		return err
 	}
 
-	// 메시지 처리
+	// 메시지 처리 루프
 	go func() {
 		for msg := range msgs {
-			handler(msg.Body)
+			var eventPayload eventtypes.EventPayload
+			if err := json.Unmarshal(msg.Body, &eventPayload); err != nil {
+				log.Printf("❌ Failed to unmarshal EventPayload: %v", err)
+				continue
+			}
+
+			// EventType에 맞는 핸들러 실행
+			if handler, exists := handlers[eventPayload.EventType]; exists {
+				go handler(eventPayload.Data)
+			} else {
+				log.Printf("⚠️ No handler found for event type: %s", eventPayload.EventType)
+			}
 		}
 	}()
+
+	log.Printf("✅ Listening on queue: %s", queueName)
 	return nil
 }

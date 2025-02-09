@@ -16,7 +16,7 @@ func NewEventHandler(userService *service.UserService) *EventHandler {
 	return &EventHandler{userService: userService}
 }
 
-func (h *EventHandler) HandleMatchEvent(body []byte) {
+func (h *EventHandler) HandleMatchEvent(body json.RawMessage) {
 	var eventData eventtypes.MatchEvent
 	if err := json.Unmarshal(body, &eventData); err != nil {
 		log.Printf("❌ Failed to unmarshal match event: %v", err)
@@ -34,7 +34,7 @@ func (h *EventHandler) HandleMatchEvent(body []byte) {
 	}
 }
 
-func (h *EventHandler) HandleFinalChoiceTimeout(body []byte) {
+func (h *EventHandler) HandleFinalChoiceTimeout(body json.RawMessage) {
 	var eventData eventtypes.FinalChoiceTimeoutEvent
 	if err := json.Unmarshal(body, &eventData); err != nil {
 		log.Printf("❌ Failed to unmarshal final choice timeout event: %v", err)
@@ -51,7 +51,7 @@ func (h *EventHandler) HandleFinalChoiceTimeout(body []byte) {
 	}
 }
 
-func (h *EventHandler) HandleRoomLeave(body []byte) {
+func (h *EventHandler) HandleRoomLeave(body json.RawMessage) {
 	var eventData eventtypes.RoomLeaveEvent
 	if err := json.Unmarshal(body, &eventData); err != nil {
 		log.Printf("❌ Failed to unmarshal room leave event: %v", err)

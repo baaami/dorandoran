@@ -8,6 +8,8 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/samber/lo v1.49.1
+	go.mongodb.org/mongo-driver v1.17.2
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
 )

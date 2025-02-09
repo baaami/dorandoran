@@ -8,6 +8,7 @@ MATCH_SOCKET_BINARY=matchSocketApp
 CHAT_SOCKET_BINARY=chatSocketApp
 PUSH_BINARY=pushApp
 SERVICES=gateway-service user-service chat-service consumer-service auth-service match-service match-socket-service chat-socket-service push-service
+INFRAS=mysql mongo redis
 
 ## up: starts all containers in the background without forcing build
 up:
@@ -64,7 +65,7 @@ build_chat:
 ## build_auth: builds the auth binary as a linux executable
 build_auth:
 	@echo "Building auth binary..."
-	cd auth-service && env GOOS=linux CGO_ENABLED=0 go build -o ${AUTH_BINARY} ./cmd/api
+	cd services/auth && env GOOS=linux CGO_ENABLED=0 go build -o ${AUTH_BINARY} ./cmd
 	@echo "Done!"
 
 ## build_match: builds the auth binary as a linux executable
@@ -94,6 +95,6 @@ build_consumer:
 ## build_push: builds the push binary as a linux executable
 build_push:
 	@echo "Building push binary..."
-	cd push-service && env GOOS=linux CGO_ENABLED=0 go build -o ${PUSH_BINARY} ./cmd
+	cd services/push && env GOOS=linux CGO_ENABLED=0 go build -o ${PUSH_BINARY} ./cmd
 	@echo "Done!"	
 

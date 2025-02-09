@@ -50,7 +50,6 @@ services:
   user-service:
     build:
       context: ./services/user
-      # dockerfile: ./user-service.dockerfile
     container_name: user-service
     restart: always
     deploy:
@@ -110,8 +109,7 @@ services:
 
   push-service:
     build:
-      context: ./push-service
-      dockerfile: ./push-service.dockerfile
+      context: ./services/push
     container_name: push-service
     restart: always
     environment:
