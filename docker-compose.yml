@@ -17,8 +17,7 @@ services:
 
   match-socket-service:
     build:
-      context: ./match-socket-service
-      dockerfile: ./match-socket-service.dockerfile
+      context: ./services/match
     container_name: match-socket-service
     restart: always
     environment:

@@ -77,7 +77,7 @@ build_match:
 ## build_match_socket: builds the auth binary as a linux executable
 build_match_socket:
 	@echo "Building match socket binary..."
-	cd match-socket-service && env GOOS=linux CGO_ENABLED=0 go build -o ${MATCH_SOCKET_BINARY} ./api
+	cd services/match && env GOOS=linux CGO_ENABLED=0 go build -o ${MATCH_SOCKET_BINARY} ./cmd
 	@echo "Done!"
 
 ## build_chat_socket: builds the auth binary as a linux executable

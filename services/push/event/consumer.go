@@ -30,8 +30,6 @@ func (c *Consumer) StartListening() {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueUser, mq.ExchangeAppTopic, err)
 	}
 
-	// 이벤트 리스닝 시작
-
 	// 이벤트 핸들러 등록
 	handlers := mq.EventHandlerMap{
 		mq.EventTypeChat:        c.eventHandler.HandleChatEvent,
@@ -42,4 +40,6 @@ func (c *Consumer) StartListening() {
 	c.mqClient.ConsumeMessages(queue.Name, handlers)
 
 	log.Println("✅ RabbitMQ Consumer Listening...")
+
+	select {}
 }
