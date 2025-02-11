@@ -2,9 +2,10 @@ package mq
 
 // Exchange Names
 const (
-	ExchangeAppTopic    = "app_topic"
-	ExchangeMatchEvents = "match_events"
-	ExchangeMatch       = "match"
+	ExchangeAppTopic             = "app_topic"
+	ExchangeMatchEvents          = "match_events"
+	ExchangeMatch                = "match"
+	ExchangeChatRoomCreateEvents = "chat_room_create_events"
 )
 
 // Exchange Types

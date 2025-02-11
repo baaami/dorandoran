@@ -1,18 +1,19 @@
 package transport
 
 import (
+	"solo/pkg/middleware"
+	"solo/pkg/redis"
 	"solo/services/match/handler"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	echo_middleware "github.com/labstack/echo/v4/middleware"
 )
 
-func NewRouter(matchHandler *handler.MatchHandler) *echo.Echo {
+func NewRouter(matchHandler *handler.MatchHandler, redisClient *redis.RedisClient) *echo.Echo {
 	e := echo.New()
 
-	// CORS 설정
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     []string{"https://*", "http://*"},
+	e.Use(echo_middleware.CORSWithConfig(echo_middleware.CORSConfig{
+		AllowOrigins:     []string{"*"},
 		AllowMethods:     []string{echo.GET, echo.POST, echo.PUT, echo.PATCH, echo.DELETE, echo.OPTIONS},
 		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposeHeaders:    []string{"Link"},
@@ -20,7 +21,8 @@ func NewRouter(matchHandler *handler.MatchHandler) *echo.Echo {
 		MaxAge:           300,
 	}))
 
-	// 웹소켓 매칭 엔드포인트
+	e.Use(middleware.SessionMiddleware(redisClient))
+
 	e.GET("/ws/match", matchHandler.HandleMatchSocket)
 
 	return e

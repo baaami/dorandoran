@@ -20,15 +20,15 @@ func NewConsumer(mqClient *mq.RabbitMQ, service *service.MatchService) *Consumer
 
 func (c *Consumer) StartListening() {
 	// Exchange 및 Queue 설정
-	err := c.mqClient.DeclareExchange(mq.ExchangeMatchEvents, mq.ExchangeTypeFanout)
+	err := c.mqClient.DeclareExchange(mq.ExchangeChatRoomCreateEvents, mq.ExchangeTypeFanout)
 	if err != nil {
 		log.Fatalf("❌ Failed to declare exchange %s: %v", mq.ExchangeTypeFanout, err)
 	}
 
 	// Queue 생성 및 바인딩
-	queue, err := c.mqClient.DeclareQueue(mq.QueueMatch, mq.ExchangeTypeFanout, []string{})
+	queue, err := c.mqClient.DeclareQueue(mq.QueueMatch, mq.ExchangeChatRoomCreateEvents, []string{})
 	if err != nil {
-		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueMatch, mq.ExchangeTypeFanout, err)
+		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueMatch, mq.ExchangeChatRoomCreateEvents, err)
 	}
 
 	// 이벤트 핸들러 등록
@@ -40,6 +40,4 @@ func (c *Consumer) StartListening() {
 	c.mqClient.ConsumeMessages(queue.Name, handlers)
 
 	log.Println("✅ RabbitMQ Consumer Listening...")
-
-	select {}
 }

@@ -32,9 +32,14 @@ func main() {
 	consumer := event.NewConsumer(mqClient, matchService)
 	consumer.StartListening()
 
-	// Echo Router 설정
-	router := transport.NewRouter(matchHandler)
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", webPort),
+		Handler: transport.NewRouter(matchHandler, redisClient),
+	}
 
 	log.Printf("🚀 Match Service Started on Port %d", webPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", webPort), router))
+	err = srv.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

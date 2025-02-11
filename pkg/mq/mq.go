@@ -46,7 +46,6 @@ func (mq *RabbitMQ) DeclareExchange(name, exchangeType string) error {
 	)
 }
 
-// DeclareQueue: Queue 생성 및 바인딩
 func (mq *RabbitMQ) DeclareQueue(queueName, exchangeName string, routingKeys []string) (amqp.Queue, error) {
 	queue, err := mq.channel.QueueDeclare(
 		queueName, // queue name
@@ -60,8 +59,13 @@ func (mq *RabbitMQ) DeclareQueue(queueName, exchangeName string, routingKeys []s
 		return queue, err
 	}
 
+	// Fanout 익스체인지는 routingKey를 사용하지 않음
+	if len(routingKeys) == 0 {
+		routingKeys = []string{""} // 빈 문자열로 바인딩
+	}
+
 	for _, routingKey := range routingKeys {
-		// Exchange와 Queue 바인딩
+		log.Printf("🔗 Binding queue %s to exchange %s with routing key [%s]", queueName, exchangeName, routingKey)
 		err = mq.channel.QueueBind(
 			queue.Name,   // queue name
 			routingKey,   // routing key
@@ -69,9 +73,13 @@ func (mq *RabbitMQ) DeclareQueue(queueName, exchangeName string, routingKeys []s
 			false,        // noWait
 			nil,          // arguments
 		)
+		if err != nil {
+			log.Printf("❌ Failed to bind queue %s to exchange %s: %v", queueName, exchangeName, err)
+			return queue, err
+		}
 	}
 
-	return queue, err
+	return queue, nil
 }
 
 // PublishMessage: 메시지 발행
@@ -106,6 +114,7 @@ func (mq *RabbitMQ) ConsumeMessages(queueName string, handlers EventHandlerMap) 
 	// 메시지 처리 루프
 	go func() {
 		for msg := range msgs {
+			log.Print("Consume Message!")
 			var eventPayload eventtypes.EventPayload
 			if err := json.Unmarshal(msg.Body, &eventPayload); err != nil {
 				log.Printf("❌ Failed to unmarshal EventPayload: %v", err)

@@ -16,6 +16,7 @@ func NewEventHandler(service *service.MatchService) *EventHandler {
 }
 
 func (h *EventHandler) HandleRoomCreateEvent(body json.RawMessage) {
+	log.Print("HandleRoomCreateEvent")
 	var chatRoom commontype.ChatRoom
 	err := json.Unmarshal(body, &chatRoom)
 	if err != nil {
