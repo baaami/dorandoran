@@ -26,7 +26,10 @@ func main() {
 		log.Panic("Redis 연결 실패: ", err)
 	}
 
-	matchService := service.NewMatchService(redisClient, mqClient)
+	// Emitter 생성 (event 패키지 직접 참조 X)
+	emitter := event.NewEmitter(mqClient)
+
+	matchService := service.NewMatchService(redisClient, mqClient, emitter)
 	matchHandler := handler.NewMatchHandler(matchService)
 
 	consumer := event.NewConsumer(mqClient, matchService)

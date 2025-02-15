@@ -17,6 +17,11 @@ const (
 )
 
 const (
+	MATCH_GAME = iota
+	MATCH_COUPLE
+)
+
+const (
 	USER_STATUS_STANDBY = iota
 	USER_STATUS_GAME_ING
 )

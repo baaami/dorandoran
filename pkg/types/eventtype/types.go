@@ -13,6 +13,19 @@ type EventPayload struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+// Event Types
+const (
+	EventTypeChat               = "chat"
+	EventTypeMatch              = "match"
+	EventTypeChatLatest         = "chat.latest"
+	EventTypeRoomLeave          = "room.leave"
+	EventTypeRoomCreate         = "room.create"
+	EventTypeCoupleRoomCreate   = "couple.room.create"
+	EventTypeRoomTimeout        = "room.timeout"
+	EventTypeRoomRemainTime     = "room.remain.time"
+	EventTypeFinalChoiceTimeout = "final.choice.timeout"
+)
+
 type ChatEvent struct {
 	MessageId       primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
 	Type            string             `bson:"type" json:"type"`

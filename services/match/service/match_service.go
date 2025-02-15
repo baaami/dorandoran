@@ -5,26 +5,43 @@ import (
 	"fmt"
 	"log"
 	"solo/pkg/dto"
+	"solo/pkg/helper"
 	"solo/pkg/mq"
 	"solo/pkg/redis"
+
 	"solo/pkg/types/commontype"
+	eventtypes "solo/pkg/types/eventtype"
 	"solo/pkg/types/sock"
+
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+type MQEmitter interface {
+	PublishMatchEvent(eventtypes.EventPayload) error
+}
 
 type MatchService struct {
 	redisClient  *redis.RedisClient
 	mqClient     *mq.RabbitMQ
 	MatchClients sync.Map
+	emitter      MQEmitter
 }
 
-func NewMatchService(redisClient *redis.RedisClient, mqClient *mq.RabbitMQ) *MatchService {
-	return &MatchService{
+func NewMatchService(redisClient *redis.RedisClient, mqClient *mq.RabbitMQ, emitter MQEmitter) *MatchService {
+	service := &MatchService{
 		redisClient: redisClient,
 		mqClient:    mqClient,
+		emitter:     emitter,
 	}
+
+	go service.startMatchMonitoring()
+
+	return service
 }
 
 func (s *MatchService) RegisterUserToMatch(conn *websocket.Conn, waitingUser commontype.WaitingUser) error {
@@ -110,4 +127,60 @@ func (s *MatchService) SendMatchFailureMessage(conn *websocket.Conn) {
 	if err := conn.WriteJSON(webSocketMsg); err != nil {
 		log.Printf("Failed to send match failure message: %v", err)
 	}
+}
+
+// 매칭 큐 모니터링 및 이벤트 전송
+func (s *MatchService) startMatchMonitoring() {
+	log.Println("🔍 Starting match queue monitoring...")
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		for coupleCount := commontype.MATCH_COUNT_MIN; coupleCount <= commontype.MATCH_COUNT_MAX; coupleCount++ {
+			matchedUsers, err := s.redisClient.MonitorAndMatchUsers(coupleCount)
+			if err != nil {
+				log.Printf("❌ Error while monitoring queue for %d: %v", coupleCount, err)
+				continue
+			}
+
+			// 매칭된 사용자들 MQ로 이벤트 발행
+			if len(matchedUsers) > 0 {
+				s.notifyMatchSuccess(matchedUsers)
+			}
+		}
+	}
+}
+
+// 매칭 성공 이벤트 MQ 발행
+func (s *MatchService) notifyMatchSuccess(users []commontype.WaitingUser) {
+	matchEvent := eventtypes.MatchEvent{
+		MatchId:      generateMatchID(users),
+		MatchType:    commontype.MATCH_GAME,
+		MatchedUsers: users,
+	}
+
+	payload := eventtypes.EventPayload{
+		EventType: eventtypes.EventTypeMatch,
+		Data:      helper.ToJSON(matchEvent),
+	}
+
+	// MQ로 이벤트 전송
+	err := s.emitter.PublishMatchEvent(payload)
+	if err != nil {
+		log.Printf("❌ Failed to publish match success event: %v", err)
+	}
+}
+
+func generateMatchID(users []commontype.WaitingUser) string {
+	timestamp := time.Now().Format("20060102150405")
+	var userIDs []string
+	for _, user := range users {
+		userIDs = append(userIDs, strconv.Itoa(user.ID))
+	}
+	return fmt.Sprintf("%s_%s", timestamp, joinIDs(userIDs))
+}
+
+func joinIDs(ids []string) string {
+	return strings.Join(ids, "_")
 }

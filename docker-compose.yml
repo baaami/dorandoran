@@ -1,8 +1,7 @@
 services:
   gateway-service:
     build:
-      context: ./gateway-service
-      dockerfile: ./gateway-service.dockerfile
+      context: ./services/gateway
     container_name: gateway-service
     restart: always
     environment:
@@ -83,20 +82,6 @@ services:
     build:
       context: ./services/auth
     container_name: auth-service
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  match-service:
-    build:
-      context: ./match-service
-      dockerfile: ./match-service.dockerfile
-    container_name: match-service
     restart: always
     environment:
       REDIS_HOST: redis

@@ -2,9 +2,11 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"solo/pkg/types/commontype"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -70,4 +72,55 @@ func (r *RedisClient) Delete(key string) error {
 		return err
 	}
 	return nil
+}
+
+func (r *RedisClient) MonitorAndMatchUsers(coupleCount int) ([]commontype.WaitingUser, error) {
+	maleQueueKey := fmt.Sprintf("matching_queue_male_%d", coupleCount)
+	femaleQueueKey := fmt.Sprintf("matching_queue_female_%d", coupleCount)
+
+	// 남성과 여성 대기열에서 사용자 확인
+	maleUsers, err := r.Client.LRange(ctx, maleQueueKey, 0, int64(coupleCount-1)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve male users from %s: %w", maleQueueKey, err)
+	}
+	femaleUsers, err := r.Client.LRange(ctx, femaleQueueKey, 0, int64(coupleCount-1)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve female users from %s: %w", femaleQueueKey, err)
+	}
+
+	// 매칭 조건 확인
+	if len(maleUsers) >= coupleCount && len(femaleUsers) >= coupleCount {
+		var matchedUsers []commontype.WaitingUser
+
+		// 남성 사용자 파싱
+		for _, maleData := range maleUsers[:coupleCount] {
+			var user commontype.WaitingUser
+			if err := json.Unmarshal([]byte(maleData), &user); err != nil {
+				log.Printf("❌ Failed to unmarshal male user: %v", err)
+				continue
+			}
+			matchedUsers = append(matchedUsers, user)
+		}
+
+		// 여성 사용자 파싱
+		for _, femaleData := range femaleUsers[:coupleCount] {
+			var user commontype.WaitingUser
+			if err := json.Unmarshal([]byte(femaleData), &user); err != nil {
+				log.Printf("❌ Failed to unmarshal female user: %v", err)
+				continue
+			}
+			matchedUsers = append(matchedUsers, user)
+		}
+
+		// 매칭된 사용자들을 큐에서 제거
+		for i := 0; i < coupleCount; i++ {
+			r.Client.LPop(ctx, maleQueueKey)
+			r.Client.LPop(ctx, femaleQueueKey)
+		}
+
+		log.Printf("✅ Successfully matched %d males and %d females", coupleCount, coupleCount)
+		return matchedUsers, nil
+	}
+
+	return nil, nil
 }
