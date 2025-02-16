@@ -18,6 +18,31 @@ func NewEventHandler(chatService *service.ChatService, redisClient *redis.RedisC
 	return &EventHandler{chatService: chatService, redisClient: redisClient}
 }
 
+func (e *EventHandler) HandleChatEvent(body json.RawMessage) {
+	var chatEvent eventtypes.ChatEvent
+	if err := json.Unmarshal(body, &chatEvent); err != nil {
+		log.Printf("❌ Failed to unmarshal chat event: %v", err)
+		return
+	}
+
+	log.Printf("💬 [DEBUG] Processing ChatEvent: %+v", chatEvent)
+
+	chat := commontype.Chat{
+		MessageId:   chatEvent.MessageId,
+		Type:        chatEvent.Type,
+		RoomID:      chatEvent.RoomID,
+		SenderID:    chatEvent.SenderID,
+		Message:     chatEvent.Message,
+		UnreadCount: chatEvent.UnreadCount,
+		CreatedAt:   chatEvent.CreatedAt,
+	}
+
+	_, err := e.chatService.AddChatMsg(chat)
+	if err != nil {
+		log.Printf("❌ Failed to insert chat message, %s", chatEvent.Message)
+	}
+}
+
 func (e *EventHandler) HandleMatchEvent(body json.RawMessage) {
 	var eventData eventtypes.MatchEvent
 	if err := json.Unmarshal(body, &eventData); err != nil {

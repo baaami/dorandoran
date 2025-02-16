@@ -14,8 +14,6 @@ func NewRouter(chatHandler *handler.ChatHandler) *echo.Echo {
 	e.GET("/room/:id", chatHandler.GetChatRoomByID)          // 채팅방 상세 조회
 	e.DELETE("/room/delete/:id", chatHandler.DeleteChatRoom) // 채팅방 삭제
 
-	// 채팅 메시지 관련 라우팅
-	e.POST("/msg", chatHandler.AddChatMsg)                 // 채팅 메시지 추가
 	e.GET("/list/:id", chatHandler.GetChatMsgListByRoomID) // 특정 방의 채팅 내역 조회
 	e.DELETE("/all/:id", chatHandler.DeleteChatByRoomID)   // 특정 방의 모든 채팅 삭제
 

@@ -47,6 +47,7 @@ func (c *Consumer) StartListening() {
 
 	// 이벤트 핸들러 등록
 	handlers := mq.EventHandlerMap{
+		mq.EventTypeChat:               c.eventHandler.HandleChatEvent,
 		mq.EventTypeMatch:              c.eventHandler.HandleMatchEvent,
 		mq.EventTypeRoomTimeout:        c.eventHandler.HandleRoomTimeout,
 		mq.EventTypeFinalChoiceTimeout: c.eventHandler.HandleFinalChoiceTimeout,

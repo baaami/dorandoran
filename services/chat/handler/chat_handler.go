@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"solo/pkg/types/commontype"
 	"solo/services/chat/service"
 
 	"github.com/labstack/echo/v4"
@@ -71,21 +70,6 @@ func (h *ChatHandler) DeleteChatRoom(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"message": "Chat room deleted successfully"})
-}
-
-// 채팅 메시지 추가
-func (h *ChatHandler) AddChatMsg(c echo.Context) error {
-	var chatMsg commontype.Chat
-	if err := c.Bind(&chatMsg); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request payload"})
-	}
-
-	messageID, err := h.chatService.AddChatMsg(chatMsg)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to insert chat message"})
-	}
-
-	return c.JSON(http.StatusCreated, map[string]string{"message": "Chat message inserted successfully", "message_id": messageID.Hex()})
 }
 
 // 특정 채팅방의 메시지 목록 조회
