@@ -80,14 +80,14 @@ func (e *EventHandler) HandleFinalChoiceTimeout(body json.RawMessage) {
 		return
 	}
 
-	log.Printf("🎯 [DEBUG] Processing RoomTimeoutEvent: %+v", eventData)
+	log.Printf("🎯 [DEBUG] Processing FinalChoiceTimeoutEvent: %+v", eventData)
 
 	err := e.chatService.UpdateChatRoomStatus(eventData.RoomID, commontype.RoomStatusChoiceComplete)
 	if err != nil {
 		log.Printf("Failed to update chat room status: %d, err: %s", commontype.RoomStatusChoiceComplete, err.Error())
 	}
 
-	err = e.redisClient.RemoveRoomFromRedis(eventData.RoomID)
+	err = e.redisClient.RemoveChoiceRoomFromRedis(eventData.RoomID)
 	if err != nil {
 		log.Printf("Failed to remove RoomID %s from rooms list, err: %v", eventData.RoomID, err)
 	}

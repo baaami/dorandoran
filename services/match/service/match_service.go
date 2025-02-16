@@ -92,8 +92,6 @@ func (s *MatchService) SendMatchSuccessMessage(userIds []int, roomID string) {
 
 	// TODO: 1명의 유저라도 실패할 경우 실패를 리턴하도록?
 	for _, userID := range userIds {
-		log.Printf("[TEST] Try to notify user, %d", userID)
-
 		if conn, ok := s.MatchClients.Load(userID); ok {
 			err := conn.(*websocket.Conn).WriteJSON(webSocketMsg)
 			if err != nil {

@@ -139,11 +139,11 @@ func (r *RedisClient) AddRoomToRedis(roomID string, userIDs []int, duration time
 		return fmt.Errorf("failed to add room %s to Redis: %v", roomID, err)
 	}
 
-	// 만료 시간 설정
-	err = r.Client.Expire(ctx, roomKey, duration).Err()
-	if err != nil {
-		return fmt.Errorf("failed to set expiration for room %s: %v", roomID, err)
-	}
+	// // 만료 시간 설정
+	// err = r.Client.Expire(ctx, roomKey, duration).Err()
+	// if err != nil {
+	// 	return fmt.Errorf("failed to set expiration for room %s: %v", roomID, err)
+	// }
 
 	log.Printf("Room %s added to Redis with users %v, expires in %v", roomID, userIDs, duration)
 	return nil
@@ -162,11 +162,18 @@ func (r *RedisClient) SetRoomStatus(roomID string, status int) error {
 
 // 채팅방 타임아웃 설정
 func (r *RedisClient) SetRoomTimeout(roomID string, duration time.Duration) error {
-	err := r.Client.Set(ctx, fmt.Sprintf("room_timeout:%s", roomID), duration.Seconds(), duration).Err()
+	err := r.Client.Set(ctx, roomID, duration.Seconds(), duration).Err()
 	if err != nil {
 		log.Printf("Failed to set room timeout for RoomID %s: %v", roomID, err)
 		return err
 	}
+
+	err = r.Client.SAdd(ctx, "rooms:list", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to add RoomID %s to rooms list: %v", roomID, err)
+		return err
+	}
+
 	log.Printf("Room timeout set for RoomID %s: %v seconds", roomID, duration.Seconds())
 	return nil
 }

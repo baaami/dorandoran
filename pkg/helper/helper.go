@@ -38,3 +38,15 @@ func IntToStringArray(arr []int) []string {
 		return strconv.Itoa(item)
 	})
 }
+
+func StringToIntArrary(strSlice []string) ([]int, error) {
+	var intSlice []int
+	for _, str := range strSlice {
+		num, err := strconv.Atoi(str)
+		if err != nil {
+			return nil, err // 변환 실패 시 에러 반환
+		}
+		intSlice = append(intSlice, num)
+	}
+	return intSlice, nil
+}

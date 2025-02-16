@@ -140,6 +140,36 @@ func (r *RedisClient) ClearRoomTimeout(roomID string) error {
 	return nil
 }
 
+func (r *RedisClient) GetAllChoiceRoomsFromRedis() ([]string, error) {
+	ctx := context.Background()
+
+	// Redis에서 방 목록 가져오기
+	roomIDs, err := r.Client.SMembers(ctx, "rooms:choice").Result()
+	if err != nil {
+		log.Printf("Failed to get room choice from Redis: %v", err)
+		return nil, err
+	}
+
+	return roomIDs, nil
+}
+
+func (r *RedisClient) GetChoiceRoomRemainingTime(roomID string) (int, error) {
+	ctx := context.Background()
+
+	ttl, err := r.Client.TTL(ctx, roomID).Result()
+	if err != nil {
+		log.Printf("Failed to get remaining time for RoomID %s: %v", roomID, err)
+		return 0, err
+	}
+
+	if ttl <= 0 {
+		log.Printf("RoomID %s has no remaining time or is expired", roomID)
+		return 0, nil // 타임아웃이 만료된 경우
+	}
+
+	return int(ttl.Seconds()), nil
+}
+
 func (r *RedisClient) GetRoomUserIDs(roomID string) ([]string, error) {
 	// Step 1: Room의 사용자 ID 리스트 가져오기
 	roomKey := fmt.Sprintf("room:%s", roomID)
@@ -169,6 +199,27 @@ func (r *RedisClient) SetFinalChoiceTimeout(roomID string, duration time.Duratio
 	}
 
 	log.Printf("Final Choice timeout set for RoomID %s: %v seconds", roomID, duration.Seconds())
+	return nil
+}
+
+func (r *RedisClient) RemoveChoiceRoomFromRedis(roomID string) error {
+	ctx := context.Background()
+
+	// Redis에서 방 제거
+	err := r.Client.Del(ctx, roomID).Err()
+	if err != nil {
+		log.Printf("Failed to delete room %s from Redis: %v", roomID, err)
+		return err
+	}
+
+	// 방 목록에서도 제거
+	err = r.Client.SRem(ctx, "rooms:choice", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to remove RoomID %s from rooms choice: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("RoomID %s removed from Redis", roomID)
 	return nil
 }
 

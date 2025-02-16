@@ -20,6 +20,7 @@ const (
 	QueueGame  = "game_queue"
 	QueueChat  = "chat_queue"
 	QueueUser  = "user_queue"
+	QueuePush  = "push_queue"
 	QueueMatch = "match_queue"
 )
 

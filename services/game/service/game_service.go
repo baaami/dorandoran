@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"solo/pkg/helper"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
@@ -22,6 +23,7 @@ import (
 type MQEmitter interface {
 	PublishRoomJoinEvent(data eventtypes.RoomJoinEvent) error
 	PublishChatMessageEvent(event eventtypes.ChatEvent) error
+	PublishFinalChoiceTimeoutEvent(event eventtypes.FinalChoiceTimeoutEvent) error
 }
 
 // Client 구조체 - WebSocket 클라이언트
@@ -40,10 +42,13 @@ type GameService struct {
 
 // NewGameService - GameService 인스턴스 생성
 func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter) *GameService {
-	return &GameService{
+	service := &GameService{
 		redisClient: redisClient,
 		emitter:     emitter,
 	}
+
+	go service.MonitorFinalChoiceTimeouts()
+	return service
 }
 
 // RegisterUserToGame - 사용자를 게임에 등록하고 Redis 활성화
@@ -357,4 +362,54 @@ func GetRoomDetail(roomID string) (*commontype.RoomDetailResponse, error) {
 	}
 
 	return &chatRoomDetail, nil
+}
+
+func (s *GameService) MonitorFinalChoiceTimeouts() {
+	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Redis에 저장된 모든 방 ID 가져오기
+		rooms, err := s.redisClient.GetAllChoiceRoomsFromRedis()
+		if err != nil {
+			log.Printf("Failed to GetAllChoiceRoomsFromRedis, err: %v", err)
+			continue
+		}
+
+		for _, roomID := range rooms {
+			// 남은 시간이 0 이하인지 확인
+			remainingTime, err := s.redisClient.GetChoiceRoomRemainingTime(roomID)
+			if err != nil || remainingTime > 0 {
+				continue // 아직 만료되지 않은 방은 스킵
+			}
+
+			userIds, err := s.redisClient.GetRoomUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to GetRoomUserIDs, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			roomTotalUserIds, err := helper.StringToIntArrary(userIds)
+			if err != nil {
+				log.Printf("Failed to ConvertStringSliceToIntSlice, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			event := eventtypes.FinalChoiceTimeoutEvent{
+				RoomID:  roomID,
+				UserIDs: roomTotalUserIds,
+			}
+
+			// 만료된 방에 대해 timeout 이벤트 발행
+			err = s.emitter.PublishFinalChoiceTimeoutEvent(event)
+			if err != nil {
+				log.Printf("Failed to handle timeout for RoomID %s: %v", roomID, err)
+			}
+
+			err = s.redisClient.RemoveChoiceRoomFromRedis(roomID)
+			if err != nil {
+				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
+			}
+		}
+	}
 }

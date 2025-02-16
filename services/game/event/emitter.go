@@ -59,3 +59,19 @@ func (e *Emitter) PublishChatMessageEvent(event eventtypes.ChatEvent) error {
 	log.Printf("📢 Published ChatMessageEvent for RoomID: %s", event.RoomID)
 	return nil
 }
+
+func (e *Emitter) PublishFinalChoiceTimeoutEvent(event eventtypes.FinalChoiceTimeoutEvent) error {
+	payload := eventtypes.EventPayload{
+		EventType: eventtypes.EventTypeFinalChoiceTimeout,
+		Data:      helper.ToJSON(event),
+	}
+
+	err := e.publish(mq.ExchangeAppTopic, mq.RoutingKeyFinalChoiceTimeout, payload)
+	if err != nil {
+		log.Printf("❌ Failed to publish final choice timeout event: %v", err)
+		return err
+	}
+
+	log.Printf("📢 Published final choice timeout event to RoomID: %s", event.RoomID)
+	return nil
+}

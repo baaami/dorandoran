@@ -54,7 +54,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	if matchEvent.MatchType == commontype.MATCH_GAME {
 		log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
-		finishTime = startTime.Add(1 * time.Minute)
+		finishTime = startTime.Add(20 * time.Second)
 
 		seq, _ = s.chatRepo.GetNextSequence("chatRoomSeq")
 	} else {
@@ -334,10 +334,10 @@ func (s *ChatService) MonitorRoomTimeouts() {
 			}
 
 			// TODO: Redis에서 최종 선택 완료 시 방 삭제
-			// err = rm.RemoveRoomFromRedis(roomID)
-			// if err != nil {
-			// 	log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
-			// }
+			err = s.redisClient.RemoveRoomFromRedis(roomID)
+			if err != nil {
+				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
+			}
 		}
 	}
 }
