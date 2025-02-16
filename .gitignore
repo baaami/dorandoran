@@ -15,3 +15,4 @@ push-service/pushApp
 services/auth/authApp
 services/user/userApp
 push-service/pushApp
+services/chat/chatApp
