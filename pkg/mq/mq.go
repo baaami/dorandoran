@@ -114,7 +114,6 @@ func (mq *RabbitMQ) ConsumeMessages(queueName string, handlers EventHandlerMap) 
 	// 메시지 처리 루프
 	go func() {
 		for msg := range msgs {
-			log.Print("Consume Message!")
 			var eventPayload eventtypes.EventPayload
 			if err := json.Unmarshal(msg.Body, &eventPayload); err != nil {
 				log.Printf("❌ Failed to unmarshal EventPayload: %v", err)

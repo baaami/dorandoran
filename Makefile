@@ -59,7 +59,7 @@ build_user:
 ## build_chat: builds the chat binary as a linux executable
 build_chat:
 	@echo "Building chat binary..."
-	cd chat-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_BINARY} ./cmd/api
+	cd services/chat && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_BINARY} ./cmd
 	@echo "Done!"
 
 ## build_auth: builds the auth binary as a linux executable

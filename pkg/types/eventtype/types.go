@@ -58,3 +58,13 @@ type FinalChoiceTimeoutEvent struct {
 	RoomID  string `bson:"room_id" json:"room_id"`
 	UserIDs []int  `bson:"user_ids" json:"user_ids"`
 }
+
+type RoomJoinEvent struct {
+	RoomID string    `bson:"room_id" json:"room_id"`
+	UserID int       `bson:"user_id" json:"user_id"`
+	JoinAt time.Time `bson:"join_at" json:"join_at"`
+}
+
+type ChatLatestEvent struct {
+	RoomID string `json:"room_id"`
+}

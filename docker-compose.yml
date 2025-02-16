@@ -56,8 +56,7 @@ services:
 
   chat-service:
     build:
-      context: ./chat-service
-      dockerfile: ./chat-service.dockerfile
+      context: ./services/chat
     container_name: chat-service
     restart: always
     environment:

@@ -1,9 +1,16 @@
 package commontype
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	UserServiceBaseURL = "http://user-service"
+)
+
+const (
+	MALE = iota
+	FEMALE
 )
 
 const (
@@ -27,6 +34,48 @@ const (
 )
 
 const DEFAULT_GAME_POINT = 10
+
+const (
+	RoomStatusGameIng = iota
+	RoomStatusChoiceIng
+	RoomStatusChoiceComplete
+)
+
+const (
+	YoungSoo = iota // 0부터 시작
+	YoungHo
+	YoungSik
+	YoungChul
+	KwangSoo
+	SangChul
+)
+
+var MaleNames = map[int]string{
+	YoungSoo:  "영수",
+	YoungHo:   "영호",
+	YoungSik:  "영식",
+	YoungChul: "영철",
+	KwangSoo:  "광수",
+	SangChul:  "상철",
+}
+
+const (
+	YoungSook = iota // 0부터 시작
+	JungSook
+	SoonJa
+	YoungJa
+	OkSoon
+	HyunSook
+)
+
+var FemaleNames = map[int]string{
+	YoungSook: "영숙",
+	JungSook:  "정숙",
+	SoonJa:    "순자",
+	YoungJa:   "영자",
+	OkSoon:    "옥순",
+	HyunSook:  "현숙",
+}
 
 type Address struct {
 	City     string `gorm:"size:100" json:"city"`

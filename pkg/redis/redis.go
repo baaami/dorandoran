@@ -124,3 +124,70 @@ func (r *RedisClient) MonitorAndMatchUsers(coupleCount int) ([]commontype.Waitin
 
 	return nil, nil
 }
+
+// 채팅방 정보를 Redis에 추가
+func (r *RedisClient) AddRoomToRedis(roomID string, userIDs []int, duration time.Duration) error {
+	roomKey := fmt.Sprintf("room:%s", roomID)
+
+	// 유저 ID들을 Redis Set에 저장
+	strUserIDs := make([]interface{}, len(userIDs))
+	for i, id := range userIDs {
+		strUserIDs[i] = fmt.Sprintf("%d", id)
+	}
+	err := r.Client.SAdd(ctx, roomKey, strUserIDs...).Err()
+	if err != nil {
+		return fmt.Errorf("failed to add room %s to Redis: %v", roomID, err)
+	}
+
+	// 만료 시간 설정
+	err = r.Client.Expire(ctx, roomKey, duration).Err()
+	if err != nil {
+		return fmt.Errorf("failed to set expiration for room %s: %v", roomID, err)
+	}
+
+	log.Printf("Room %s added to Redis with users %v, expires in %v", roomID, userIDs, duration)
+	return nil
+}
+
+// 채팅방 상태 설정
+func (r *RedisClient) SetRoomStatus(roomID string, status int) error {
+	statusKey := fmt.Sprintf("room_status:%s", roomID)
+	err := r.Client.Set(ctx, statusKey, status, 0).Err() // 만료 시간 없음
+	if err != nil {
+		return fmt.Errorf("failed to set status for room %s: %v", roomID, err)
+	}
+	log.Printf("Set status for room %s to %d", roomID, status)
+	return nil
+}
+
+// 채팅방 타임아웃 설정
+func (r *RedisClient) SetRoomTimeout(roomID string, duration time.Duration) error {
+	err := r.Client.Set(ctx, fmt.Sprintf("room_timeout:%s", roomID), duration.Seconds(), duration).Err()
+	if err != nil {
+		log.Printf("Failed to set room timeout for RoomID %s: %v", roomID, err)
+		return err
+	}
+	log.Printf("Room timeout set for RoomID %s: %v seconds", roomID, duration.Seconds())
+	return nil
+}
+
+func (r *RedisClient) RemoveRoomFromRedis(roomID string) error {
+	ctx := context.Background()
+
+	// Redis에서 방 제거
+	err := r.Client.Del(ctx, roomID).Err()
+	if err != nil {
+		log.Printf("Failed to delete room %s from Redis: %v", roomID, err)
+		return err
+	}
+
+	// 방 목록에서도 제거
+	err = r.Client.SRem(ctx, "rooms:list", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to remove RoomID %s from rooms list: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("RoomID %s removed from Redis", roomID)
+	return nil
+}
