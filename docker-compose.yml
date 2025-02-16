@@ -29,11 +29,10 @@ services:
       mode: replicated
       replicas: 1
 
-  chat-socket-service:
+  game-service:
     build:
-      context: ./chat-socket-service
-      dockerfile: ./chat-socket-service.dockerfile
-    container_name: chat-socket-service
+      context: ./services/game
+    container_name: game-service
     restart: always
     environment:
       REDIS_HOST: redis

@@ -1,0 +1,360 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
+	"solo/pkg/redis"
+	"solo/pkg/types/commontype"
+	eventtypes "solo/pkg/types/eventtype"
+	"solo/pkg/types/stype"
+
+	"github.com/gorilla/websocket"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+type MQEmitter interface {
+	PublishRoomJoinEvent(data eventtypes.RoomJoinEvent) error
+	PublishChatMessageEvent(event eventtypes.ChatEvent) error
+}
+
+// Client 구조체 - WebSocket 클라이언트
+type Client struct {
+	Conn *websocket.Conn
+	Send chan interface{}
+	Ctx  context.Context
+}
+
+// GameService - 게임 서비스 계층
+type GameService struct {
+	redisClient *redis.RedisClient
+	clients     sync.Map // key: userID, value: *Client
+	emitter     MQEmitter
+}
+
+// NewGameService - GameService 인스턴스 생성
+func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter) *GameService {
+	return &GameService{
+		redisClient: redisClient,
+		emitter:     emitter,
+	}
+}
+
+// RegisterUserToGame - 사용자를 게임에 등록하고 Redis 활성화
+func (s *GameService) RegisterUserToGame(userID int, client *Client) error {
+	// WebSocket 클라이언트 저장
+	s.clients.Store(userID, client)
+
+	// Redis에 활성 사용자 등록
+	serverID := "game-server-1" // TODO: 서버 고유 ID 설정 필요
+	err := s.redisClient.RegisterActiveUser(userID, serverID)
+	if err != nil {
+		log.Printf("❌ Redis 사용자 등록 실패: %v", err)
+		return err
+	}
+
+	log.Printf("✅ 사용자 게임 등록: User %d", userID)
+	return nil
+}
+
+// UnRegisterUserFromGame - 사용자를 게임에서 제거하고 Redis에서 삭제
+func (s *GameService) UnRegisterUserFromGame(userID int) {
+	// WebSocket 클라이언트 제거
+	if clientInterface, ok := s.clients.Load(userID); ok {
+		client := clientInterface.(*Client)
+		close(client.Send) // Send 채널 닫기
+		s.clients.Delete(userID)
+	}
+
+	// Redis에서 활성 사용자 제거
+	err := s.redisClient.UnregisterActiveUser(userID)
+	if err != nil {
+		log.Printf("❌ Redis 사용자 제거 실패: %v", err)
+	} else {
+		log.Printf("✅ 사용자 게임 제거: User %d", userID)
+	}
+}
+
+func (s *GameService) BroadcastMessage(roomID string, userID int, message string, headCnt int) error {
+	log.Printf("💬 User %d sending message to room %s", userID, roomID)
+
+	// Redis에서 비활성 사용자 목록 조회
+	inactiveUserIDs, err := s.redisClient.GetInActiveUserIDs(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetInActiveUserIDs 실패: %w", err)
+	}
+
+	// 방에 접속해있는 사용자 ID 리스트 가져오기
+	joinedUserIDs, err := s.redisClient.GetJoinedUser(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetJoinedUser 실패: %w", err)
+	}
+
+	// 메시지 생성
+	chatEvent := eventtypes.ChatEvent{
+		MessageId:       primitive.NewObjectID(),
+		Type:            commontype.ChatTypeChat,
+		RoomID:          roomID,
+		SenderID:        userID,
+		Message:         message,
+		UnreadCount:     headCnt - len(joinedUserIDs),
+		InactiveUserIds: inactiveUserIDs,
+		ReaderIds:       joinedUserIDs,
+		CreatedAt:       time.Now(),
+	}
+
+	// RabbitMQ를 통해 메시지 전송
+	err = s.emitter.PublishChatMessageEvent(chatEvent)
+	if err != nil {
+		log.Printf("⚠️ RabbitMQ PublishChatMessageEvent 실패: %v", err)
+	}
+
+	return nil
+}
+
+func (s *GameService) SendMessageToRoom(roomID string, message stype.WebSocketMessage) error {
+	activeUserIDs, err := s.redisClient.GetActiveUserIDs(roomID)
+	if err != nil {
+		log.Printf("❌ Redis GetActiveUserIDs 실패: %v", err)
+		return err
+	}
+
+	for _, userID := range activeUserIDs {
+		if client, ok := s.clients.Load(userID); ok {
+			log.Printf("📨 Sending WebSocket message to User %d in Room %s", userID, roomID)
+
+			client.(*Client).Send <- message
+		}
+	}
+
+	return nil
+}
+
+func (s *GameService) JoinGameRoom(roomID string, userID int) error {
+	log.Printf("🎮 User %d joining game room %s", userID, roomID)
+
+	// Redis에 게임방 참가 정보 저장
+	err := s.redisClient.JoinRoom(roomID, userID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis JoinRoom 실패: %w", err)
+	}
+
+	// RabbitMQ를 통해 이벤트 발행
+	roomJoinMsg := eventtypes.RoomJoinEvent{
+		RoomID: roomID,
+		UserID: userID,
+		JoinAt: time.Now(),
+	}
+
+	err = s.emitter.PublishRoomJoinEvent(roomJoinMsg)
+	if err != nil {
+		log.Printf("⚠️ RabbitMQ PublishRoomJoinEvent 실패: %v", err)
+	}
+
+	return nil
+}
+
+func (s *GameService) LeaveGameRoom(roomID string, userID int) error {
+	log.Printf("🚪 User %d leaving game room %s", userID, roomID)
+
+	// Redis에서 유저 제거
+	err := s.redisClient.LeaveRoom(roomID, userID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis LeaveRoom 실패: %w", err)
+	}
+
+	return nil
+}
+
+func (s *GameService) BroadCastFinalChoiceStart(roomID string) error {
+	// 현재 룸 상태 확인
+	status, err := s.redisClient.GetRoomStatus(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetRoomStatus 실패: %w", err)
+	}
+
+	if status != commontype.RoomStatusGameIng {
+		log.Printf("⚠️ Room %s is not in active game state, skipping timeout process.", roomID)
+		return nil
+	}
+
+	payload, err := json.Marshal(stype.FinalChoiceStartMessage{RoomID: roomID})
+	if err != nil {
+		return fmt.Errorf("❌ FinalChoiceStartMessage 직렬화 실패: %w", err)
+	}
+
+	message := stype.WebSocketMessage{
+		Kind:    stype.MessageKindFinalChoiceStart,
+		Payload: json.RawMessage(payload),
+	}
+
+	err = s.SendMessageToRoom(roomID, message)
+	if err != nil {
+		return fmt.Errorf("❌ WebSocket final_choice_start 전송 실패: %w", err)
+	}
+
+	// Redis에서 타임아웃 데이터 정리
+	err = s.redisClient.ClearRoomTimeout(roomID)
+	if err != nil {
+		log.Printf("❌ Redis ClearRoomTimeout 실패: %v", err)
+	}
+
+	err = s.redisClient.SetRoomStatus(roomID, commontype.RoomStatusChoiceIng)
+	if err != nil {
+		return fmt.Errorf("❌ Redis SetRoomStatus(RoomStatusChoiceIng) 실패: %w", err)
+	}
+
+	roomDetail, err := GetRoomDetail(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetRoomDetail 실패: %w", err)
+	}
+
+	err = s.redisClient.SetFinalChoiceTimeout(roomID, time.Until(roomDetail.FinishFinalChoiceAt))
+	if err != nil {
+		return fmt.Errorf("❌ Redis SetFinalChoiceTimeout 실패: %w", err)
+	}
+
+	return nil
+}
+
+func (s *GameService) ProcessRoomTimeoutMessage(roomTimeoutMsg stype.RoomTimeoutMessage, userID int) error {
+	err := s.redisClient.AddTimeoutUser(roomTimeoutMsg.RoomID, userID)
+	if err != nil {
+		log.Printf("Failed to SaveUserChoice, err: %v", err)
+		return nil
+	}
+
+	roomTimeoutUserIds, err := s.redisClient.GetTimeoutUserCount(roomTimeoutMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to GetTimeoutUserCount, err: %v", err)
+		return nil
+	}
+
+	roomTotalUserIds, err := s.redisClient.GetRoomUserIDs(roomTimeoutMsg.RoomID)
+	if err != nil {
+		log.Printf("Failed to GetRoomUserIDs, err: %v", err)
+		return nil
+	}
+
+	if int(roomTimeoutUserIds) == len(roomTotalUserIds) {
+		s.BroadCastFinalChoiceStart(roomTimeoutMsg.RoomID)
+	}
+
+	return nil
+}
+
+func (s *GameService) BroadcastFinalChoices(roomID string) error {
+	log.Printf("📢 Broadcasting final choices for Room %s", roomID)
+
+	// Redis에서 최종 선택 결과 조회
+	finalChoiceResults, err := s.redisClient.GetAllChoices(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetAllChoices 실패: %w", err)
+	}
+
+	// JSON 직렬화
+	payload, err := json.Marshal(finalChoiceResults)
+	if err != nil {
+		return fmt.Errorf("❌ Final choices 직렬화 실패: %w", err)
+	}
+
+	// WebSocket 메시지 생성
+	message := stype.WebSocketMessage{
+		Kind:    stype.MessageKindFinalChoiceResult,
+		Payload: json.RawMessage(payload),
+	}
+
+	// 활성 유저에게 최종 선택 결과 전송
+	err = s.SendMessageToRoom(roomID, message)
+	if err != nil {
+		return fmt.Errorf("❌ WebSocket 전송 실패: %w", err)
+	}
+
+	log.Printf("✅ Final choices broadcasted to Room %s", roomID)
+
+	// Redis에서 최종 선택 정보 삭제
+	err = s.redisClient.ClearFinalChoiceRoom(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis ClearFinalChoiceRoom 실패: %w", err)
+	}
+
+	return nil
+}
+
+func (s *GameService) ProcessFinalChoice(userID int, finalChoiceMsg stype.FinalChoiceMessage) error {
+	roomID := finalChoiceMsg.RoomID
+	selectedUserID := finalChoiceMsg.SelectedUserID
+	log.Printf("💘 User %d selected User %d in Room %s", userID, selectedUserID, roomID)
+
+	// 유저의 선택을 Redis에 저장
+	err := s.redisClient.SaveUserChoice(roomID, userID, selectedUserID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis SaveUserChoice 실패: %w", err)
+	}
+
+	// 방에 참여한 전체 유저 수 조회
+	roomTotalUserIDs, err := s.redisClient.GetRoomUserIDs(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetRoomUserIDs 실패: %w", err)
+	}
+
+	// 모든 유저가 선택을 완료했는지 확인
+	allChosen, err := s.redisClient.IsAllChoicesCompleted(roomID, int64(len(roomTotalUserIDs)))
+	if err != nil {
+		return fmt.Errorf("❌ Redis IsAllChoicesCompleted 실패: %w", err)
+	}
+
+	if allChosen {
+		log.Printf("🎉 All users in Room %s have made their final choices!", roomID)
+
+		// 최종 선택 결과 전송
+		err = s.BroadcastFinalChoices(roomID)
+		if err != nil {
+			return fmt.Errorf("❌ BroadcastFinalChoices 실패: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// TODO: Bridige network 사용하지 않도록!!
+func GetRoomDetail(roomID string) (*commontype.RoomDetailResponse, error) {
+	var chatRoomDetail commontype.RoomDetailResponse
+
+	// Matching 필터 획득
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://chat-service/room/%s", roomID), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	err = json.Unmarshal(body, &chatRoomDetail)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &chatRoomDetail, nil
+}

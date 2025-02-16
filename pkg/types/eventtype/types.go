@@ -20,6 +20,7 @@ const (
 	EventTypeChatLatest         = "chat.latest"
 	EventTypeRoomLeave          = "room.leave"
 	EventTypeRoomCreate         = "room.create"
+	EventTypeRoomJoin           = "room.join"
 	EventTypeCoupleRoomCreate   = "couple.room.create"
 	EventTypeRoomTimeout        = "room.timeout"
 	EventTypeRoomRemainTime     = "room.remain.time"
@@ -66,5 +67,9 @@ type RoomJoinEvent struct {
 }
 
 type ChatLatestEvent struct {
+	RoomID string `json:"room_id"`
+}
+
+type FinalChoiceEvent struct {
 	RoomID string `json:"room_id"`
 }

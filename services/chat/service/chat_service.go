@@ -298,7 +298,7 @@ func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*comm
 
 // 특정 채팅방 타임아웃 감지
 func (s *ChatService) MonitorRoomTimeouts() {
-	ticker := time.NewTicker(1 * time.Second) // 최대 1초 내에 이벤트 감지
+	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
 	defer ticker.Stop()
 
 	for range ticker.C {

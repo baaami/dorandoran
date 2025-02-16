@@ -5,9 +5,9 @@ CONSUMER_BINARY=consumerApp
 AUTH_BINARY=authApp
 MATCH_BINARY=matchApp
 MATCH_SOCKET_BINARY=matchSocketApp
-CHAT_SOCKET_BINARY=chatSocketApp
+GAME_BINARY=gameApp
 PUSH_BINARY=pushApp
-SERVICES=gateway-service user-service chat-service consumer-service auth-service match-socket-service chat-socket-service push-service
+SERVICES=gateway-service user-service chat-service consumer-service auth-service match-socket-service game-service push-service
 INFRAS=mysql mongo redis
 
 ## up: starts all containers in the background without forcing build
@@ -17,7 +17,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user build_chat build_consumer build_auth build_match_socket build_chat_socket build_push build_push
+up_build: build_gateway build_user build_chat build_consumer build_auth build_match_socket build_game build_push build_push
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -25,7 +25,7 @@ up_build: build_gateway build_user build_chat build_consumer build_auth build_ma
 	@echo "Docker images built and started!"
 
 ## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
-up_service: build_gateway build_user build_chat build_consumer build_auth build_match_socket build_chat_socket build_push
+up_service: build_gateway build_user build_chat build_consumer build_auth build_match_socket build_game build_push
 	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
 	docker-compose stop ${SERVICES}
 	docker-compose rm -f ${SERVICES}
@@ -74,10 +74,10 @@ build_match_socket:
 	cd services/match && env GOOS=linux CGO_ENABLED=0 go build -o ${MATCH_SOCKET_BINARY} ./cmd
 	@echo "Done!"
 
-## build_chat_socket: builds the auth binary as a linux executable
-build_chat_socket:
-	@echo "Building chat socket binary..."
-	cd chat-socket-service && env GOOS=linux CGO_ENABLED=0 go build -o ${CHAT_SOCKET_BINARY} ./api
+## build_game: builds the auth binary as a linux executable
+build_game:
+	@echo "Building game binary..."
+	cd services/game && env GOOS=linux CGO_ENABLED=0 go build -o ${GAME_BINARY} ./cmd
 	@echo "Done!"	
 
 ## build_consumer: builds the consumer binary as a linux executable

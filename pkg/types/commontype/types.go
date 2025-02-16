@@ -9,6 +9,12 @@ const (
 )
 
 const (
+	ChatTypeChat  = "chat"
+	ChatTypeJoin  = "join"
+	ChatTypeLeave = "leave"
+)
+
+const (
 	MALE = iota
 	FEMALE
 )
@@ -130,4 +136,34 @@ type GamerInfo struct {
 	CharacterID        int    `bson:"character_id" json:"character_id"`                   // 캐릭터 식별자 (0 ~ 5)
 	CharacterName      string `bson:"character_avatar_name" json:"character_avatar_name"` // 캐릭터 이름
 	CharacterAvatarURL string `bson:"character_avatar_url" json:"character_avatar_url"`   // 캐릭터 아바타 이미지 URL
+}
+
+type RoomDetailResponse struct {
+	ID                  string    `bson:"id" json:"id"` // UUID 사용
+	Type                int       `bson:"type" json:"type"`
+	Status              int       `bson:"status" json:"status"`
+	Seq                 int       `bson:"seq" json:"seq"`
+	RoomName            string    `bson:"room_name" json:"room_name"`
+	Users               []Gamer   `bson:"users" json:"users"`
+	CreatedAt           time.Time `bson:"created_at" json:"created_at"`
+	FinishChatAt        time.Time `bson:"finish_chat_at" json:"finish_chat_at"`
+	FinishFinalChoiceAt time.Time `bson:"finish_final_choice_at" json:"finish_final_choice_at"`
+	ModifiedAt          time.Time `bson:"modified_at" json:"modified_at"`
+}
+
+type Gamer struct {
+	ID       int      `gorm:"primaryKey;autoIncrement" json:"id"`
+	SnsType  int      `gorm:"index" json:"sns_type"`
+	SnsID    string   `gorm:"index" json:"sns_id"`
+	Name     string   `gorm:"size:100" json:"name"`
+	Gender   int      `json:"gender"`
+	Birth    string   `gorm:"size:20" json:"birth"`
+	Address  Address  `gorm:"embedded;embeddedPrefix:address_" json:"address"`
+	GameInfo GameInfo `gorm:"embedded;embeddedPrefix:game_info_" json:"game_info"`
+}
+
+type GameInfo struct {
+	CharacterID        int    `gorm:"index" json:"character_id"`
+	CharacterName      string `gorm:"size:64" json:"character_name"`
+	CharacterAvatarURL string `gorm:"size:256" json:"character_avatar_url"`
 }

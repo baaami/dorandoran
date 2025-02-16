@@ -20,7 +20,7 @@ func NewEmitter(mqClient *mq.RabbitMQ) *Emitter {
 func (e *Emitter) publish(exchangeName, routingKey string, payload eventtypes.EventPayload) error {
 	eventBytes, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("❌ Failed to marshal event: %s, err: %v", exchangeName, err)
+		log.Printf("❌ Failed to marshal event: %s, err: %v", payload.EventType, err)
 		return err
 	}
 
@@ -30,7 +30,7 @@ func (e *Emitter) publish(exchangeName, routingKey string, payload eventtypes.Ev
 		eventBytes,
 	)
 	if err != nil {
-		log.Printf("❌ Failed to publish event: %s, err: %v", exchangeName, err)
+		log.Printf("❌ Failed to publish event: %s, err: %v", payload.EventType, err)
 		return err
 	}
 

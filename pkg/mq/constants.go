@@ -17,6 +17,7 @@ const (
 
 // Queue Names
 const (
+	QueueGame  = "game_queue"
 	QueueChat  = "chat_queue"
 	QueueUser  = "user_queue"
 	QueueMatch = "match_queue"
