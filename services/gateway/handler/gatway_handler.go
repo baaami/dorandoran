@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"strings"
+	"solo/pkg/helper"
 
 	"github.com/labstack/echo/v4"
 )
@@ -17,21 +17,12 @@ func NewGatewayHandler() *GatewayHandler {
 	return &GatewayHandler{}
 }
 
-// Usage - API 명세 핸들러
-func Usage(c echo.Context) error {
-	payload := map[string]interface{}{
-		"error":   false,
-		"message": "I will Write Usage Here",
-	}
-	return c.JSON(http.StatusOK, payload)
-}
-
 // ProxyService - API를 프록시해주는 역할
 func (h *GatewayHandler) ProxyService(c echo.Context) error {
 	log.Printf("Proxy Request URL: %s", c.Request().URL)
 
 	// 요청 경로에서 첫 번째 경로 요소를 추출
-	firstPath, trimmedPath := extractFirstPath(c.Request().URL.Path)
+	firstPath, trimmedPath := helper.ExtractFirstPath(c.Request().URL.Path)
 
 	// 첫 번째 경로 요소에 따라 targetURL 설정
 	baseURL := "http://" + firstPath + "-service"
@@ -82,21 +73,6 @@ func (h *GatewayHandler) ProxyService(c echo.Context) error {
 	}
 
 	return nil
-}
-
-// 첫 번째 경로 요소를 추출하고 나머지 경로를 반환하는 함수
-func extractFirstPath(path string) (string, string) {
-	parts := strings.SplitN(path, "/", 3)
-
-	if len(parts) > 1 {
-		firstPath := parts[1]
-		if len(parts) > 2 {
-			return firstPath, "/" + parts[2]
-		}
-		return firstPath, "/"
-	}
-
-	return "", "/"
 }
 
 // ProfileHandler - 프로필 이미지 제공
