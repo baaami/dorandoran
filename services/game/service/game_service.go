@@ -24,6 +24,7 @@ type MQEmitter interface {
 	PublishRoomJoinEvent(data eventtypes.RoomJoinEvent) error
 	PublishChatMessageEvent(event eventtypes.ChatEvent) error
 	PublishFinalChoiceTimeoutEvent(event eventtypes.FinalChoiceTimeoutEvent) error
+	PublishRoomTimeoutEvent(timeoutEvent eventtypes.RoomTimeoutEvent) error
 }
 
 // Client 구조체 - WebSocket 클라이언트
@@ -47,7 +48,12 @@ func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter) *GameServ
 		emitter:     emitter,
 	}
 
+	// 최종 선택 이전 대화 세션 타임아웃 확인
+	go service.MonitorChatTimeouts()
+
+	// 최종 선택 이전 대화 세션 타임아웃 확인
 	go service.MonitorFinalChoiceTimeouts()
+
 	return service
 }
 
@@ -362,6 +368,52 @@ func GetRoomDetail(roomID string) (*commontype.RoomDetailResponse, error) {
 	}
 
 	return &chatRoomDetail, nil
+}
+
+// 특정 채팅방 타임아웃 감지
+func (s *GameService) MonitorChatTimeouts() {
+	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Redis에 저장된 모든 방 ID 가져오기
+		rooms, err := s.redisClient.GetAllRoomsFromRedis()
+		if err != nil {
+			log.Printf("Failed to fetch rooms for timeout monitoring: %v", err)
+			continue
+		}
+
+		for _, roomID := range rooms {
+			// 남은 시간이 0 이하인지 확인
+			remainingTime, err := s.redisClient.GetRoomRemainingTime(roomID)
+			if err != nil || remainingTime > 0 {
+				continue // 아직 만료되지 않은 방은 스킵
+			}
+
+			inactiveUsers, err := s.redisClient.GetInActiveUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to get inactive users, err: %s", err.Error())
+				continue
+			}
+
+			event := eventtypes.RoomTimeoutEvent{
+				RoomID:          roomID,
+				InactiveUserIds: inactiveUsers,
+			}
+
+			// 만료된 방에 대해 timeout 이벤트 발행
+			err = s.emitter.PublishRoomTimeoutEvent(event)
+			if err != nil {
+				log.Printf("Failed to handle timeout for RoomID %s: %v", roomID, err)
+			}
+
+			// TODO: Redis에서 최종 선택 완료 시 방 삭제
+			err = s.redisClient.RemoveRoomFromRedis(roomID)
+			if err != nil {
+				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
+			}
+		}
+	}
 }
 
 func (s *GameService) MonitorFinalChoiceTimeouts() {

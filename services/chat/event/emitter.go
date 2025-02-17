@@ -68,11 +68,3 @@ func (e *Emitter) PublishRoomLeaveEvent(data eventtypes.RoomLeaveEvent) error {
 	}
 	return e.publish(mq.ExchangeAppTopic, mq.RoutingKeyRoomLeave, payload)
 }
-
-func (e *Emitter) PublishRoomTimeoutEvent(timeoutEvent eventtypes.RoomTimeoutEvent) error {
-	payload := eventtypes.EventPayload{
-		EventType: eventtypes.EventTypeRoomTimeout,
-		Data:      helper.ToJSON(timeoutEvent),
-	}
-	return e.publish(mq.ExchangeAppTopic, mq.RoutingKeyRoomTimeout, payload)
-}

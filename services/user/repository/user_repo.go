@@ -82,25 +82,22 @@ func (r *UserRepository) UpdateUser(user User) error {
 
 // 유저 상태 업데이트
 func (r *UserRepository) UpdateUserGameInfo(userID int, newStatus int, gameRoomID string) error {
-	result := r.db.Model(&User{}).Where("id = ?", userID).Update("game_status", newStatus)
+	// 한 번의 쿼리로 game_status와 game_room_id를 함께 업데이트
+	result := r.db.Model(&User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"game_status":  newStatus,
+		"game_room_id": gameRoomID,
+	})
+
 	if result.Error != nil {
-		log.Printf("❌ Failed to update game_status for user ID %d: %v", userID, result.Error)
+		log.Printf("❌ Failed to update game info for user ID %d: %v", userID, result.Error)
 		return result.Error
 	}
+
 	if result.RowsAffected == 0 {
-		log.Printf("⚠️ No user found with ID %d to update game_status", userID)
+		log.Printf("⚠️ No user found with ID %d to update game info", userID)
 		return errors.New("user not found")
 	}
 
-	result = r.db.Model(&User{}).Where("id = ?", userID).Update("game_room_id", gameRoomID)
-	if result.Error != nil {
-		log.Printf("Failed to update game_room_id for user ID %d: %v", userID, result.Error)
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		log.Printf("No user found with ID %d to update game_room_id", userID)
-		return errors.New("user not found")
-	}
 	return nil
 }
 

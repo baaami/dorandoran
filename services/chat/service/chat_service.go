@@ -19,7 +19,6 @@ type MQEmitter interface {
 	PublishCoupleRoomCreateEvent(data commontype.ChatRoom) error
 	PublishChatLatestEvent(data eventtypes.ChatLatestEvent) error
 	PublishRoomLeaveEvent(data eventtypes.RoomLeaveEvent) error
-	PublishRoomTimeoutEvent(timeoutEvent eventtypes.RoomTimeoutEvent) error
 }
 
 type ChatService struct {
@@ -29,16 +28,11 @@ type ChatService struct {
 }
 
 func NewChatService(chatRepo *repo.ChatRepository, redisClient *redis.RedisClient, emitter MQEmitter) *ChatService {
-	service := &ChatService{
+	return &ChatService{
 		chatRepo:    chatRepo,
 		redisClient: redisClient,
 		emitter:     emitter,
 	}
-
-	// 최종 선택 이전 대화 세션 타임아웃 확인
-	go service.MonitorRoomTimeouts()
-
-	return service
 }
 
 // 방 생성 (matchEvent 기반)
@@ -294,50 +288,4 @@ func (s *ChatService) DeleteChatByRoomID(roomID string) error {
 // 특정 유저의 게임 캐릭터 정보 조회
 func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*commontype.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
-}
-
-// 특정 채팅방 타임아웃 감지
-func (s *ChatService) MonitorRoomTimeouts() {
-	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
-	defer ticker.Stop()
-
-	for range ticker.C {
-		// Redis에 저장된 모든 방 ID 가져오기
-		rooms, err := s.redisClient.GetAllRoomsFromRedis()
-		if err != nil {
-			log.Printf("Failed to fetch rooms for timeout monitoring: %v", err)
-			continue
-		}
-
-		for _, roomID := range rooms {
-			// 남은 시간이 0 이하인지 확인
-			remainingTime, err := s.redisClient.GetRoomRemainingTime(roomID)
-			if err != nil || remainingTime > 0 {
-				continue // 아직 만료되지 않은 방은 스킵
-			}
-
-			inactiveUsers, err := s.redisClient.GetInActiveUserIDs(roomID)
-			if err != nil {
-				log.Printf("Failed to get inactive users, err: %s", err.Error())
-				continue
-			}
-
-			event := eventtypes.RoomTimeoutEvent{
-				RoomID:          roomID,
-				InactiveUserIds: inactiveUsers,
-			}
-
-			// 만료된 방에 대해 timeout 이벤트 발행
-			err = s.emitter.PublishRoomTimeoutEvent(event)
-			if err != nil {
-				log.Printf("Failed to handle timeout for RoomID %s: %v", roomID, err)
-			}
-
-			// TODO: Redis에서 최종 선택 완료 시 방 삭제
-			err = s.redisClient.RemoveRoomFromRedis(roomID)
-			if err != nil {
-				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
-			}
-		}
-	}
 }

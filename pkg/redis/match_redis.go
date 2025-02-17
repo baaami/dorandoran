@@ -54,7 +54,6 @@ func (r *RedisClient) RemoveUserFromQueue(user commontype.WaitingUser) error {
 		}
 	}
 
-	log.Printf("User %d not found in any queue", user.ID)
 	return nil
 }
 
