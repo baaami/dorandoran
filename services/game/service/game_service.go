@@ -48,10 +48,10 @@ func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter) *GameServ
 		emitter:     emitter,
 	}
 
-	// 최종 선택 이전 대화 세션 타임아웃 확인
+	// 게임방 대화 시간 타임아웃 모니터링
 	go service.MonitorChatTimeouts()
 
-	// 최종 선택 이전 대화 세션 타임아웃 확인
+	// 최종 선택 시간 타임아웃 모니터링
 	go service.MonitorFinalChoiceTimeouts()
 
 	return service
