@@ -23,7 +23,7 @@ func (h *EventHandler) HandleMatchEvent(body json.RawMessage) {
 		return
 	}
 
-	log.Printf("🎯 Processing Match Event: %+v", eventData)
+	log.Printf("🎯 Processing Match Event, matchId: %s", eventData.MatchId)
 
 	for _, user := range eventData.MatchedUsers {
 		err := h.userService.UpdateUserGameInfo(user.ID, commontype.USER_STATUS_GAME_ING, eventData.MatchId)
@@ -41,7 +41,7 @@ func (h *EventHandler) HandleFinalChoiceTimeout(body json.RawMessage) {
 		return
 	}
 
-	log.Printf("⏳ Handling Final Choice Timeout for users: %+v", eventData.UserIDs)
+	log.Printf("⏳ Processing Final Choice Timeout , room: %s", eventData.RoomID)
 
 	for _, id := range eventData.UserIDs {
 		err := h.userService.UpdateUserGameInfo(id, commontype.USER_STATUS_STANDBY, "")

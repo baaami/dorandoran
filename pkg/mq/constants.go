@@ -4,7 +4,6 @@ package mq
 const (
 	ExchangeAppTopic               = "app_topic"
 	ExchangeMatchEvents            = "match_events"
-	ExchangeMatch                  = "match"
 	ExchangeChatRoomCreateEvents   = "chat_room_create_events"
 	ExchangeCoupleRoomCreateEvents = "couple_room_create_events"
 )

@@ -36,7 +36,8 @@ type FinalChoiceResultMessage struct {
 }
 
 type FinalChoiceStartMessage struct {
-	RoomID string `json:"room_id"`
+	RoomID   string `json:"room_id"`
+	RoomName string `json:"room_name"`
 }
 
 type JoinRoomMessage struct {

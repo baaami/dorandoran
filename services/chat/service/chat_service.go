@@ -1,11 +1,16 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"strconv"
 	"time"
 
+	"solo/pkg/dto"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
@@ -41,6 +46,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	chatRoomID := matchEvent.MatchId
 
 	var seq int64
+	var roomName string
 	var startTime time.Time
 	var finishTime time.Time
 	var gamers []commontype.GamerInfo
@@ -51,12 +57,14 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		finishTime = startTime.Add(20 * time.Second)
 
 		seq, _ = s.chatRepo.GetNextSequence("chatRoomSeq")
+		roomName = fmt.Sprintf("%d기", seq)
 	} else {
 		log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
 		finishTime = startTime.Add(10 * time.Minute)
 
 		seq = 0
+		roomName = "커플 채팅방"
 	}
 
 	// 나는 솔로 캐릭터 할당
@@ -90,6 +98,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 
 	room := commontype.ChatRoom{
 		ID:                  chatRoomID,
+		Name:                roomName,
 		Seq:                 seq,
 		Type:                matchEvent.MatchType,
 		UserIDs:             extractUserIDs(matchEvent.MatchedUsers),
@@ -166,7 +175,7 @@ func (s *ChatService) GetChatRoomList(userID int) ([]commontype.ChatRoom, error)
 }
 
 // 특정 채팅방 상세 정보 조회
-func (s *ChatService) GetChatRoomByID(roomID string) (*commontype.ChatRoom, error) {
+func (s *ChatService) GetChatRoomByID(roomID string) (*dto.RoomDetailResponse, error) {
 	room, err := s.chatRepo.GetRoomByID(roomID)
 	if err != nil {
 		log.Printf("Failed to get chat room %s: %v", roomID, err)
@@ -175,7 +184,49 @@ func (s *ChatService) GetChatRoomByID(roomID string) (*commontype.ChatRoom, erro
 	if room == nil {
 		return nil, errors.New("chat room not found")
 	}
-	return room, nil
+
+	var gamerList []commontype.Gamer
+
+	for _, userID := range room.UserIDs {
+		user, err := getUserByUserID(strconv.Itoa(userID))
+		if err != nil {
+			log.Printf("Failed to get user %d: %v", userID, err)
+		}
+
+		gamer, err := s.chatRepo.GetUserGameInfoInRoom(userID, room.ID)
+		if err != nil {
+			log.Printf("Failed to get user game info %d: %v", userID, err)
+		}
+
+		gamerList = append(gamerList, commontype.Gamer{
+			ID:      user.ID,
+			SnsType: user.SnsType,
+			SnsID:   user.SnsID,
+			Name:    user.Name,
+			Gender:  user.Gender,
+			Birth:   user.Birth,
+			Address: user.Address,
+			GameInfo: commontype.GameInfo{
+				CharacterID:        gamer.CharacterID,
+				CharacterName:      gamer.CharacterName,
+				CharacterAvatarURL: gamer.CharacterAvatarURL,
+			},
+		})
+	}
+
+	roomDetail := dto.RoomDetailResponse{
+		ID:                  room.ID,
+		Type:                room.Type,
+		Status:              room.Status,
+		Seq:                 int(room.Seq),
+		RoomName:            room.Name,
+		Users:               gamerList,
+		CreatedAt:           room.CreatedAt,
+		FinishChatAt:        room.FinishChatAt,
+		FinishFinalChoiceAt: room.FinishFinalChoiceAt,
+	}
+
+	return &roomDetail, nil
 }
 
 // 채팅방 참여 처리
@@ -288,4 +339,57 @@ func (s *ChatService) DeleteChatByRoomID(roomID string) error {
 // 특정 유저의 게임 캐릭터 정보 조회
 func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*commontype.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
+}
+
+// [Bridge user] 회원 정보 획득
+func getUserByUserID(userID string) (*commontype.User, error) {
+	client := &http.Client{
+		Timeout: time.Second * 10, // 요청 타임아웃 설정
+	}
+
+	// 요청 URL 생성
+	url := "http://user-service/find"
+
+	// GET 요청 생성
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	// 사용자 ID를 요청의 헤더에 추가
+	req.Header.Set("X-User-ID", userID)
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 응답 처리
+	if resp.StatusCode == http.StatusNotFound {
+		// 유저가 존재하지 않는 경우
+		return nil, nil
+	} else if resp.StatusCode != http.StatusOK {
+		// 다른 에러가 발생한 경우
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// 응답 본문에서 유저 정보 디코딩
+	var user commontype.User
+
+	// 응답 본문 로깅 추가
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	// 본문을 다시 디코딩
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	// 유저가 존재하는 경우
+	return &user, nil
 }

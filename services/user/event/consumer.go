@@ -3,6 +3,7 @@ package event
 import (
 	"log"
 	"solo/pkg/mq"
+	eventtypes "solo/pkg/types/eventtype"
 	"solo/services/user/service"
 )
 
@@ -25,9 +26,9 @@ func (c *Consumer) StartListening() {
 		log.Fatalf("❌ Failed to declare exchange %s: %v", mq.ExchangeAppTopic, err)
 	}
 
-	err = c.mqClient.DeclareExchange(mq.ExchangeMatch, mq.ExchangeTypeFanout)
+	err = c.mqClient.DeclareExchange(mq.ExchangeMatchEvents, mq.ExchangeTypeFanout)
 	if err != nil {
-		log.Fatalf("❌ Failed to declare exchange %s: %v", mq.ExchangeMatch, err)
+		log.Fatalf("❌ Failed to declare exchange %s: %v", mq.ExchangeMatchEvents, err)
 	}
 
 	// Queue 생성 및 바인딩
@@ -36,16 +37,16 @@ func (c *Consumer) StartListening() {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueUser, mq.ExchangeAppTopic, err)
 	}
 
-	_, err = c.mqClient.DeclareQueue(mq.QueueUser, mq.ExchangeMatch, []string{})
+	_, err = c.mqClient.DeclareQueue(mq.QueueUser, mq.ExchangeMatchEvents, []string{})
 	if err != nil {
-		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueUser, mq.ExchangeMatch, err)
+		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueUser, mq.ExchangeMatchEvents, err)
 	}
 
 	// 이벤트 핸들러 등록
 	handlers := mq.EventHandlerMap{
-		mq.EventTypeMatch:              c.eventHandler.HandleMatchEvent,
-		mq.EventTypeFinalChoiceTimeout: c.eventHandler.HandleFinalChoiceTimeout,
-		mq.EventTypeRoomLeave:          c.eventHandler.HandleRoomLeave,
+		eventtypes.EventTypeMatch:              c.eventHandler.HandleMatchEvent,
+		eventtypes.EventTypeFinalChoiceTimeout: c.eventHandler.HandleFinalChoiceTimeout,
+		eventtypes.EventTypeRoomLeave:          c.eventHandler.HandleRoomLeave,
 	}
 
 	// 메시지 소비 시작

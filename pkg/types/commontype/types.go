@@ -120,6 +120,7 @@ type MatchFilter struct {
 
 type ChatRoom struct {
 	ID                  string      `bson:"id" json:"id"` // UUID 사용
+	Name                string      `bson:"name" json:"name"`
 	Type                int         `bson:"type" json:"type"`
 	Status              int         `bson:"status" json:"status"`
 	UserIDs             []int       `bson:"user_ids" json:"user_ids"`
@@ -138,17 +139,10 @@ type GamerInfo struct {
 	CharacterAvatarURL string `bson:"character_avatar_url" json:"character_avatar_url"`   // 캐릭터 아바타 이미지 URL
 }
 
-type RoomDetailResponse struct {
-	ID                  string    `bson:"id" json:"id"` // UUID 사용
-	Type                int       `bson:"type" json:"type"`
-	Status              int       `bson:"status" json:"status"`
-	Seq                 int       `bson:"seq" json:"seq"`
-	RoomName            string    `bson:"room_name" json:"room_name"`
-	Users               []Gamer   `bson:"users" json:"users"`
-	CreatedAt           time.Time `bson:"created_at" json:"created_at"`
-	FinishChatAt        time.Time `bson:"finish_chat_at" json:"finish_chat_at"`
-	FinishFinalChoiceAt time.Time `bson:"finish_final_choice_at" json:"finish_final_choice_at"`
-	ModifiedAt          time.Time `bson:"modified_at" json:"modified_at"`
+type GameInfo struct {
+	CharacterID        int    `gorm:"index" json:"character_id"`
+	CharacterName      string `gorm:"size:64" json:"character_name"`
+	CharacterAvatarURL string `gorm:"size:256" json:"character_avatar_url"`
 }
 
 type Gamer struct {
@@ -160,10 +154,4 @@ type Gamer struct {
 	Birth    string   `gorm:"size:20" json:"birth"`
 	Address  Address  `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 	GameInfo GameInfo `gorm:"embedded;embeddedPrefix:game_info_" json:"game_info"`
-}
-
-type GameInfo struct {
-	CharacterID        int    `gorm:"index" json:"character_id"`
-	CharacterName      string `gorm:"size:64" json:"character_name"`
-	CharacterAvatarURL string `gorm:"size:256" json:"character_avatar_url"`
 }

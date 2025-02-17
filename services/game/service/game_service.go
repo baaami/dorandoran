@@ -10,11 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"solo/pkg/dto"
 	"solo/pkg/helper"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
 	"solo/pkg/types/stype"
+	"solo/services/chat/repo"
 
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -37,14 +39,16 @@ type Client struct {
 // GameService - 게임 서비스 계층
 type GameService struct {
 	redisClient *redis.RedisClient
+	chatRepo    *repo.ChatRepository
 	clients     sync.Map // key: userID, value: *Client
 	emitter     MQEmitter
 }
 
 // NewGameService - GameService 인스턴스 생성
-func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter) *GameService {
+func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter, chatRepo *repo.ChatRepository) *GameService {
 	service := &GameService{
 		redisClient: redisClient,
+		chatRepo:    chatRepo,
 		emitter:     emitter,
 	}
 
@@ -190,12 +194,17 @@ func (s *GameService) BroadCastFinalChoiceStart(roomID string) error {
 		return fmt.Errorf("❌ Redis GetRoomStatus 실패: %w", err)
 	}
 
+	room, err := s.chatRepo.GetRoomByID(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ Redis GetRoomByID 실패: %w", err)
+	}
+
 	if status != commontype.RoomStatusGameIng {
 		log.Printf("⚠️ Room %s is not in active game state, skipping timeout process.", roomID)
 		return nil
 	}
 
-	payload, err := json.Marshal(stype.FinalChoiceStartMessage{RoomID: roomID})
+	payload, err := json.Marshal(stype.FinalChoiceStartMessage{RoomID: roomID, RoomName: room.Name})
 	if err != nil {
 		return fmt.Errorf("❌ FinalChoiceStartMessage 직렬화 실패: %w", err)
 	}
@@ -335,8 +344,8 @@ func (s *GameService) ProcessFinalChoice(userID int, finalChoiceMsg stype.FinalC
 }
 
 // TODO: Bridige network 사용하지 않도록!!
-func GetRoomDetail(roomID string) (*commontype.RoomDetailResponse, error) {
-	var chatRoomDetail commontype.RoomDetailResponse
+func GetRoomDetail(roomID string) (*dto.RoomDetailResponse, error) {
+	var chatRoomDetail dto.RoomDetailResponse
 
 	// Matching 필터 획득
 	client := http.Client{}
