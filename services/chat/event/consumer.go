@@ -33,9 +33,12 @@ func (c *Consumer) StartListening() {
 
 	// Queue 생성 및 바인딩
 	queue, err := c.mqClient.DeclareQueue(mq.QueueChat, mq.ExchangeAppTopic,
-		[]string{mq.RoutingKeyRoomTimeout,
+		[]string{
+			mq.RoutingKeyChat,
+			mq.RoutingKeyRoomTimeout,
 			mq.RoutingKeyFinalChoiceTimeout,
-			mq.RoutingKeyRoomJoin})
+			mq.RoutingKeyRoomJoin,
+		})
 	if err != nil {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueChat, mq.ExchangeAppTopic, err)
 	}
