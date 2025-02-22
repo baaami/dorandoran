@@ -245,7 +245,6 @@ func (h *GameHandler) pingPongHandler(ctx context.Context, cancel context.Cancel
 
 			select {
 			case <-pongChannel:
-				log.Printf("✅ Pong 수신: User %d", userID)
 			case <-time.After(7 * time.Second):
 				log.Printf("⏳ Pong 시간 초과: User %d", userID)
 				cancel()

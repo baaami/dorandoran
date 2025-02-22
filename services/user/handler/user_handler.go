@@ -147,6 +147,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(updatedUser)
 }
 
 // 유저 삭제

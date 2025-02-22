@@ -1,9 +1,12 @@
 package handler
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 
+	"solo/pkg/dto"
+	"solo/pkg/types/commontype"
 	"solo/services/chat/service"
 
 	"github.com/labstack/echo/v4"
@@ -42,7 +45,47 @@ func (h *ChatHandler) GetChatRoomList(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve chat rooms"})
 	}
 
-	return c.JSON(http.StatusOK, rooms)
+	var roomlist []dto.RoomListResponse
+	for _, room := range rooms {
+		latestMessage, err := h.chatService.GetLatestMessage(room.ID)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve latest message"})
+		}
+
+		unreadCount, err := h.chatService.GetUnreadCount(room.ID, userID)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve unread count"})
+		}
+
+		gamerInfo, err := h.chatService.GetGamerInfo(userID, room.ID)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve gamer info"})
+		}
+		if gamerInfo == nil {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Gamer info not found"})
+		}
+
+		roomlist = append(roomlist, dto.RoomListResponse{
+			ID:       room.ID,
+			RoomName: room.Name,
+			RoomType: room.Type,
+			LastMessage: dto.LastMessage{
+				SenderID: latestMessage.SenderID,
+				Message:  latestMessage.Message,
+				GameInfo: commontype.GameInfo{
+					CharacterID:        gamerInfo.CharacterID,
+					CharacterName:      gamerInfo.CharacterName,
+					CharacterAvatarURL: gamerInfo.CharacterAvatarURL,
+				},
+				CreatedAt: latestMessage.CreatedAt,
+			},
+			UnreadCount: unreadCount,
+			CreatedAt:   room.CreatedAt,
+			ModifiedAt:  room.ModifiedAt,
+		})
+	}
+
+	return c.JSON(http.StatusOK, roomlist)
 }
 
 // 특정 채팅방 상세 정보 조회
@@ -82,14 +125,17 @@ func (h *ChatHandler) GetChatMsgListByRoomID(c echo.Context) error {
 		page = 1
 	}
 
-	messages, totalCount, err := h.chatService.GetChatMsgListByRoomID(roomID, page, 20)
+	messages, totalCount, err := h.chatService.GetChatMsgListByRoomID(roomID, page, commontype.DEFAULT_PAGE_SIZE)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch chat messages"})
 	}
 
-	response := map[string]interface{}{
-		"messages":    messages,
-		"total_count": totalCount,
+	response := dto.ChatListResponse{
+		Data:        messages,
+		CurrentPage: page,
+		NextPage:    page + 1,
+		HasNextPage: page < int(totalCount),
+		TotalPages:  int(math.Ceil(float64(totalCount) / float64(commontype.DEFAULT_PAGE_SIZE))),
 	}
 
 	return c.JSON(http.StatusOK, response)

@@ -174,6 +174,18 @@ func (s *ChatService) GetChatRoomList(userID int) ([]commontype.ChatRoom, error)
 	return rooms, nil
 }
 
+func (s *ChatService) GetLatestMessage(roomID string) (*commontype.Chat, error) {
+	return s.chatRepo.GetLastMessageByRoomID(roomID)
+}
+
+func (s *ChatService) GetUnreadCount(roomID string, userID int) (int, error) {
+	return s.chatRepo.GetUnreadCountByUserAndRoom(userID, roomID)
+}
+
+func (s *ChatService) GetGamerInfo(userID int, roomID string) (*commontype.GamerInfo, error) {
+	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
+}
+
 // 특정 채팅방 상세 정보 조회
 func (s *ChatService) GetChatRoomByID(roomID string) (*dto.RoomDetailResponse, error) {
 	room, err := s.chatRepo.GetRoomByID(roomID)
