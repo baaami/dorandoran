@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"solo/pkg/types/commontype"
 	"solo/pkg/types/stype"
 	"strconv"
 	"time"
@@ -35,7 +36,7 @@ func (r *RedisClient) GetActiveUserIDs(roomID string) ([]int, error) {
 	for _, sUserID := range userIDs {
 		activeKey := "client:active"
 		active, err := r.Client.HGet(ctx, activeKey, sUserID).Result()
-		if err == redis.Nil || active != "unique-server-id" {
+		if err == redis.Nil || active != commontype.DEFAULT_TEMP_SERVER_ID {
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("failed to check active status for user %s: %v", sUserID, err)

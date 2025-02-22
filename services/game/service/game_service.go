@@ -67,7 +67,7 @@ func (s *GameService) RegisterUserToGame(userID int, client *Client) error {
 	s.clients.Store(userID, client)
 
 	// Redis에 활성 사용자 등록
-	serverID := "game-server-1" // TODO: 서버 고유 ID 설정 필요
+	serverID := commontype.DEFAULT_TEMP_SERVER_ID // TODO: 서버 고유 ID 설정 필요
 	err := s.redisClient.RegisterActiveUser(userID, serverID)
 	if err != nil {
 		log.Printf("❌ Redis 사용자 등록 실패: %v", err)

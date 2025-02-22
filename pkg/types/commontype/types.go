@@ -41,6 +41,7 @@ const (
 
 const DEFAULT_GAME_POINT = 10
 const DEFAULT_PAGE_SIZE = 20
+const DEFAULT_TEMP_SERVER_ID = "game-server-1"
 
 const (
 	RoomStatusGameIng = iota

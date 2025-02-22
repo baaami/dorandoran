@@ -76,7 +76,7 @@ func (h *GameHandler) HandleGameSocket(c echo.Context) error {
 
 	// WaitGroup을 사용하여 모든 고루틴 종료 대기
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3) // 3개의 고루틴으로 변경
 
 	// Ping-Pong 메커니즘
 	go func() {
@@ -84,10 +84,16 @@ func (h *GameHandler) HandleGameSocket(c echo.Context) error {
 		h.pingPongHandler(ctx, cancel, conn, userID, pongChannel)
 	}()
 
-	// 메시지 처리 고루틴
+	// 메시지 수신 고루틴
 	go func() {
 		defer wg.Done()
 		h.listenForMessages(ctx, cancel, conn, userID, pongChannel)
+	}()
+
+	// 메시지 전송 고루틴 추가
+	go func() {
+		defer wg.Done()
+		h.writeMessages(ctx, client)
 	}()
 
 	wg.Wait()
@@ -248,6 +254,24 @@ func (h *GameHandler) pingPongHandler(ctx context.Context, cancel context.Cancel
 			case <-time.After(7 * time.Second):
 				log.Printf("⏳ Pong 시간 초과: User %d", userID)
 				cancel()
+				return
+			}
+		}
+	}
+}
+
+// writeMessages - Send 채널의 메시지를 WebSocket으로 전송
+func (h *GameHandler) writeMessages(ctx context.Context, client *service.Client) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case message, ok := <-client.Send:
+			if !ok {
+				return
+			}
+			if err := client.Conn.WriteJSON(message); err != nil {
+				log.Printf("❌ WebSocket 메시지 전송 실패: %v", err)
 				return
 			}
 		}
