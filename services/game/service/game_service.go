@@ -142,10 +142,20 @@ func (s *GameService) SendMessageToRoom(roomID string, message stype.WebSocketMe
 
 	for _, userID := range activeUserIDs {
 		if client, ok := s.clients.Load(userID); ok {
-			log.Printf("📨 Sending WebSocket message to User %d in Room %s", userID, roomID)
+			log.Printf("📨 Sending WebSocket %s message to User %d in Room %s", message.Kind, userID, roomID)
 
 			client.(*Client).Send <- message
 		}
+	}
+
+	return nil
+}
+
+func (s *GameService) SendMessageToUser(userID int, message stype.WebSocketMessage) error {
+	if client, ok := s.clients.Load(userID); ok {
+		log.Printf("📨 Sending WebSocket %s message to User %d", message.Kind, userID)
+
+		client.(*Client).Send <- message
 	}
 
 	return nil

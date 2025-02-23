@@ -24,6 +24,15 @@ const (
 	MessageKindCoupleMatchSuccess = "couple_match_success"
 )
 
+const (
+	PushMessageStatusMatchSuccess = "success"
+	PushMessageStatusMatchFailure = "fail"
+)
+
+const (
+	MessageTypeMatch = "match"
+)
+
 type ChatMessage struct {
 	HeadCnt int    `json:"head_cnt"`
 	RoomID  string `json:"room_id"`

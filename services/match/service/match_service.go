@@ -11,7 +11,7 @@ import (
 
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
-	"solo/pkg/types/sock"
+	"solo/pkg/types/stype"
 
 	"strconv"
 	"strings"
@@ -75,7 +75,7 @@ func (s *MatchService) UnregisterUserFromMatch(waitingUser commontype.WaitingUse
 
 func (s *MatchService) SendMatchSuccessMessage(userIds []int, roomID string) {
 	matchMsg := dto.MatchResponse{
-		Type:   sock.PushMessageStatusMatchSuccess,
+		Type:   stype.PushMessageStatusMatchSuccess,
 		RoomID: roomID,
 	}
 
@@ -85,8 +85,8 @@ func (s *MatchService) SendMatchSuccessMessage(userIds []int, roomID string) {
 		return
 	}
 
-	webSocketMsg := sock.WebSocketMessage{
-		Kind:    sock.MessageTypeMatch,
+	webSocketMsg := stype.WebSocketMessage{
+		Kind:    stype.MessageTypeMatch,
 		Payload: json.RawMessage(payload),
 	}
 
@@ -107,7 +107,7 @@ func (s *MatchService) SendMatchSuccessMessage(userIds []int, roomID string) {
 
 func (s *MatchService) SendMatchFailureMessage(conn *websocket.Conn) {
 	matchMsg := dto.MatchResponse{
-		Type:   sock.PushMessageStatusMatchFailure,
+		Type:   stype.PushMessageStatusMatchFailure,
 		RoomID: "",
 	}
 
@@ -117,8 +117,8 @@ func (s *MatchService) SendMatchFailureMessage(conn *websocket.Conn) {
 		return
 	}
 
-	webSocketMsg := sock.WebSocketMessage{
-		Kind:    sock.MessageTypeMatch,
+	webSocketMsg := stype.WebSocketMessage{
+		Kind:    stype.MessageTypeMatch,
 		Payload: json.RawMessage(payload),
 	}
 
