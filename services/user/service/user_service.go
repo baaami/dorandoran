@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log"
 	"solo/pkg/dto"
 	"solo/services/user/repository"
 )
@@ -85,6 +86,16 @@ func (s *UserService) GetUserBySNS(snsType int, snsID string) (*dto.UserDTO, err
 	}, nil
 }
 
+// 유저 알람 허용 여부 조회
+func (s *UserService) GetUserAlert(id int) (bool, error) {
+	alert, err := s.repo.GetUserAlert(id)
+	if err != nil {
+		log.Printf("❌ Failed to get user alert by ID %d: %v", id, err)
+		return false, err
+	}
+	return alert, nil
+}
+
 // 유저 등록
 func (s *UserService) RegisterUser(user dto.UserDTO) (*dto.UserDTO, error) {
 	userModel := repository.User{
@@ -130,6 +141,7 @@ func (s *UserService) UpdateUser(user dto.UserDTO) error {
 		GameStatus: user.GameStatus,
 		GameRoomID: user.GameRoomID,
 		GamePoint:  user.GamePoint,
+		Alert:      user.Alert,
 	}
 	return s.repo.UpdateUser(userModel)
 }

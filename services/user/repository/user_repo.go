@@ -71,6 +71,17 @@ func (r *UserRepository) GetUserBySNS(snsType int, snsID string) (*User, error) 
 	return &user, nil
 }
 
+// 유저 알람 허용 여부 조회
+func (r *UserRepository) GetUserAlert(id int) (bool, error) {
+	var user User
+	err := r.db.Where("id = ?", id).First(&user).Error
+	if err != nil {
+		log.Printf("❌ Failed to get user alert by ID %d: %v", id, err)
+		return false, err
+	}
+	return user.Alert, nil
+}
+
 // 유저 업데이트
 func (r *UserRepository) UpdateUser(user User) error {
 	if err := r.db.Model(&User{ID: user.ID}).Updates(user).Error; err != nil {

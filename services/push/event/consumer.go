@@ -3,6 +3,7 @@ package event
 import (
 	"log"
 	"solo/pkg/mq"
+	"solo/services/user/service"
 )
 
 type Consumer struct {
@@ -10,10 +11,10 @@ type Consumer struct {
 	eventHandler *EventHandler
 }
 
-func NewConsumer(mqClient *mq.RabbitMQ) *Consumer {
+func NewConsumer(mqClient *mq.RabbitMQ, userService *service.UserService) *Consumer {
 	return &Consumer{
 		mqClient:     mqClient,
-		eventHandler: NewEventHandler(),
+		eventHandler: NewEventHandler(userService),
 	}
 }
 

@@ -17,4 +17,5 @@ type UserDTO struct {
 	GameStatus int        `json:"game_status"`
 	GameRoomID string     `json:"game_room_id"`
 	GamePoint  int        `json:"game_point"`
+	Alert      bool       `json:"alert"`
 }

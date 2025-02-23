@@ -111,6 +111,7 @@ type User struct {
 	GameStatus int     `gorm:"default:0" json:"game_status"`
 	GameRoomID string  `gorm:"size:100" json:"game_room_id"`
 	GamePoint  int     `json:"game_point"`
+	Alert      bool    `gorm:"default:true" json:"alert"`
 }
 
 type MatchFilter struct {
@@ -156,4 +157,10 @@ type Gamer struct {
 	Birth    string   `gorm:"size:20" json:"birth"`
 	Address  Address  `gorm:"embedded;embeddedPrefix:address_" json:"address"`
 	GameInfo GameInfo `gorm:"embedded;embeddedPrefix:game_info_" json:"game_info"`
+}
+
+type PushNotification struct {
+	Header  string
+	Content string
+	Url     string
 }

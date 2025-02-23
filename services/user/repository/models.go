@@ -17,6 +17,7 @@ type User struct {
 	GameStatus int     `gorm:"default:0" json:"game_status"`
 	GameRoomID string  `gorm:"size:100" json:"game_room_id"`
 	GamePoint  int     `json:"game_point"`
+	Alert      bool    `gorm:"default:true" json:"alert"`
 }
 
 type MatchFilter struct {
