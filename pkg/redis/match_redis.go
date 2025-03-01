@@ -14,87 +14,23 @@ func (r *RedisClient) MonitorAndMatchUsers(coupleCount int) ([]commontype.Waitin
 	maleKey := fmt.Sprintf("matching_queue:%d:%d", commontype.MALE, coupleCount)
 	femaleKey := fmt.Sprintf("matching_queue:%d:%d", commontype.FEMALE, coupleCount)
 
-	// 1. 남성 대기열에서 가장 오래 기다린 사용자 coupleCount 명 찾기
 	oldestMales, err := r.Client.ZRange(ctx, maleKey, 0, int64(coupleCount-1)).Result()
-	if err != nil {
-		log.Printf("❌ Failed to retrieve male users: %v", err)
-		return nil, err
-	}
-	if len(oldestMales) < coupleCount {
-		return nil, nil
-	}
-
-	var maleWaitingQueues []commontype.WaitingUser
-	for _, maleData := range oldestMales {
-		var mq commontype.WaitingUser
-		if err := json.Unmarshal([]byte(maleData), &mq); err != nil {
-			log.Printf("❌ Failed to unmarshal male user data: %v", err)
-			return nil, err
-		}
-		maleWaitingQueues = append(maleWaitingQueues, mq)
-	}
-
-	// 2. 남성 사용자들의 평균 나이를 기준으로 나이 범위 설정
-	var totalAge int
-	for _, mq := range maleWaitingQueues {
-		totalAge += calculateAge(mq.Birth)
-	}
-	avgAge := float64(totalAge) / float64(len(maleWaitingQueues))
-	minAge := avgAge - 10
-	maxAge := avgAge + 10
-
-	log.Printf("🔍 Matching males avg age: %.2f, searching females between %.2f and %.2f", avgAge, minAge, maxAge)
-
-	// 3. 나이 범위 내의 여성 상대 찾기
-	females, err := r.Client.ZRangeByScore(ctx, femaleKey, &redis.ZRangeBy{
-		Min:   fmt.Sprintf("%f", minAge),
-		Max:   fmt.Sprintf("%f", maxAge),
-		Count: int64(coupleCount),
-	}).Result()
-	if err != nil {
-		log.Printf("❌ Failed to retrieve female users: %v", err)
+	if err != nil || len(oldestMales) < coupleCount {
 		return nil, err
 	}
 
-	if len(females) < coupleCount {
-		log.Printf("ℹ️ Not enough female users for matching. Required: %d, Found: %d", coupleCount, len(females))
-		return nil, nil
+	maleWaitingQueues := parseWaitingUsers(oldestMales)
+	avgAge := calculateAverageAge(maleWaitingQueues)
+
+	females, err := r.findFemalesWithExpandingAgeRange(femaleKey, avgAge, coupleCount)
+	if err != nil || len(females) < coupleCount {
+		return nil, err
 	}
 
-	// 4. 매칭된 사용자들 처리
-	var matchedUsers []commontype.WaitingUser
+	matchedUsers := append(parseWaitingUsers(oldestMales), parseWaitingUsers(females)...)
 
-	// 남성 사용자 파싱
-	for _, maleData := range oldestMales {
-		var user commontype.WaitingUser
-		if err := json.Unmarshal([]byte(maleData), &user); err != nil {
-			log.Printf("❌ Failed to unmarshal male user: %v", err)
-			continue
-		}
-		matchedUsers = append(matchedUsers, user)
-	}
-
-	// 여성 사용자 파싱
-	for _, femaleData := range females {
-		var user commontype.WaitingUser
-		if err := json.Unmarshal([]byte(femaleData), &user); err != nil {
-			log.Printf("❌ Failed to unmarshal female user: %v", err)
-			continue
-		}
-		matchedUsers = append(matchedUsers, user)
-	}
-
-	// 매칭된 사용자들을 큐에서 제거
-	for _, userData := range oldestMales {
-		if err := r.Client.ZRem(ctx, maleKey, userData).Err(); err != nil {
-			log.Printf("❌ Failed to remove matched male user from queue: %v", err)
-		}
-	}
-	for _, userData := range females {
-		if err := r.Client.ZRem(ctx, femaleKey, userData).Err(); err != nil {
-			log.Printf("❌ Failed to remove matched female user from queue: %v", err)
-		}
-	}
+	removeMatchedUsersFromQueue(r, maleKey, oldestMales)
+	removeMatchedUsersFromQueue(r, femaleKey, females)
 
 	log.Printf("✅ Successfully matched %d couples", coupleCount)
 	return matchedUsers, nil
@@ -129,7 +65,7 @@ func (r *RedisClient) RemoveUserFromQueue(user commontype.WaitingUser) error {
 		queueKey := fmt.Sprintf("%s:%d", genderQueuePrefix, coupleCount)
 
 		// Attempt to remove the user from the current queue
-		if err := r.Client.LRem(ctx, queueKey, 1, userData).Err(); err != nil {
+		if err := r.Client.ZRem(ctx, queueKey, 1, userData).Err(); err != nil {
 			log.Printf("Failed to remove user %d from queue %s: %v", user.ID, queueKey, err)
 			continue
 		}
@@ -200,9 +136,60 @@ func calculateAge(birth string) int {
 	return age
 }
 
-func getGenderString(gender int) string {
-	if gender == 0 {
-		return "male"
+// 연령대 범위를 점진적으로 확장하며 여성 사용자 찾기
+func (r *RedisClient) findFemalesWithExpandingAgeRange(femaleKey string, avgAge float64, coupleCount int) ([]string, error) {
+	ageRange := 5
+	maxAgeRange := 15
+
+	for ageRange <= maxAgeRange {
+		minAge := avgAge - float64(ageRange)
+		maxAge := avgAge + float64(ageRange)
+
+		females, err := r.Client.ZRangeByScore(ctx, femaleKey, &redis.ZRangeBy{
+			Min:   fmt.Sprintf("%f", minAge),
+			Max:   fmt.Sprintf("%f", maxAge),
+			Count: int64(coupleCount),
+		}).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(females) >= coupleCount {
+			return females, nil
+		}
+
+		ageRange += 5
 	}
-	return "female"
+
+	return nil, nil
+}
+
+// 평균 나이 계산 함수
+func calculateAverageAge(users []commontype.WaitingUser) float64 {
+	var totalAge int
+	for _, user := range users {
+		totalAge += calculateAge(user.Birth)
+	}
+	return float64(totalAge) / float64(len(users))
+}
+
+// 사용자 데이터 파싱 함수
+func parseWaitingUsers(data []string) []commontype.WaitingUser {
+	var users []commontype.WaitingUser
+	for _, userData := range data {
+		var user commontype.WaitingUser
+		if err := json.Unmarshal([]byte(userData), &user); err == nil {
+			users = append(users, user)
+		}
+	}
+	return users
+}
+
+// 매칭된 사용자 큐에서 제거 함수
+func removeMatchedUsersFromQueue(r *RedisClient, key string, users []string) {
+	for _, userData := range users {
+		if err := r.Client.ZRem(ctx, key, userData).Err(); err != nil {
+			log.Printf("❌ Failed to remove matched user from queue: %v", err)
+		}
+	}
 }
