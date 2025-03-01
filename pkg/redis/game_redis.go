@@ -112,8 +112,8 @@ func (r *RedisClient) GetJoinedUser(roomID string) ([]int, error) {
 	return userIDs, nil
 }
 
-func (r *RedisClient) AddTimeoutUser(roomID string, userID int) error {
-	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
+func (r *RedisClient) AddChatTimeoutUser(roomID string, userID int) error {
+	timeoutKey := fmt.Sprintf("chat_timeout:%s", roomID)
 	err := r.Client.SAdd(ctx, timeoutKey, strconv.Itoa(userID)).Err()
 	if err != nil {
 		return fmt.Errorf("failed to add timeout user %d to room %s: %v", userID, roomID, err)
@@ -122,8 +122,8 @@ func (r *RedisClient) AddTimeoutUser(roomID string, userID int) error {
 	return nil
 }
 
-func (r *RedisClient) GetTimeoutUserCount(roomID string) (int64, error) {
-	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
+func (r *RedisClient) GetChatTimeoutUserCount(roomID string) (int64, error) {
+	timeoutKey := fmt.Sprintf("chat_timeout:%s", roomID)
 	count, err := r.Client.SCard(ctx, timeoutKey).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get timeout user count for room %s: %v", roomID, err)
@@ -131,8 +131,8 @@ func (r *RedisClient) GetTimeoutUserCount(roomID string) (int64, error) {
 	return count, nil
 }
 
-func (r *RedisClient) ClearRoomTimeout(roomID string) error {
-	timeoutKey := fmt.Sprintf("room_timeout:%s", roomID)
+func (r *RedisClient) ClearChatTimeout(roomID string) error {
+	timeoutKey := fmt.Sprintf("chat_timeout:%s", roomID)
 	err := r.Client.Del(ctx, timeoutKey).Err()
 	if err != nil {
 		return fmt.Errorf("failed to clear room timeout data for room %s: %v", roomID, err)
