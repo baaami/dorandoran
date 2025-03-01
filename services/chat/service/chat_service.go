@@ -16,6 +16,7 @@ import (
 	eventtypes "solo/pkg/types/eventtype"
 	"solo/services/chat/repo"
 
+	"github.com/samber/lo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -186,8 +187,12 @@ func (s *ChatService) GetGamerInfo(userID int, roomID string) (*commontype.Gamer
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
 }
 
+func (s *ChatService) GetChatRoomByID(roomID string) (*commontype.ChatRoom, error) {
+	return s.chatRepo.GetRoomByID(roomID)
+}
+
 // 특정 채팅방 상세 정보 조회
-func (s *ChatService) GetChatRoomByID(roomID string) (*dto.RoomDetailResponse, error) {
+func (s *ChatService) GetChatRoomDetailByID(roomID string) (*dto.RoomDetailResponse, error) {
 	room, err := s.chatRepo.GetRoomByID(roomID)
 	if err != nil {
 		log.Printf("Failed to get chat room %s: %v", roomID, err)
@@ -351,6 +356,19 @@ func (s *ChatService) DeleteChatByRoomID(roomID string) error {
 // 특정 유저의 게임 캐릭터 정보 조회
 func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*commontype.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
+}
+
+func (s *ChatService) IsUserInRoom(userID int, roomID string) (bool, error) {
+	room, err := s.GetChatRoomByID(roomID)
+	if err != nil {
+		return false, err
+	}
+	if room == nil {
+		return false, nil
+	}
+
+	// UserIDs 배열에 해당 사용자가 있는지 확인
+	return lo.Contains(room.UserIDs, userID), nil
 }
 
 // [Bridge user] 회원 정보 획득

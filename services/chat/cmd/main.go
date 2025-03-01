@@ -52,7 +52,7 @@ func main() {
 	eventConsumer := event.NewConsumer(mqClient, redisClient, chatService)
 	go eventConsumer.StartListening()
 
-	router := transport.NewRouter(chatHandler)
+	router := transport.NewRouter(chatHandler, chatService)
 
 	log.Printf("🚀 Chat Service Started on Port %d", webPort)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", webPort), router))

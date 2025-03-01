@@ -1,24 +1,30 @@
 package transport
 
 import (
+	"solo/pkg/middleware"
 	"solo/services/chat/handler"
+	"solo/services/chat/service"
 
 	"github.com/labstack/echo/v4"
 )
 
-func NewRouter(chatHandler *handler.ChatHandler) *echo.Echo {
+func NewRouter(chatHandler *handler.ChatHandler, chatService *service.ChatService) *echo.Echo {
 	e := echo.New()
 
-	// 채팅방 관련 라우팅
-	e.GET("/room/list", chatHandler.GetChatRoomList)         // 채팅방 목록 조회
-	e.GET("/room/:id", chatHandler.GetChatRoomByID)          // 채팅방 상세 조회
-	e.DELETE("/room/delete/:id", chatHandler.DeleteChatRoom) // 채팅방 삭제
+	// 채팅방 목록 조회는 미들웨어 없이 접근 가능
+	e.GET("/room/list", chatHandler.GetChatRoomList)
 
-	e.GET("/list/:id", chatHandler.GetChatMsgListByRoomID) // 특정 방의 채팅 내역 조회
-	e.DELETE("/all/:id", chatHandler.DeleteChatByRoomID)   // 특정 방의 모든 채팅 삭제
-
-	// 게임 캐릭터 정보 조회
-	e.GET("/character/name/:id", chatHandler.GetCharacterNameByRoomID) // 특정 방의 캐릭터 정보 조회
+	// roomID를 사용하는 엔드포인트들을 그룹으로 묶어서 미들웨어 적용
+	roomGroup := e.Group("")
+	roomGroup.Use(middleware.RoomAccessChecker(chatService))
+	{
+		// 채팅방 관련 라우팅 (roomID 파라미터 사용)
+		roomGroup.GET("/room/:id", chatHandler.GetChatRoomByID)
+		roomGroup.DELETE("/room/delete/:id", chatHandler.DeleteChatRoom)
+		roomGroup.GET("/list/:id", chatHandler.GetChatMsgListByRoomID)
+		roomGroup.DELETE("/all/:id", chatHandler.DeleteChatByRoomID)
+		roomGroup.GET("/character/name/:id", chatHandler.GetCharacterNameByRoomID)
+	}
 
 	return e
 }
