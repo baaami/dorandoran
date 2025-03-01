@@ -230,9 +230,9 @@ func (s *GameService) BroadCastFinalChoiceStart(roomID string) error {
 	}
 
 	// Redis에서 타임아웃 데이터 정리
-	err = s.redisClient.ClearRoomTimeout(roomID)
+	err = s.redisClient.ClearFinalChoiceRoom(roomID)
 	if err != nil {
-		log.Printf("❌ Redis ClearRoomTimeout 실패: %v", err)
+		log.Printf("❌ Redis ClearFinalChoiceRoom 실패: %v", err)
 	}
 
 	err = s.redisClient.SetRoomStatus(roomID, commontype.RoomStatusChoiceIng)
@@ -254,15 +254,15 @@ func (s *GameService) BroadCastFinalChoiceStart(roomID string) error {
 }
 
 func (s *GameService) ProcessRoomTimeoutMessage(roomTimeoutMsg stype.RoomTimeoutMessage, userID int) error {
-	err := s.redisClient.AddTimeoutUser(roomTimeoutMsg.RoomID, userID)
+	err := s.redisClient.AddChatTimeoutUser(roomTimeoutMsg.RoomID, userID)
 	if err != nil {
 		log.Printf("Failed to SaveUserChoice, err: %v", err)
 		return nil
 	}
 
-	roomTimeoutUserIds, err := s.redisClient.GetTimeoutUserCount(roomTimeoutMsg.RoomID)
+	roomTimeoutUserIds, err := s.redisClient.GetChatTimeoutUserCount(roomTimeoutMsg.RoomID)
 	if err != nil {
-		log.Printf("Failed to GetTimeoutUserCount, err: %v", err)
+		log.Printf("Failed to GetChatTimeoutUserCount, err: %v", err)
 		return nil
 	}
 

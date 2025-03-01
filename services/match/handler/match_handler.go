@@ -72,7 +72,7 @@ func (h *MatchHandler) HandleMatchSocket(c echo.Context) error {
 	err = h.matchService.RegisterUserToMatch(conn, waitingUser)
 	if err != nil {
 		log.Printf("Failed to register user %d to queue: %v", userID, err)
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "Failed to register user to queue")
 	}
 	defer h.matchService.UnregisterUserFromMatch(waitingUser)
 
