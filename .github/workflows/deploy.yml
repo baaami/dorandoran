@@ -12,6 +12,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.2' # 원하는 Go 버전으로 설정
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
@@ -21,7 +26,12 @@ jobs:
           SERVICES=($(ls ./services))
 
           for SERVICE in "${SERVICES[@]}"; do
+            echo "Building Go binary for $SERVICE..."
+            (cd ./services/$SERVICE && env GOOS=linux CGO_ENABLED=0 go build -o ${SERVICE}App ./cmd)
+
+            echo "Building Docker image for $SERVICE..."
             docker build -t baaami/doran-$SERVICE:$IMAGE_TAG -t baaami/doran-$SERVICE:latest ./services/$SERVICE
+
             docker push baaami/doran-$SERVICE:$IMAGE_TAG
             docker push baaami/doran-$SERVICE:latest
           done
