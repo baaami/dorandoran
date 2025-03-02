@@ -50,6 +50,11 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
 
+      - name: Debug: Check Helm Chart path
+        run: |
+          ls -R
+          ls -R source
+
       - name: Deploy using Helm
         run: |
           IMAGE_TAG=${{ github.sha }}
