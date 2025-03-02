@@ -55,3 +55,4 @@ jobs:
           IMAGE_TAG=${{ github.sha }}
           helm upgrade --install doran ./helm-chart -n doran-space \
             --set global.imageTag=$IMAGE_TAG
+        working-directory: .    # 작업 디렉토리 설정이 필요한 경

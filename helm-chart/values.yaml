@@ -120,15 +120,38 @@ serviceAccount:
   name: ""
 
 ingress:
-  enabled: false  # ingress를 사용하지 않는다면 false로 설정
-  className: ""
-  annotations: {}
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
   hosts:
-    - host: chart-example.local
+    - host: api.example.com
       paths:
         - path: /
-          pathType: ImplementationSpecific
-  tls: []
+          pathType: Prefix
+          serviceName: gateway  # 올바른 서비스 이름 설정
+          servicePort: 2719
+    - host: ws1.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: match  # 올바른 서비스 이름 설정
+          servicePort: 2720
+    - host: ws2.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: game  # 올바른 서비스 이름 설정
+          servicePort: 2721
+  tls:
+    - hosts:
+        - api.example.com
+        - ws1.example.com
+        - ws2.example.com
+      secretName: tls-secret
+
 
 autoscaling:
   enabled: false  # autoscaling을 사용하지 않는다면 false로 설정

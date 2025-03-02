@@ -17,11 +17,18 @@ spec:
     spec:
       containers:
         - name: {{ $name }}
+          {{- if contains "baaami" $service.image }}
           image: "{{ $service.image }}:{{ $.Values.global.imageTag }}"
+          {{- else }}
+          image: "{{ $service.image }}"
+          {{- end }}
+          {{- if $service.ports }}
           ports:
             {{- range $service.ports }}
-            - containerPort: {{ . }}
+            - containerPort: {{ .targetPort }}
+              name: {{ .name }}
             {{- end }}
+          {{- end }}
           env:
             {{- range $key, $value := $service.env }}
             - name: {{ $key }}
