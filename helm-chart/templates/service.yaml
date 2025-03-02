@@ -1,16 +1,19 @@
+{{- range $name, $service := .Values.services }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.serviceName }}
+  name: {{ $.Release.Name }}-{{ $name }}
   labels:
-    app: {{ .Release.Name }}-{{ .Values.serviceName }}
+    app: {{ $.Release.Name }}-{{ $name }}
 spec:
-  type: ClusterIP
+  type: {{ $.Values.service.type }}
   selector:
-    app: {{ .Release.Name }}-{{ .Values.serviceName }}
+    app: {{ $.Release.Name }}-{{ $name }}
   ports:
-    {{- range .Values.ports }}
+    {{- range $service.ports }}
     - protocol: TCP
       port: {{ . }}
       targetPort: {{ . }}
     {{- end }}
+---
+{{- end }}

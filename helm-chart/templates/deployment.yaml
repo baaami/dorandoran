@@ -1,28 +1,31 @@
+{{- range $name, $service := .Values.services }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-{{ .Values.serviceName }}
+  name: {{ $.Release.Name }}-{{ $name }}
   labels:
-    app: {{ .Release.Name }}-{{ .Values.serviceName }}
+    app: {{ $.Release.Name }}-{{ $name }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: {{ $service.replicas }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-{{ .Values.serviceName }}
+      app: {{ $.Release.Name }}-{{ $name }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-{{ .Values.serviceName }}
+        app: {{ $.Release.Name }}-{{ $name }}
     spec:
       containers:
-        - name: {{ .Values.serviceName }}
-          image: "{{ .Values.image }}:{{ .Values.global.imageTag }}"
+        - name: {{ $name }}
+          image: "{{ $service.image }}:{{ $.Values.global.imageTag }}"
           ports:
-            {{- range .Values.ports }}
+            {{- range $service.ports }}
             - containerPort: {{ . }}
             {{- end }}
           env:
-            {{- range $key, $value := .Values.env }}
+            {{- range $key, $value := $service.env }}
             - name: {{ $key }}
               value: "{{ $value }}"
             {{- end }}
+---
+{{- end }}
