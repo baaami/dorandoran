@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.serviceName }}
+  labels:
+    app: {{ .Release.Name }}-{{ .Values.serviceName }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Release.Name }}-{{ .Values.serviceName }}
+  ports:
+    {{- range .Values.ports }}
+    - protocol: TCP
+      port: {{ . }}
+      targetPort: {{ . }}
+    {{- end }}

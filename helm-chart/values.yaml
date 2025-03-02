@@ -1,0 +1,97 @@
+global:
+  imageTag: latest  # GitHub Actions에서 최신 커밋 태그를 전달
+
+services:
+  gateway:
+    image: baaami/doran-gateway
+    replicas: 1
+    ports:
+      - 2719
+    env:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: admin
+
+  match:
+    image: baaami/doran-match
+    replicas: 1
+    ports:
+      - 2720
+    env:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: admin
+
+  game:
+    image: baaami/doran-game
+    replicas: 1
+    ports:
+      - 2721
+    env:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: admin
+
+  user:
+    image: baaami/doran-user
+    replicas: 1
+
+  chat:
+    image: baaami/doran-chat
+    replicas: 1
+    env:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: admin
+
+  auth:
+    image: baaami/doran-auth
+    replicas: 1
+    env:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: admin
+
+  push:
+    image: baaami/doran-push
+    replicas: 1
+    env:
+      ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
+      ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
+
+  mysql:
+    image: mysql:8
+    replicas: 1
+    ports:
+      - 3306
+    env:
+      MYSQL_DATABASE: users
+      MYSQL_ROOT_PASSWORD: sample
+
+  mongo:
+    image: mongo:4.2.16-bionic
+    replicas: 1
+    ports:
+      - 27017
+    env:
+      MONGO_INITDB_DATABASE: logs
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: sample
+
+  rabbitmq:
+    image: rabbitmq:3.9-management-alpine
+    replicas: 1
+    ports:
+      - 5672
+      - 15672
+    env:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  redis:
+    image: redis:alpine
+    replicas: 1
+    ports:
+      - 6379
+    env:
+      REDIS_PASSWORD: admin
