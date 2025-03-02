@@ -18,7 +18,7 @@ jobs:
       - name: Build and Push Docker Images
         run: |
           IMAGE_TAG=${{ github.sha }}
-          SERVICES=$(ls ./services)
+          SERVICES=($(ls ./services))
 
           for SERVICE in "${SERVICES[@]}"; do
             docker build -t baaami/doran-$SERVICE:$IMAGE_TAG -t baaami/doran-$SERVICE:latest ./services/$SERVICE
