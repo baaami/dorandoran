@@ -53,5 +53,5 @@ jobs:
       - name: Deploy using Helm
         run: |
           IMAGE_TAG=${{ github.sha }}
-          helm upgrade --install doran ./helm-chart -n mynamespace \
+          helm upgrade --install doran ./helm-chart -n doran-space \
             --set global.imageTag=$IMAGE_TAG
