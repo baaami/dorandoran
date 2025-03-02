@@ -126,8 +126,8 @@ services:
       mode: replicated
       replicas: 1
     environment:
-      RABBITMQ_DEFAULT_USER: guest # 기본 사용자
-      RABBITMQ_DEFAULT_PASS: guest # 기본 비밀번호
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
 
