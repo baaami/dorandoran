@@ -114,10 +114,11 @@ services:
       - port: 6379
         targetPort: 6379
         name: redis
-    args: ["--requirepass", "$(REDIS_PASSWORD)"]
-    env:
-      - name: REDIS_PASSWORD
-        value: "admin"
+    command: 
+      - "redis-server"
+    args: 
+      - "--requirepass"
+      - "admin"    # 직접 패스워드 지정
 
 service:
   type: ClusterIP  # 기본 서비스 타입 설정
