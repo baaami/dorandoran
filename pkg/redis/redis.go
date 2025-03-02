@@ -20,8 +20,17 @@ type RedisClient struct {
 func NewRedisClient() (*RedisClient, error) {
 	// 환경 변수에서 Redis 설정 가져오기
 	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "doran-redis"
+	}
 	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
 	redisPassword := os.Getenv("REDIS_PASSWORD")
+	if redisPassword == "" {
+		redisPassword = "admin"
+	}
 
 	// Redis 클라이언트 설정
 	rdb := redis.NewClient(&redis.Options{
