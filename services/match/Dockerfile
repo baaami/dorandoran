@@ -2,6 +2,6 @@ FROM alpine:latest
 
 RUN mkdir /app
 
-COPY matchSocketApp /app
+COPY matchApp /app
 
-CMD [ "/app/matchSocketApp" ]
+CMD [ "/app/matchApp" ]
