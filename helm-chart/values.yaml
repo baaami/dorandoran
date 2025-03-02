@@ -113,7 +113,20 @@ services:
       REDIS_PASSWORD: admin
 
 service:
-  type: ClusterIP  # 기본 서비스 타입 설정
+  type: NodePort  # 서비스 타입을 NodePort로 변경
+  ports:
+    - name: api
+      port: 2719
+      targetPort: 2719
+      nodePort: 30019  # NodePort 범위 내에서 선택
+    - name: match
+      port: 2720
+      targetPort: 2720
+      nodePort: 30020  # NodePort 범위 내에서 선택
+    - name: game
+      port: 2721
+      targetPort: 2721
+      nodePort: 30021  # NodePort 범위 내에서 선택
 
 serviceAccount:
   create: true
