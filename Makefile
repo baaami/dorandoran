@@ -3,10 +3,9 @@ USER_BINARY=userApp
 CHAT_BINARY=chatApp
 AUTH_BINARY=authApp
 MATCH_BINARY=matchApp
-MATCH_SOCKET_BINARY=matchSocketApp
 GAME_BINARY=gameApp
 PUSH_BINARY=pushApp
-SERVICES=gateway-service user-service chat-service auth-service match-socket-service game-service push-service
+SERVICES=gateway-service user-service chat-service auth-service match-service game-service push-service
 INFRAS=mysql mongo redis
 
 ## up: starts all containers in the background without forcing build
@@ -16,7 +15,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user build_chat build_auth build_match_socket build_game build_push build_push
+up_build: build_gateway build_user build_chat build_auth build_match build_game build_push build_push
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -24,7 +23,7 @@ up_build: build_gateway build_user build_chat build_auth build_match_socket buil
 	@echo "Docker images built and started!"
 
 ## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
-up_service: build_gateway build_user build_chat build_auth build_match_socket build_game build_push
+up_service: build_gateway build_user build_chat build_auth build_match build_game build_push
 	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
 	docker-compose stop ${SERVICES}
 	docker-compose rm -f ${SERVICES}
@@ -67,10 +66,10 @@ build_auth:
 	cd services/auth && env GOOS=linux CGO_ENABLED=0 go build -o ${AUTH_BINARY} ./cmd
 	@echo "Done!"
 
-## build_match_socket: builds the auth binary as a linux executable
-build_match_socket:
+## build_match: builds the auth binary as a linux executable
+build_match:
 	@echo "Building match socket binary..."
-	cd services/match && env GOOS=linux CGO_ENABLED=0 go build -o ${MATCH_SOCKET_BINARY} ./cmd
+	cd services/match && env GOOS=linux CGO_ENABLED=0 go build -o ${MATCH_BINARY} ./cmd
 	@echo "Done!"
 
 ## build_game: builds the auth binary as a linux executable
