@@ -50,9 +50,8 @@ jobs:
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
 
-      - name: Check Helm Chart path
-        run: |
-          ls -R
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
       - name: Deploy using Helm
         run: |
