@@ -19,7 +19,7 @@ services:
     replicas: 1
     ports:
       - port: 2720
-        targetPort: 2720
+        targetPort: 2720 
         name: http
     env:
       REDIS_HOST: doran-redis
@@ -114,8 +114,10 @@ services:
       - port: 6379
         targetPort: 6379
         name: redis
+    args: ["--requirepass", "$(REDIS_PASSWORD)"]
     env:
-      REDIS_PASSWORD: admin
+      - name: REDIS_PASSWORD
+        value: "admin"
 
 service:
   type: ClusterIP  # 기본 서비스 타입 설정
