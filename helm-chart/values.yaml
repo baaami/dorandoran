@@ -10,7 +10,7 @@ services:
         targetPort: 2719
         name: http
     env:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: admin
 
@@ -22,7 +22,7 @@ services:
         targetPort: 2720
         name: http
     env:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: admin
 
@@ -34,37 +34,42 @@ services:
         targetPort: 2721
         name: http
     env:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: admin
-
+      MONGO_HOST: doran-mongo
+      RABBITMQ_HOST: doran-rabbitmq
   user:
     image: baaami/doran-user
     replicas: 1
-
+    env:
+      MYSQL_HOST: doran-mysql
+      RABBITMQ_HOST: doran-rabbitmq
   chat:
     image: baaami/doran-chat
     replicas: 1
     env:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: admin
-
+      MONGO_HOST: doran-mongo
+      RABBITMQ_HOST: doran-rabbitmq
   auth:
     image: baaami/doran-auth
     replicas: 1
     env:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: admin
-
+      RABBITMQ_HOST: doran-rabbitmq
   push:
     image: baaami/doran-push
     replicas: 1
     env:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
       ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
-
+      MYSQL_HOST: doran-mysql
+      RABBITMQ_HOST: doran-rabbitmq
   mysql:
     image: mysql:8
     replicas: 1

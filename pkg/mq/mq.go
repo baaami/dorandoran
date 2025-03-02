@@ -2,7 +2,9 @@ package mq
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"os"
 	eventtypes "solo/pkg/types/eventtype"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -18,7 +20,12 @@ type EventHandlerMap map[string]func(json.RawMessage)
 
 // ConnectToRabbitMQ: RabbitMQ 연결 설정
 func ConnectToRabbitMQ() (*RabbitMQ, error) {
-	conn, err := amqp.Dial("amqp://guest:guest@rabbitmq")
+	rabbitmqHost := os.Getenv("RABBITMQ_HOST")
+	if rabbitmqHost == "" {
+		rabbitmqHost = "doran-rabbitmq"
+	}
+
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://guest:guest@%s", rabbitmqHost))
 	if err != nil {
 		log.Printf("❌ Failed to connect to RabbitMQ: %v", err)
 		return nil, err

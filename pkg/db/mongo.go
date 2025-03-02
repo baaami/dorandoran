@@ -2,16 +2,22 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const mongoURL = "mongodb://mongo:27017"
-
 func ConnectMongo() (*mongo.Client, error) {
+	host := os.Getenv("MONGO_HOST")
+	if host == "" {
+		host = "doran-mongo"
+	}
+	mongoURL := fmt.Sprintf("mongodb://%s:27017", host)
+
 	clientOptions := options.Client().ApplyURI(mongoURL)
 	clientOptions.SetAuth(options.Credential{
 		Username: "admin",

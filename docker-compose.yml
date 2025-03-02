@@ -8,6 +8,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      RABBITMQ_HOST: rabbitmq
     ports:
       - '2719:80'
     deploy:
@@ -23,6 +24,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      RABBITMQ_HOST: rabbitmq
     ports:
       - '2720:80'
     deploy:
@@ -38,6 +40,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      MONGO_HOST: mongo
+      RABBITMQ_HOST: rabbitmq
     ports:
       - '2721:80'
     deploy:
@@ -49,6 +53,9 @@ services:
       context: ./services/user
     container_name: user-service
     restart: always
+    environment:
+      MYSQL_HOST: mysql
+      RABBITMQ_HOST: rabbitmq
     deploy:
       mode: replicated
       replicas: 1
@@ -62,6 +69,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      MONGO_HOST: mongo
+      RABBITMQ_HOST: rabbitmq
     deploy:
       mode: replicated
       replicas: 1
@@ -75,6 +84,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      RABBITMQ_HOST: rabbitmq
     deploy:
       mode: replicated
       replicas: 1
@@ -87,6 +97,8 @@ services:
     environment:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
       ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
+      MYSQL_HOST: mysql
+      RABBITMQ_HOST: rabbitmq
     deploy:
       mode: replicated
       replicas: 1
