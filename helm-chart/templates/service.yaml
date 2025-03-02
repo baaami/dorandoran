@@ -10,10 +10,18 @@ spec:
   selector:
     app: {{ $.Release.Name }}-{{ $name }}
   ports:
+    {{- if $service.ports }}
     {{- range $service.ports }}
     - protocol: TCP
-      port: {{ . }}
-      targetPort: {{ . }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      name: {{ .name }}
+    {{- end }}
+    {{- else }}
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      name: default
     {{- end }}
 ---
 {{- end }}

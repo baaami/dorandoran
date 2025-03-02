@@ -6,7 +6,9 @@ services:
     image: baaami/doran-gateway
     replicas: 1
     ports:
-      - 2719
+      - port: 2719
+        targetPort: 2719
+        name: http
     env:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
@@ -16,7 +18,9 @@ services:
     image: baaami/doran-match
     replicas: 1
     ports:
-      - 2720
+      - port: 2720
+        targetPort: 2720
+        name: http
     env:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
@@ -26,7 +30,9 @@ services:
     image: baaami/doran-game
     replicas: 1
     ports:
-      - 2721
+      - port: 2721
+        targetPort: 2721
+        name: http
     env:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
@@ -63,7 +69,9 @@ services:
     image: mysql:8
     replicas: 1
     ports:
-      - 3306
+      - port: 3306
+        targetPort: 3306
+        name: mysql
     env:
       MYSQL_DATABASE: users
       MYSQL_ROOT_PASSWORD: sample
@@ -72,7 +80,9 @@ services:
     image: mongo:4.2.16-bionic
     replicas: 1
     ports:
-      - 27017
+      - port: 27017
+        targetPort: 27017
+        name: mongo
     env:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
@@ -82,8 +92,12 @@ services:
     image: rabbitmq:3.9-management-alpine
     replicas: 1
     ports:
-      - 5672
-      - 15672
+      - port: 5672
+        targetPort: 5672
+        name: amqp
+      - port: 15672
+        targetPort: 15672
+        name: management
     env:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -92,13 +106,14 @@ services:
     image: redis:alpine
     replicas: 1
     ports:
-      - 6379
+      - port: 6379
+        targetPort: 6379
+        name: redis
     env:
       REDIS_PASSWORD: admin
 
 service:
-  type: ClusterIP  # 또는 NodePort, LoadBalancer 등 원하는 타입으로 설정
-  port: 80  # 원하는 포트 번호로 설정
+  type: ClusterIP  # 기본 서비스 타입 설정
 
 serviceAccount:
   create: true
@@ -115,15 +130,6 @@ ingress:
           pathType: ImplementationSpecific
   tls: []
 
-autoscaling:
-  enabled: false  # autoscaling을 사용하지 않는다면 false로 설정
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
-
-  tls: []
-  
 autoscaling:
   enabled: false  # autoscaling을 사용하지 않는다면 false로 설정
   minReplicas: 1
