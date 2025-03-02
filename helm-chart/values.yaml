@@ -12,7 +12,6 @@ services:
     env:
       REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: admin
 
   match:
     image: baaami/doran-match
@@ -24,7 +23,6 @@ services:
     env:
       REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: admin
 
   game:
     image: baaami/doran-game
@@ -36,7 +34,6 @@ services:
     env:
       REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: admin
       MONGO_HOST: doran-mongo
       RABBITMQ_HOST: doran-rabbitmq
   user:
@@ -51,7 +48,6 @@ services:
     env:
       REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: admin
       MONGO_HOST: doran-mongo
       RABBITMQ_HOST: doran-rabbitmq
   auth:
@@ -60,7 +56,6 @@ services:
     env:
       REDIS_HOST: doran-redis
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: admin
       RABBITMQ_HOST: doran-rabbitmq
   push:
     image: baaami/doran-push
@@ -114,11 +109,8 @@ services:
       - port: 6379
         targetPort: 6379
         name: redis
-    command: 
-      - "redis-server"
-    args: 
-      - "--requirepass"
-      - "admin"    # 직접 패스워드 지정
+    env:
+      REDIS_PASSWORD: admin
 
 service:
   type: ClusterIP  # 기본 서비스 타입 설정

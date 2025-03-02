@@ -28,16 +28,20 @@ func NewRedisClient() (*RedisClient, error) {
 		redisPort = "6379"
 	}
 	redisPassword := os.Getenv("REDIS_PASSWORD")
-	if redisPassword == "" {
-		redisPassword = "admin"
-	}
 
-	// Redis 클라이언트 설정
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
-		Password: redisPassword,
-		DB:       0, // 기본 DB 사용
-	})
+	var rdb *redis.Client
+	if redisPassword == "" {
+		rdb = redis.NewClient(&redis.Options{
+			Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
+			DB:   0, // 기본 DB 사용
+		})
+	} else {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     fmt.Sprintf("%s:%s", redisHost, redisPort),
+			Password: redisPassword,
+			DB:       0, // 기본 DB 사용
+		})
+	}
 
 	// 연결 확인
 	_, err := rdb.Ping(ctx).Result()
