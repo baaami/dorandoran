@@ -1,5 +1,5 @@
 global:
-  imageTag: latest  # GitHub Actions에서 최신 커밋 태그를 전달
+  imageTag: latest # GitHub Actions에서 최신 커밋 태그를 전달
 
 services:
   gateway:
@@ -18,7 +18,7 @@ services:
     replicas: 1
     ports:
       - port: 2720
-        targetPort: 2720 
+        targetPort: 2720
         name: http
     env:
       REDIS_HOST: doran-redis
@@ -113,20 +113,17 @@ services:
       REDIS_PASSWORD: admin
 
 service:
-  type: NodePort  # 서비스 타입을 NodePort로 변경
+  type: ClusterIP # 서비스 타입을 NodePort로 변경
   ports:
-    - name: api
+    - name: gateway
       port: 2719
       targetPort: 2719
-      nodePort: 30019  # NodePort 범위 내에서 선택
     - name: match
       port: 2720
       targetPort: 2720
-      nodePort: 30020  # NodePort 범위 내에서 선택
     - name: game
       port: 2721
       targetPort: 2721
-      nodePort: 30021  # NodePort 범위 내에서 선택
 
 serviceAccount:
   create: true
@@ -144,19 +141,19 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-          serviceName: gateway  # 올바른 서비스 이름 설정
+          serviceName: doran-gateway # 올바른 서비스 이름 설정
           servicePort: 2719
     - host: ws1.example.com
       paths:
         - path: /
           pathType: Prefix
-          serviceName: match  # 올바른 서비스 이름 설정
+          serviceName: doran-match # 올바른 서비스 이름 설정
           servicePort: 2720
     - host: ws2.example.com
       paths:
         - path: /
           pathType: Prefix
-          serviceName: game  # 올바른 서비스 이름 설정
+          serviceName: doran-game # 올바른 서비스 이름 설정
           servicePort: 2721
   tls:
     - hosts:
@@ -165,11 +162,9 @@ ingress:
         - ws2.example.com
       secretName: tls-secret
 
-
 autoscaling:
-  enabled: false  # autoscaling을 사용하지 않는다면 false로 설정
+  enabled: false # autoscaling을 사용하지 않는다면 false로 설정
   minReplicas: 1
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
-  
