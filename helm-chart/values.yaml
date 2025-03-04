@@ -141,19 +141,19 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-          serviceName: doran-gateway # 올바른 서비스 이름 설정
+          serviceName: gateway # 올바른 서비스 이름 설정
           servicePort: 2719
     - host: ws1.example.com
       paths:
         - path: /
           pathType: Prefix
-          serviceName: doran-match # 올바른 서비스 이름 설정
+          serviceName: match # 올바른 서비스 이름 설정
           servicePort: 2720
     - host: ws2.example.com
       paths:
         - path: /
           pathType: Prefix
-          serviceName: doran-game # 올바른 서비스 이름 설정
+          serviceName: game # 올바른 서비스 이름 설정
           servicePort: 2721
   tls:
     - hosts:
