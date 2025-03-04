@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	UserServiceBaseURL = "http://user-service"
+	UserServiceBaseURL = "http://doran-user"
 )
 
 const (

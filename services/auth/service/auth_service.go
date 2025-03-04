@@ -148,7 +148,7 @@ func (s *AuthService) RegisterNewUser(snsType int, snsID string) (commontype.Use
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return commontype.User{}, fmt.Errorf("failed to send request to user-service: %v", err)
+		return commontype.User{}, fmt.Errorf("failed to send request to doran-user: %v", err)
 	}
 	defer resp.Body.Close()
 

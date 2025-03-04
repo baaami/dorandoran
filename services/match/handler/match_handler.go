@@ -120,7 +120,7 @@ func GetUserInfo(userID int) (*commontype.User, error) {
 	// Matching 필터 획득
 	client := http.Client{}
 
-	req, err := http.NewRequest(http.MethodGet, "http://user-service/find", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://doran-user/find", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func GetMatchFilterInfo(userID int) (*commontype.MatchFilter, error) {
 	// Matching 필터 획득
 	client := http.Client{}
 
-	req, err := http.NewRequest(http.MethodGet, "http://user-service/match/filter", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://doran-user/match/filter", nil)
 	if err != nil {
 		return nil, err
 	}

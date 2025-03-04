@@ -360,7 +360,7 @@ func GetRoomDetail(roomID string) (*dto.RoomDetailResponse, error) {
 	// Matching 필터 획득
 	client := http.Client{}
 
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://chat-service/room/%s", roomID), nil)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://doran-chat/room/%s", roomID), nil)
 	if err != nil {
 		return nil, err
 	}

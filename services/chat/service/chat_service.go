@@ -378,7 +378,7 @@ func getUserByUserID(userID string) (*commontype.User, error) {
 	}
 
 	// 요청 URL 생성
-	url := "http://user-service/find"
+	url := "http://doran-user/find"
 
 	// GET 요청 생성
 	req, err := http.NewRequest("GET", url, nil)

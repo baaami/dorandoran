@@ -25,7 +25,7 @@ func (h *GatewayHandler) ProxyService(c echo.Context) error {
 	firstPath, trimmedPath := helper.ExtractFirstPath(c.Request().URL.Path)
 
 	// 첫 번째 경로 요소에 따라 targetURL 설정
-	baseURL := "http://" + firstPath + "-service"
+	baseURL := "http://" + "doran-" + firstPath
 	targetURL := baseURL + trimmedPath
 
 	// 쿼리 스트링 추가

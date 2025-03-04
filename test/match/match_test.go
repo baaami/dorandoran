@@ -137,7 +137,7 @@ func updateProfile(t *testing.T, sessionID string, userID string, gender int, bi
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request to user-service: %v", err)
+		return fmt.Errorf("failed to send request to doran-user: %v", err)
 	}
 	defer resp.Body.Close()
 
