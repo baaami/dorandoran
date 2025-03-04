@@ -7,7 +7,7 @@ services:
     replicas: 1
     ports:
       - port: 2719
-        targetPort: 2719
+        targetPort: 80
         name: http
     env:
       REDIS_HOST: doran-redis
@@ -18,7 +18,7 @@ services:
     replicas: 1
     ports:
       - port: 2720
-        targetPort: 2720
+        targetPort: 80
         name: http
     env:
       REDIS_HOST: doran-redis
@@ -29,7 +29,7 @@ services:
     replicas: 1
     ports:
       - port: 2721
-        targetPort: 2721
+        targetPort: 80
         name: http
     env:
       REDIS_HOST: doran-redis
@@ -117,13 +117,13 @@ service:
   ports:
     - name: gateway
       port: 2719
-      targetPort: 2719
+      targetPort: 80
     - name: match
       port: 2720
-      targetPort: 2720
+      targetPort: 80
     - name: game
       port: 2721
-      targetPort: 2721
+      targetPort: 80
 
 serviceAccount:
   create: true
