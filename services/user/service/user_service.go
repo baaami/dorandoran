@@ -3,6 +3,7 @@ package service
 import (
 	"log"
 	"solo/pkg/dto"
+	"solo/pkg/models"
 	"solo/services/user/repository"
 )
 
@@ -98,14 +99,14 @@ func (s *UserService) GetUserAlert(id int) (bool, error) {
 
 // 유저 등록
 func (s *UserService) RegisterUser(user dto.UserDTO) (*dto.UserDTO, error) {
-	userModel := repository.User{
+	userModel := models.User{
 		ID:         user.ID,
 		SnsType:    user.SnsType,
 		SnsID:      user.SnsID,
 		Name:       user.Name,
 		Gender:     user.Gender,
 		Birth:      user.Birth,
-		Address:    repository.Address(user.Address),
+		Address:    models.Address(user.Address),
 		GameStatus: user.GameStatus,
 		GameRoomID: user.GameRoomID,
 		GamePoint:  user.GamePoint,
@@ -117,7 +118,7 @@ func (s *UserService) RegisterUser(user dto.UserDTO) (*dto.UserDTO, error) {
 	user.ID = id
 
 	// TODO: 이후 사용자가 반드시 입렫하도록 수정 or User 필드에 합치기
-	filter := repository.MatchFilter{
+	filter := models.MatchFilter{
 		UserID:          user.ID,
 		CoupleCount:     4,
 		AddressRangeUse: false,
@@ -130,14 +131,14 @@ func (s *UserService) RegisterUser(user dto.UserDTO) (*dto.UserDTO, error) {
 
 // 유저 업데이트
 func (s *UserService) UpdateUser(user dto.UserDTO) error {
-	userModel := repository.User{
+	userModel := models.User{
 		ID:         user.ID,
 		SnsType:    user.SnsType,
 		SnsID:      user.SnsID,
 		Name:       user.Name,
 		Gender:     user.Gender,
 		Birth:      user.Birth,
-		Address:    repository.Address(user.Address),
+		Address:    models.Address(user.Address),
 		GameStatus: user.GameStatus,
 		GameRoomID: user.GameRoomID,
 		GamePoint:  user.GamePoint,

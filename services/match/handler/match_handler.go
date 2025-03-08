@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"solo/pkg/models"
 	"solo/pkg/types/commontype"
 	"solo/services/match/service"
 	"strconv"
@@ -114,8 +115,8 @@ func isTimeoutError(err error) bool {
 }
 
 // [Bridge user] 유저 정보 조회
-func GetUserInfo(userID int) (*commontype.User, error) {
-	var user commontype.User
+func GetUserInfo(userID int) (*models.User, error) {
+	var user models.User
 
 	// Matching 필터 획득
 	client := http.Client{}
@@ -153,8 +154,8 @@ func GetUserInfo(userID int) (*commontype.User, error) {
 }
 
 // [Bridge user] 유저 필터 정보 조회
-func GetMatchFilterInfo(userID int) (*commontype.MatchFilter, error) {
-	var matchFilter commontype.MatchFilter
+func GetMatchFilterInfo(userID int) (*models.MatchFilter, error) {
+	var matchFilter models.MatchFilter
 
 	// Matching 필터 획득
 	client := http.Client{}

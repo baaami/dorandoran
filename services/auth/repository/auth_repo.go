@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 
@@ -40,13 +41,13 @@ func (repo *AuthRepository) GetSessionByUserID(userID int) (string, error) {
 }
 
 // 사용자 조회 또는 생성
-func (repo *AuthRepository) FindOrCreateUser(snsType int, snsID string) (commontype.User, string, error) {
+func (repo *AuthRepository) FindOrCreateUser(snsType int, snsID string) (models.User, string, error) {
 	userKey := fmt.Sprintf("user:%d:%s", snsType, snsID)
 
 	// Redis에서 사용자 조회
 	userData, err := repo.RedisClient.Get(userKey)
 	if err == nil && userData != "" {
-		var user commontype.User
+		var user models.User
 		err = json.Unmarshal([]byte(userData), &user)
 		if err == nil {
 			sessionID := repo.CreateSession(user.ID)
@@ -55,7 +56,7 @@ func (repo *AuthRepository) FindOrCreateUser(snsType int, snsID string) (commont
 	}
 
 	// 사용자가 없으면 새로 등록
-	newUser := commontype.User{
+	newUser := models.User{
 		SnsType:    snsType,
 		SnsID:      snsID,
 		GameStatus: commontype.USER_STATUS_STANDBY,
@@ -65,7 +66,7 @@ func (repo *AuthRepository) FindOrCreateUser(snsType int, snsID string) (commont
 	userJSON, _ := json.Marshal(newUser)
 	err = repo.RedisClient.Set(userKey, string(userJSON), 0)
 	if err != nil {
-		return commontype.User{}, "", fmt.Errorf("failed to save new user: %v", err)
+		return models.User{}, "", fmt.Errorf("failed to save new user: %v", err)
 	}
 
 	sessionID := repo.CreateSession(newUser.ID)

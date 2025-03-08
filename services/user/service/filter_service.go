@@ -2,6 +2,7 @@ package service
 
 import (
 	"solo/pkg/dto"
+	"solo/pkg/models"
 	"solo/services/user/repository"
 )
 
@@ -15,7 +16,7 @@ func NewFilterService(repo *repository.FilterRepository) *FilterService {
 
 // 유저의 매칭 필터 업데이트
 func (s *FilterService) InsertDefaultMatchFilter(userID int, filter dto.MatchFilterDTO) error {
-	filterModel := repository.MatchFilter{
+	filterModel := models.MatchFilter{
 		UserID:          userID,
 		CoupleCount:     4,
 		AddressRangeUse: false,
@@ -44,7 +45,7 @@ func (s *FilterService) GetMatchFilterByUserID(userID int) (*dto.MatchFilterDTO,
 
 // 유저의 매칭 필터 업데이트
 func (s *FilterService) UpdateMatchFilter(userID int, filter dto.MatchFilterDTO) error {
-	filterModel := repository.MatchFilter{
+	filterModel := models.MatchFilter{
 		UserID:          userID,
 		CoupleCount:     filter.CoupleCount,
 		AddressRangeUse: filter.AddressRangeUse,

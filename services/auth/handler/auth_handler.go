@@ -3,6 +3,7 @@ package handler
 import (
 	"log"
 	"net/http"
+	"solo/pkg/models"
 	"solo/pkg/types/commontype"
 	"solo/services/auth/service"
 	"strings"
@@ -51,7 +52,7 @@ func (h *AuthHandler) KakaoLoginHandler(c echo.Context) error {
 	}
 
 	// 유저가 존재하지 않는 경우 회원가입
-	if loginUser == (commontype.User{}) {
+	if loginUser == (models.User{}) {
 		loginUser, err = h.authService.RegisterNewUser(commontype.KAKAO, snsID)
 		if err != nil {
 			log.Printf("Failed to register new user, err: %s", err.Error())
@@ -99,7 +100,7 @@ func (h *AuthHandler) NaverLoginHandler(c echo.Context) error {
 	}
 
 	// 유저가 존재하지 않는 경우 회원가입
-	if loginUser == (commontype.User{}) {
+	if loginUser == (models.User{}) {
 		loginUser, err = h.authService.RegisterNewUser(commontype.NAVER, snsID)
 		if err != nil {
 			log.Printf("Failed to register new user, err: %s", err.Error())

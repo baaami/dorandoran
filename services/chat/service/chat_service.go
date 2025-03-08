@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
@@ -222,7 +223,7 @@ func (s *ChatService) GetChatRoomDetailByID(roomID string) (*dto.RoomDetailRespo
 			Name:    user.Name,
 			Gender:  user.Gender,
 			Birth:   user.Birth,
-			Address: user.Address,
+			Address: commontype.Address(user.Address),
 			GameInfo: commontype.GameInfo{
 				CharacterID:        gamer.CharacterID,
 				CharacterName:      gamer.CharacterName,
@@ -372,7 +373,7 @@ func (s *ChatService) IsUserInRoom(userID int, roomID string) (bool, error) {
 }
 
 // [Bridge user] 회원 정보 획득
-func getUserByUserID(userID string) (*commontype.User, error) {
+func getUserByUserID(userID string) (*models.User, error) {
 	client := &http.Client{
 		Timeout: time.Second * 10, // 요청 타임아웃 설정
 	}
@@ -406,7 +407,7 @@ func getUserByUserID(userID string) (*commontype.User, error) {
 	}
 
 	// 응답 본문에서 유저 정보 디코딩
-	var user commontype.User
+	var user models.User
 
 	// 응답 본문 로깅 추가
 	body, err := io.ReadAll(resp.Body)
