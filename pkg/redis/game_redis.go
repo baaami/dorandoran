@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"log"
 	"solo/pkg/types/commontype"
-	"solo/pkg/types/stype"
+	"solo/pkg/utils/stype"
+
 	"strconv"
 	"time"
 

@@ -15,7 +15,8 @@ import (
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
-	"solo/pkg/types/stype"
+	"solo/pkg/utils/stype"
+
 	"solo/services/chat/repo"
 
 	"github.com/gorilla/websocket"

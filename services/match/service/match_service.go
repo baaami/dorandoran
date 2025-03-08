@@ -8,10 +8,10 @@ import (
 	"solo/pkg/helper"
 	"solo/pkg/mq"
 	"solo/pkg/redis"
+	"solo/pkg/utils/stype"
 
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
-	"solo/pkg/types/stype"
 
 	"strconv"
 	"strings"

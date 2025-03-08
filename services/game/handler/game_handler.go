@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"solo/pkg/types/stype"
+	"solo/pkg/utils/stype"
 	"solo/services/game/service"
 
 	"github.com/gorilla/websocket"

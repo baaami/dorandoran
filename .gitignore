@@ -14,3 +14,5 @@ services/gateway/gatewayApp
 .env
 services/match/matchSocketApp
 services/push/pushApp
+services/match/matchApp
+test/rest

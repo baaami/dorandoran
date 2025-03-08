@@ -22,8 +22,8 @@ import (
 )
 
 type MQEmitter interface {
-	PublishChatRoomCreateEvent(data commontype.ChatRoom) error
-	PublishCoupleRoomCreateEvent(data commontype.ChatRoom) error
+	PublishChatRoomCreateEvent(data models.ChatRoom) error
+	PublishCoupleRoomCreateEvent(data models.ChatRoom) error
 	PublishChatLatestEvent(data eventtypes.ChatLatestEvent) error
 	PublishRoomLeaveEvent(data eventtypes.RoomLeaveEvent) error
 }
@@ -51,7 +51,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	var roomName string
 	var startTime time.Time
 	var finishTime time.Time
-	var gamers []commontype.GamerInfo
+	var gamers []models.GamerInfo
 
 	if matchEvent.MatchType == commontype.MATCH_GAME {
 		log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
@@ -74,7 +74,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	female := 0
 
 	for _, user := range matchEvent.MatchedUsers {
-		var gamer commontype.GamerInfo
+		var gamer models.GamerInfo
 
 		if matchEvent.MatchType == commontype.MATCH_GAME {
 			gamer.UserID = user.ID
@@ -98,7 +98,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		gamers = append(gamers, gamer)
 	}
 
-	room := commontype.ChatRoom{
+	room := models.ChatRoom{
 		ID:                  chatRoomID,
 		Name:                roomName,
 		Seq:                 seq,
@@ -167,7 +167,7 @@ func extractUserIDs(users []commontype.WaitingUser) []int {
 }
 
 // 특정 유저가 속한 채팅방 목록 조회
-func (s *ChatService) GetChatRoomList(userID int) ([]commontype.ChatRoom, error) {
+func (s *ChatService) GetChatRoomList(userID int) ([]models.ChatRoom, error) {
 	rooms, err := s.chatRepo.GetRoomsByUserID(userID)
 	if err != nil {
 		log.Printf("Failed to get chat rooms for user %d: %v", userID, err)
@@ -176,7 +176,7 @@ func (s *ChatService) GetChatRoomList(userID int) ([]commontype.ChatRoom, error)
 	return rooms, nil
 }
 
-func (s *ChatService) GetLatestMessage(roomID string) (*commontype.Chat, error) {
+func (s *ChatService) GetLatestMessage(roomID string) (*models.Chat, error) {
 	return s.chatRepo.GetLastMessageByRoomID(roomID)
 }
 
@@ -184,11 +184,11 @@ func (s *ChatService) GetUnreadCount(roomID string, userID int) (int, error) {
 	return s.chatRepo.GetUnreadCountByUserAndRoom(userID, roomID)
 }
 
-func (s *ChatService) GetGamerInfo(userID int, roomID string) (*commontype.GamerInfo, error) {
+func (s *ChatService) GetGamerInfo(userID int, roomID string) (*models.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
 }
 
-func (s *ChatService) GetChatRoomByID(roomID string) (*commontype.ChatRoom, error) {
+func (s *ChatService) GetChatRoomByID(roomID string) (*models.ChatRoom, error) {
 	return s.chatRepo.GetRoomByID(roomID)
 }
 
@@ -265,7 +265,7 @@ func (s *ChatService) HandleRoomJoin(roomID string, userID int, joinTime time.Ti
 
 	var messageIDs []primitive.ObjectID
 	for _, message := range messages {
-		reader := commontype.ChatReader{
+		reader := models.ChatReader{
 			MessageId: message.MessageId,
 			RoomID:    roomID,
 			UserId:    userID,
@@ -306,7 +306,7 @@ func (s *ChatService) DeleteChatRoom(roomID string) error {
 }
 
 // 채팅 메시지 추가
-func (s *ChatService) AddChatMsg(chatMsg commontype.Chat) (primitive.ObjectID, error) {
+func (s *ChatService) AddChatMsg(chatMsg models.Chat) (primitive.ObjectID, error) {
 	messageID, err := s.chatRepo.InsertChatMessage(chatMsg)
 	if err != nil {
 		log.Printf("Failed to insert chat message: %v", err)
@@ -318,7 +318,7 @@ func (s *ChatService) AddChatMsg(chatMsg commontype.Chat) (primitive.ObjectID, e
 // 채팅 메시지 읽음 처리
 func (s *ChatService) HandleChatRead(messageID primitive.ObjectID, roomID string, readerIDs []int, readAt time.Time) error {
 	for _, userID := range readerIDs {
-		reader := commontype.ChatReader{
+		reader := models.ChatReader{
 			MessageId: messageID,
 			RoomID:    roomID,
 			UserId:    userID,
@@ -336,7 +336,7 @@ func (s *ChatService) HandleChatRead(messageID primitive.ObjectID, roomID string
 }
 
 // 특정 채팅방의 메시지 목록 조회 (페이징 포함)
-func (s *ChatService) GetChatMsgListByRoomID(roomID string, pageNumber int, pageSize int) ([]*commontype.Chat, int64, error) {
+func (s *ChatService) GetChatMsgListByRoomID(roomID string, pageNumber int, pageSize int) ([]*models.Chat, int64, error) {
 	messages, totalCount, err := s.chatRepo.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
 	if err != nil {
 		log.Printf("Failed to get chat messages for room %s: %v", roomID, err)
@@ -355,7 +355,7 @@ func (s *ChatService) DeleteChatByRoomID(roomID string) error {
 }
 
 // 특정 유저의 게임 캐릭터 정보 조회
-func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*commontype.GamerInfo, error) {
+func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*models.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
 }
 

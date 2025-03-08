@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
-	"solo/pkg/types/commontype"
+	"solo/pkg/models"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -22,7 +22,7 @@ func NewChatRepository(client *mongo.Client) *ChatRepository {
 }
 
 // 채팅 메시지 삽입
-func (r *ChatRepository) InsertChatMessage(entry commontype.Chat) (primitive.ObjectID, error) {
+func (r *ChatRepository) InsertChatMessage(entry models.Chat) (primitive.ObjectID, error) {
 	collection := r.client.Database("chat_db").Collection("messages")
 
 	result, err := collection.InsertOne(context.TODO(), entry)
@@ -41,7 +41,7 @@ func (r *ChatRepository) InsertChatMessage(entry commontype.Chat) (primitive.Obj
 }
 
 // 채팅방 메시지 목록 조회
-func (r *ChatRepository) GetChatMessagesByRoomID(roomID string) ([]commontype.Chat, error) {
+func (r *ChatRepository) GetChatMessagesByRoomID(roomID string) ([]models.Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -55,7 +55,7 @@ func (r *ChatRepository) GetChatMessagesByRoomID(roomID string) ([]commontype.Ch
 	}
 	defer cursor.Close(ctx)
 
-	var messages []commontype.Chat
+	var messages []models.Chat
 	if err := cursor.All(ctx, &messages); err != nil {
 		log.Println("Error decoding chat messages:", err)
 		return nil, err
@@ -65,7 +65,7 @@ func (r *ChatRepository) GetChatMessagesByRoomID(roomID string) ([]commontype.Ch
 }
 
 // 특정 채팅방의 메시지 목록을 페이징 처리하여 조회
-func (r *ChatRepository) GetByRoomIDWithPagination(roomID string, pageNumber int, pageSize int) ([]*commontype.Chat, int64, error) {
+func (r *ChatRepository) GetByRoomIDWithPagination(roomID string, pageNumber int, pageSize int) ([]*models.Chat, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -91,9 +91,9 @@ func (r *ChatRepository) GetByRoomIDWithPagination(roomID string, pageNumber int
 	}
 	defer cursor.Close(ctx)
 
-	var messages []*commontype.Chat
+	var messages []*models.Chat
 	for cursor.Next(ctx) {
-		var item commontype.Chat
+		var item models.Chat
 		if err := cursor.Decode(&item); err != nil {
 			log.Printf("Error decoding chat message: %v", err)
 			return nil, 0, err
@@ -105,7 +105,7 @@ func (r *ChatRepository) GetByRoomIDWithPagination(roomID string, pageNumber int
 }
 
 // 특정 방에서 before 시간 이전에 존재하는 읽지 않은 메시지 리스트 조회
-func (r *ChatRepository) GetUnreadMessagesBefore(roomID string, before time.Time, userID int) ([]commontype.Chat, error) {
+func (r *ChatRepository) GetUnreadMessagesBefore(roomID string, before time.Time, userID int) ([]models.Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -135,9 +135,9 @@ func (r *ChatRepository) GetUnreadMessagesBefore(roomID string, before time.Time
 	}
 	defer cursor.Close(ctx)
 
-	var messages []commontype.Chat
+	var messages []models.Chat
 	for cursor.Next(ctx) {
-		var message commontype.Chat
+		var message models.Chat
 		if err := cursor.Decode(&message); err != nil {
 			log.Printf("Error decoding message: %v", err)
 			continue
@@ -169,16 +169,16 @@ func (r *ChatRepository) UpdateUnreadCounts(messageIDs []primitive.ObjectID) err
 }
 
 // 특정 방의 최신 메시지 조회
-func (r *ChatRepository) GetLastMessageByRoomID(roomID string) (*commontype.Chat, error) {
+func (r *ChatRepository) GetLastMessageByRoomID(roomID string) (*models.Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	collection := r.client.Database("chat_db").Collection("messages")
 
-	var lastMessage commontype.Chat
+	var lastMessage models.Chat
 	err := collection.FindOne(ctx, bson.M{"room_id": roomID}, options.FindOne().SetSort(bson.D{{"created_at", -1}})).Decode(&lastMessage)
 	if err == mongo.ErrNoDocuments {
-		return &commontype.Chat{
+		return &models.Chat{
 			Message:   "",
 			SenderID:  0,
 			CreatedAt: time.Time{},
@@ -211,7 +211,7 @@ func (r *ChatRepository) DeleteChatByRoomID(roomID string) error {
 }
 
 // 채팅 메시지 읽음 처리 삽입
-func (r *ChatRepository) InsertChatReader(reader commontype.ChatReader) error {
+func (r *ChatRepository) InsertChatReader(reader models.ChatReader) error {
 	collection := r.client.Database("chat_db").Collection("message_readers")
 
 	_, err := collection.InsertOne(context.TODO(), reader)
@@ -271,7 +271,7 @@ func (r *ChatRepository) GetUnreadCountByUserAndRoom(userID int, roomID string) 
 }
 
 // 새로운 채팅방 삽입
-func (r *ChatRepository) InsertRoom(room *commontype.ChatRoom) error {
+func (r *ChatRepository) InsertRoom(room *models.ChatRoom) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -287,7 +287,7 @@ func (r *ChatRepository) InsertRoom(room *commontype.ChatRoom) error {
 }
 
 // 특정 타입의 방 목록 조회
-func (r *ChatRepository) GetAllRoomsOfType(roomType int) ([]commontype.ChatRoom, error) {
+func (r *ChatRepository) GetAllRoomsOfType(roomType int) ([]models.ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -301,9 +301,9 @@ func (r *ChatRepository) GetAllRoomsOfType(roomType int) ([]commontype.ChatRoom,
 	}
 	defer cursor.Close(ctx)
 
-	var rooms []commontype.ChatRoom
+	var rooms []models.ChatRoom
 	for cursor.Next(ctx) {
-		var room commontype.ChatRoom
+		var room models.ChatRoom
 		if err := cursor.Decode(&room); err != nil {
 			log.Printf("Error decoding room: %v", err)
 			continue
@@ -380,13 +380,13 @@ func (r *ChatRepository) LeaveRoom(roomID string, userID int) error {
 }
 
 // 특정 Room ID로 채팅방 조회
-func (r *ChatRepository) GetRoomByID(roomID string) (*commontype.ChatRoom, error) {
+func (r *ChatRepository) GetRoomByID(roomID string) (*models.ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := r.client.Database("chat_db").Collection("rooms")
 
-	var room commontype.ChatRoom
+	var room models.ChatRoom
 	err := collection.FindOne(ctx, bson.M{"id": roomID}).Decode(&room)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -400,7 +400,7 @@ func (r *ChatRepository) GetRoomByID(roomID string) (*commontype.ChatRoom, error
 }
 
 // 특정 유저가 포함된 모든 채팅방 조회
-func (r *ChatRepository) GetRoomsByUserID(userID int) ([]commontype.ChatRoom, error) {
+func (r *ChatRepository) GetRoomsByUserID(userID int) ([]models.ChatRoom, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -412,9 +412,9 @@ func (r *ChatRepository) GetRoomsByUserID(userID int) ([]commontype.ChatRoom, er
 	}
 	defer cursor.Close(ctx)
 
-	var rooms []commontype.ChatRoom
+	var rooms []models.ChatRoom
 	for cursor.Next(ctx) {
-		var room commontype.ChatRoom
+		var room models.ChatRoom
 		if err := cursor.Decode(&room); err != nil {
 			log.Println("Error decoding room:", err)
 			continue
@@ -426,13 +426,13 @@ func (r *ChatRepository) GetRoomsByUserID(userID int) ([]commontype.ChatRoom, er
 }
 
 // 특정 채팅방 내에서 사용자의 게임 정보 조회
-func (r *ChatRepository) GetUserGameInfoInRoom(userID int, roomID string) (*commontype.GamerInfo, error) {
+func (r *ChatRepository) GetUserGameInfoInRoom(userID int, roomID string) (*models.GamerInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := r.client.Database("chat_db").Collection("rooms")
 
-	var room commontype.ChatRoom
+	var room models.ChatRoom
 	err := collection.FindOne(ctx, bson.M{"id": roomID}).Decode(&room)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {

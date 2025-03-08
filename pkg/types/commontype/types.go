@@ -1,9 +1,5 @@
 package commontype
 
-import (
-	"time"
-)
-
 const (
 	UserServiceBaseURL = "http://doran-user"
 )
@@ -98,27 +94,6 @@ type WaitingUser struct {
 	Birth       string  `json:"birth"`
 	Address     Address `json:"address"`
 	CoupleCount int     `json:"couple_count"`
-}
-
-type ChatRoom struct {
-	ID                  string      `bson:"id" json:"id"` // UUID 사용
-	Name                string      `bson:"name" json:"name"`
-	Type                int         `bson:"type" json:"type"`
-	Status              int         `bson:"status" json:"status"`
-	UserIDs             []int       `bson:"user_ids" json:"user_ids"`
-	Gamers              []GamerInfo `bson:"gamers" json:"gamers"` // 사용자별 캐릭터 정보
-	Seq                 int64       `bson:"seq" json:"seq"`       // 자동 증가 필드
-	CreatedAt           time.Time   `bson:"created_at" json:"created_at"`
-	FinishChatAt        time.Time   `bson:"finish_chat_at" json:"finish_chat_at"`
-	FinishFinalChoiceAt time.Time   `bson:"finish_final_choice_at" json:"finish_final_choice_at"`
-	ModifiedAt          time.Time   `bson:"modified_at" json:"modified_at"`
-}
-
-type GamerInfo struct {
-	UserID             int    `bson:"user_id" json:"user_id"`                             // 사용자 ID
-	CharacterID        int    `bson:"character_id" json:"character_id"`                   // 캐릭터 식별자 (0 ~ 5)
-	CharacterName      string `bson:"character_avatar_name" json:"character_avatar_name"` // 캐릭터 이름
-	CharacterAvatarURL string `bson:"character_avatar_url" json:"character_avatar_url"`   // 캐릭터 아바타 이미지 URL
 }
 
 type GameInfo struct {

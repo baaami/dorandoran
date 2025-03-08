@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"solo/pkg/models"
 	"solo/pkg/types/commontype"
 	"time"
 )
@@ -29,11 +30,11 @@ type RoomListResponse struct {
 }
 
 type ChatListResponse struct {
-	Data        []*commontype.Chat `json:"data"`
-	CurrentPage int                `json:"currentPage"`
-	NextPage    int                `json:"nextPage,omitempty"`
-	HasNextPage bool               `json:"hasNextPage"`
-	TotalPages  int                `json:"totalPages"`
+	Data        []*models.Chat `json:"data"`
+	CurrentPage int            `json:"currentPage"`
+	NextPage    int            `json:"nextPage,omitempty"`
+	HasNextPage bool           `json:"hasNextPage"`
+	TotalPages  int            `json:"totalPages"`
 }
 
 type LastMessage struct {
