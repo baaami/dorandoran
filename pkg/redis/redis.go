@@ -99,12 +99,6 @@ func (r *RedisClient) AddRoomToRedis(roomID string, userIDs []int, duration time
 		return fmt.Errorf("failed to add room %s to Redis: %v", roomID, err)
 	}
 
-	// // 만료 시간 설정
-	// err = r.Client.Expire(ctx, roomKey, duration).Err()
-	// if err != nil {
-	// 	return fmt.Errorf("failed to set expiration for room %s: %v", roomID, err)
-	// }
-
 	log.Printf("Room %s added to Redis with users %v, expires in %v", roomID, userIDs, duration)
 	return nil
 }

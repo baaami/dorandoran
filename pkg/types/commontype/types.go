@@ -1,5 +1,7 @@
 package commontype
 
+import "time"
+
 const (
 	UserServiceBaseURL = "http://doran-user"
 )
@@ -9,6 +11,17 @@ const (
 	ChatTypeForm  = "form"
 	ChatTypeJoin  = "join"
 	ChatTypeLeave = "leave"
+)
+
+const (
+	MasterID = 0
+)
+
+const (
+	GameRunningTime        = 1 * time.Hour
+	CoupleRunningTime      = 24 * 3 * time.Hour
+	FinishFinalChoiceTimer = 30 * time.Second
+	BalanceGameTimer       = 15 * time.Minute
 )
 
 const (

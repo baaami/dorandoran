@@ -14,6 +14,7 @@ import (
 	"solo/services/chat/event"
 	"solo/services/chat/handler"
 	"solo/services/chat/repo"
+	"solo/services/user/repository"
 
 	"solo/services/chat/service"
 	"solo/services/chat/transport"
@@ -31,6 +32,11 @@ func main() {
 	}
 	defer mongoClient.Disconnect(ctx)
 
+	mysqlClient, err := db.ConnectMySQL()
+	if err != nil {
+		log.Panic("MySQL 연결 실패: ", err)
+	}
+
 	mqClient, err := mq.ConnectToRabbitMQ()
 	if err != nil {
 		log.Panic("RabbitMQ 연결 실패: ", err)
@@ -45,9 +51,18 @@ func main() {
 
 	emitter := event.NewEmitter(mqClient)
 
-	chatRepo := repo.NewChatRepository(mongoClient)                       // Repository 생성
-	chatService := service.NewChatService(chatRepo, redisClient, emitter) // Service 생성
-	chatHandler := handler.NewChatHandler(chatService)                    // Handler 생성
+	chatRepo, err := repo.NewChatRepository(mongoClient)
+	if err != nil {
+		log.Panic("ChatRepository 생성 실패: ", err)
+	}
+	userRepo := repository.NewUserRepository(mysqlClient) // Repository 생성
+	err = userRepo.InitDB()
+	if err != nil {
+		log.Panic("Failed to User DB Migration: ", err)
+	}
+
+	chatService := service.NewChatService(chatRepo, userRepo, redisClient, emitter) // Service 생성
+	chatHandler := handler.NewChatHandler(chatService)                              // Handler 생성
 
 	eventConsumer := event.NewConsumer(mqClient, redisClient, chatService)
 	go eventConsumer.StartListening()

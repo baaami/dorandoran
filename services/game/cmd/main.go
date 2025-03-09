@@ -49,7 +49,10 @@ func main() {
 	emitter := event.NewEmitter(mqClient)
 
 	// 서비스 계층
-	chatRepo := repo.NewChatRepository(mongoClient) // Repository 생성
+	chatRepo, err := repo.NewChatRepository(mongoClient)
+	if err != nil {
+		log.Panic("ChatRepository 생성 실패: ", err)
+	}
 	gameService := service.NewGameService(redisClient, emitter, chatRepo)
 
 	// WebSocket 핸들러

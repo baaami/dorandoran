@@ -1,13 +1,9 @@
 package service
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"strconv"
 	"time"
 
 	"solo/pkg/dto"
@@ -16,6 +12,7 @@ import (
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
 	"solo/services/chat/repo"
+	"solo/services/user/repository"
 
 	"github.com/samber/lo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -30,13 +27,15 @@ type MQEmitter interface {
 
 type ChatService struct {
 	chatRepo    *repo.ChatRepository
+	userRepo    *repository.UserRepository
 	redisClient *redis.RedisClient
 	emitter     MQEmitter
 }
 
-func NewChatService(chatRepo *repo.ChatRepository, redisClient *redis.RedisClient, emitter MQEmitter) *ChatService {
+func NewChatService(chatRepo *repo.ChatRepository, userRepo *repository.UserRepository, redisClient *redis.RedisClient, emitter MQEmitter) *ChatService {
 	return &ChatService{
 		chatRepo:    chatRepo,
+		userRepo:    userRepo,
 		redisClient: redisClient,
 		emitter:     emitter,
 	}
@@ -56,14 +55,14 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	if matchEvent.MatchType == commontype.MATCH_GAME {
 		log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
-		finishTime = startTime.Add(20 * time.Second)
+		finishTime = startTime.Add(commontype.GameRunningTime)
 
 		seq, _ = s.chatRepo.GetNextSequence("chatRoomSeq")
 		roomName = fmt.Sprintf("%d기", seq)
 	} else {
 		log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
-		finishTime = startTime.Add(10 * time.Minute)
+		finishTime = startTime.Add(commontype.CoupleRunningTime)
 
 		seq = 0
 		roomName = "커플 채팅방"
@@ -107,7 +106,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		Gamers:              gamers,
 		CreatedAt:           startTime,
 		FinishChatAt:        finishTime,
-		FinishFinalChoiceAt: finishTime.Add(30 * time.Second),
+		FinishFinalChoiceAt: finishTime.Add(commontype.FinishFinalChoiceTimer),
 		ModifiedAt:          startTime,
 	}
 
@@ -137,6 +136,15 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	if err != nil {
 		log.Printf("Failed to set room timeout in Redis: %v", err)
 		return err
+	}
+
+	// 밸런스 게임 타이머 설정 (15분)
+	if matchEvent.MatchType == commontype.MATCH_GAME {
+		err = s.redisClient.SetBalanceGameTimer(room.ID, commontype.BalanceGameTimer)
+		if err != nil {
+			log.Printf("Failed to set balance game timer: %v", err)
+			return err
+		}
 	}
 
 	if matchEvent.MatchType == commontype.MATCH_GAME {
@@ -206,7 +214,7 @@ func (s *ChatService) GetChatRoomDetailByID(roomID string) (*dto.RoomDetailRespo
 	var gamerList []commontype.Gamer
 
 	for _, userID := range room.UserIDs {
-		user, err := getUserByUserID(strconv.Itoa(userID))
+		user, err := s.userRepo.GetUserByID(userID)
 		if err != nil {
 			log.Printf("Failed to get user %d: %v", userID, err)
 		}
@@ -400,57 +408,4 @@ func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, commen
 // 밸런스 게임 폼 댓글 조회
 func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.Comment, int64, error) {
 	return s.chatRepo.GetBalanceFormComments(formID, page, pageSize)
-}
-
-// [Bridge user] 회원 정보 획득
-func getUserByUserID(userID string) (*models.User, error) {
-	client := &http.Client{
-		Timeout: time.Second * 10, // 요청 타임아웃 설정
-	}
-
-	// 요청 URL 생성
-	url := "http://doran-user/find"
-
-	// GET 요청 생성
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
-	}
-
-	// 사용자 ID를 요청의 헤더에 추가
-	req.Header.Set("X-User-ID", userID)
-
-	// 요청 실행
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// 응답 처리
-	if resp.StatusCode == http.StatusNotFound {
-		// 유저가 존재하지 않는 경우
-		return nil, nil
-	} else if resp.StatusCode != http.StatusOK {
-		// 다른 에러가 발생한 경우
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// 응답 본문에서 유저 정보 디코딩
-	var user models.User
-
-	// 응답 본문 로깅 추가
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	// 본문을 다시 디코딩
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	// 유저가 존재하는 경우
-	return &user, nil
 }

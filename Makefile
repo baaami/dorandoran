@@ -5,7 +5,7 @@ AUTH_BINARY=authApp
 MATCH_BINARY=matchApp
 GAME_BINARY=gameApp
 PUSH_BINARY=pushApp
-SERVICES=gateway-service user-service chat-service auth-service match-service game-service push-service
+SERVICES=doran-gateway doran-user doran-chat doran-auth doran-match doran-game doran-push
 INFRAS=mysql mongo redis
 
 ## up: starts all containers in the background without forcing build
