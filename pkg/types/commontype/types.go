@@ -6,6 +6,7 @@ const (
 
 const (
 	ChatTypeChat  = "chat"
+	ChatTypeForm  = "form"
 	ChatTypeJoin  = "join"
 	ChatTypeLeave = "leave"
 )

@@ -3,8 +3,10 @@ package repo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"solo/pkg/models"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,8 +19,75 @@ type ChatRepository struct {
 	client *mongo.Client
 }
 
-func NewChatRepository(client *mongo.Client) *ChatRepository {
-	return &ChatRepository{client: client}
+func NewChatRepository(client *mongo.Client) (*ChatRepository, error) {
+	repo := &ChatRepository{client: client}
+	if err := repo.InitDatabase(); err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %v", err)
+	}
+	return repo, nil
+}
+
+// InitDatabase 데이터베이스 초기화
+func (r *ChatRepository) InitDatabase() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 데이터베이스 생성 (MongoDB는 실제로 데이터가 들어갈 때 생성됨)
+	db := r.client.Database("chat_db")
+
+	// 필요한 컬렉션들 생성
+	collections := []string{
+		"messages",
+		"message_readers",
+		"rooms",
+		"balance_forms",
+		"balance_form_votes",
+		"balance_form_comments",
+		"room_counter",
+	}
+
+	for _, collName := range collections {
+		err := db.CreateCollection(ctx, collName)
+		if err != nil {
+			// 이미 컬렉션이 존재하는 경우 무시
+			if !strings.Contains(err.Error(), "already exists") {
+				log.Printf("Error creating collection %s: %v", collName, err)
+				return err
+			}
+		}
+	}
+
+	// 필요한 인덱스 생성
+	// messages 컬렉션
+	msgCollection := db.Collection("messages")
+	_, err := msgCollection.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "room_id", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "created_at", Value: -1}},
+		},
+	})
+	if err != nil {
+		log.Printf("Error creating indexes for messages: %v", err)
+		return err
+	}
+
+	// balance_form_votes 컬렉션 (중복 투표 방지를 위한 복합 인덱스)
+	votesCollection := db.Collection("balance_form_votes")
+	_, err = votesCollection.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "form_id", Value: 1},
+			{Key: "user_id", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
+	})
+	if err != nil {
+		log.Printf("Error creating index for balance_form_votes: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // 채팅 메시지 삽입
@@ -46,7 +115,7 @@ func (r *ChatRepository) GetChatMessagesByRoomID(roomID string) ([]models.Chat, 
 	defer cancel()
 
 	collection := r.client.Database("chat_db").Collection("messages")
-	opts := options.Find().SetSort(bson.D{{"created_at", -1}})
+	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
 
 	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID}, opts)
 	if err != nil {
@@ -80,9 +149,9 @@ func (r *ChatRepository) GetByRoomIDWithPagination(roomID string, pageNumber int
 
 	// 메시지 조회
 	opts := options.Find()
-	opts.SetSort(bson.D{{"created_at", -1}})         // 최신 순으로 정렬
-	opts.SetSkip(int64((pageNumber - 1) * pageSize)) // 페이지에 맞는 메시지 건너뛰기
-	opts.SetLimit(int64(pageSize))                   // 페이지당 메시지 수 제한
+	opts.SetSort(bson.D{{Key: "created_at", Value: -1}}) // 최신 순으로 정렬
+	opts.SetSkip(int64((pageNumber - 1) * pageSize))     // 페이지에 맞는 메시지 건너뛰기
+	opts.SetLimit(int64(pageSize))                       // 페이지당 메시지 수 제한
 
 	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID}, opts)
 	if err != nil {
@@ -176,7 +245,7 @@ func (r *ChatRepository) GetLastMessageByRoomID(roomID string) (*models.Chat, er
 	collection := r.client.Database("chat_db").Collection("messages")
 
 	var lastMessage models.Chat
-	err := collection.FindOne(ctx, bson.M{"room_id": roomID}, options.FindOne().SetSort(bson.D{{"created_at", -1}})).Decode(&lastMessage)
+	err := collection.FindOne(ctx, bson.M{"room_id": roomID}, options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})).Decode(&lastMessage)
 	if err == mongo.ErrNoDocuments {
 		return &models.Chat{
 			Message:   "",
@@ -484,7 +553,7 @@ func (r *ChatRepository) GetNextSequence(sequenceName string) (int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	countersCollection := r.client.Database("chat_db").Collection("counters")
+	counterCollection := r.client.Database("chat_db").Collection("room_counter")
 
 	filter := bson.M{"_id": sequenceName}
 	update := bson.M{"$inc": bson.M{"seq": 1}}
@@ -493,11 +562,265 @@ func (r *ChatRepository) GetNextSequence(sequenceName string) (int64, error) {
 	var result struct {
 		Seq int64 `bson:"seq"`
 	}
-	err := countersCollection.FindOneAndUpdate(ctx, filter, update, options).Decode(&result)
+	err := counterCollection.FindOneAndUpdate(ctx, filter, update, options).Decode(&result)
 	if err != nil {
 		log.Printf("Error generating sequence for %s: %v", sequenceName, err)
 		return 0, err
 	}
 
 	return result.Seq, nil
+}
+
+// 밸런스 게임 폼 조회
+func (r *ChatRepository) GetBalanceFormByID(formID primitive.ObjectID) (*models.BalanceGameForm, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// 1. 기본 폼 정보 조회
+	var form models.BalanceGameForm
+	err := r.client.Database("chat_db").Collection("balance_forms").
+		FindOne(ctx, bson.M{"_id": formID}).Decode(&form)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		log.Printf("Error finding balance form by ID %s: %v", formID.Hex(), err)
+		return nil, err
+	}
+
+	// 2. 댓글 조회
+	cursor, err := r.client.Database("chat_db").Collection("balance_form_comments").
+		Find(ctx, bson.M{"balance_form_id": formID})
+	if err != nil {
+		log.Printf("Error finding comments for balance form %s: %v", formID.Hex(), err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// 댓글 디코딩
+	var comments []models.Comment
+	if err = cursor.All(ctx, &comments); err != nil {
+		log.Printf("Error decoding comments for balance form %s: %v", formID.Hex(), err)
+		return nil, err
+	}
+	form.Comments = comments
+
+	return &form, nil
+}
+
+// 밸런스 게임 폼 삽입
+func (r *ChatRepository) InsertBalanceForm(form *models.BalanceGameForm) (primitive.ObjectID, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_forms")
+
+	// 초기 투표 수는 0으로 설정
+	form.Votes = models.Votes{
+		RedCount:  0,
+		BlueCount: 0,
+	}
+
+	result, err := collection.InsertOne(ctx, form)
+	if err != nil {
+		log.Printf("Error inserting balance form: %v", err)
+		return primitive.NilObjectID, err
+	}
+
+	formID, ok := result.InsertedID.(primitive.ObjectID)
+	if !ok {
+		return primitive.NilObjectID, errors.New("failed to convert InsertedID to ObjectID")
+	}
+
+	return formID, nil
+}
+
+// 댓글 추가
+func (r *ChatRepository) AddBalanceFormComment(formID primitive.ObjectID, comment *models.Comment) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_form_comments")
+
+	// 댓글에 폼 ID 추가
+	commentDoc := bson.M{
+		"balance_form_id": formID,
+		"sender_id":       comment.SenderID,
+		"message":         comment.Message,
+		"created_at":      time.Now(),
+	}
+
+	_, err := collection.InsertOne(ctx, commentDoc)
+	if err != nil {
+		log.Printf("Error adding comment to form %s: %v", formID.Hex(), err)
+		return err
+	}
+
+	return nil
+}
+
+// 밸런스 게임 폼의 댓글 페이징 조회
+func (r *ChatRepository) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.Comment, int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_form_comments")
+
+	// 총 댓글 수 계산
+	totalCount, err := collection.CountDocuments(ctx, bson.M{"balance_form_id": formID})
+	if err != nil {
+		log.Printf("Error counting comments for form %s: %v", formID.Hex(), err)
+		return nil, 0, err
+	}
+
+	// 댓글 조회 (최신순)
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64((page - 1) * pageSize)).
+		SetLimit(int64(pageSize))
+
+	cursor, err := collection.Find(ctx, bson.M{"balance_form_id": formID}, opts)
+	if err != nil {
+		log.Printf("Error finding comments for form %s: %v", formID.Hex(), err)
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var comments []models.Comment
+	if err = cursor.All(ctx, &comments); err != nil {
+		log.Printf("Error decoding comments: %v", err)
+		return nil, 0, err
+	}
+
+	return comments, totalCount, nil
+}
+
+// 사용자의 투표 여부 확인
+func (r *ChatRepository) GetUserVote(formID primitive.ObjectID, userID int) (*models.BalanceFormVote, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_form_votes")
+
+	var vote models.BalanceFormVote
+	err := collection.FindOne(ctx, bson.M{
+		"form_id": formID,
+		"user_id": userID,
+	}).Decode(&vote)
+
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
+	if err != nil {
+		log.Printf("Error finding vote for user %d in form %s: %v", userID, formID.Hex(), err)
+		return nil, err
+	}
+
+	return &vote, nil
+}
+
+// 투표 기록 삽입
+func (r *ChatRepository) InsertBalanceFormVote(vote *models.BalanceFormVote) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 트랜잭션 시작
+	session, err := r.client.StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sessCtx mongo.SessionContext) error {
+		// 1. 이미 투표했는지 확인
+		existingVote, err := r.GetUserVote(vote.FormID, vote.UserID)
+		if err != nil {
+			return err
+		}
+		if existingVote != nil {
+			return errors.New("user already voted")
+		}
+
+		// 2. 투표 기록 저장
+		voteRecordsCollection := r.client.Database("chat_db").Collection("balance_form_votes")
+		vote.CreatedAt = time.Now() // 생성 시간 설정
+		_, err = voteRecordsCollection.InsertOne(sessCtx, vote)
+		if err != nil {
+			log.Printf("Error inserting vote record: %v", err)
+			return err
+		}
+
+		// 3. 투표 수 증가
+		votesCollection := r.client.Database("chat_db").Collection("balance_forms")
+		updateField := "votes.blue_cnt"
+		if vote.IsRed {
+			updateField = "votes.red_cnt"
+		}
+
+		_, err = votesCollection.UpdateOne(sessCtx,
+			bson.M{"_id": vote.FormID},
+			bson.M{"$inc": bson.M{updateField: 1}})
+		if err != nil {
+			log.Printf("Error updating vote count: %v", err)
+			return err
+		}
+
+		return nil
+	}
+
+	return mongo.WithSession(ctx, session, callback)
+}
+
+// 투표 취소
+func (r *ChatRepository) CancelVote(formID primitive.ObjectID, userID int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 트랜잭션 시작
+	session, err := r.client.StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sessCtx mongo.SessionContext) error {
+		// 1. 기존 투표 확인
+		existingVote, err := r.GetUserVote(formID, userID)
+		if err != nil {
+			return err
+		}
+		if existingVote == nil {
+			return errors.New("no vote found to cancel")
+		}
+
+		// 2. 투표 수 감소
+		votesCollection := r.client.Database("chat_db").Collection("balance_forms")
+		updateField := "votes.blue_cnt"
+		if existingVote.IsRed {
+			updateField = "votes.red_cnt"
+		}
+
+		_, err = votesCollection.UpdateOne(sessCtx,
+			bson.M{"_id": formID},
+			bson.M{"$inc": bson.M{updateField: -1}})
+		if err != nil {
+			log.Printf("Error decreasing vote count: %v", err)
+			return err
+		}
+
+		// 3. 투표 기록 삭제
+		voteRecordsCollection := r.client.Database("chat_db").Collection("balance_form_votes")
+		_, err = voteRecordsCollection.DeleteOne(sessCtx, bson.M{
+			"form_id": formID,
+			"user_id": userID,
+		})
+		if err != nil {
+			log.Printf("Error deleting vote record: %v", err)
+			return err
+		}
+
+		return nil
+	}
+
+	return mongo.WithSession(ctx, session, callback)
 }

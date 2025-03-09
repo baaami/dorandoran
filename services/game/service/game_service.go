@@ -390,7 +390,7 @@ func GetRoomDetail(roomID string) (*dto.RoomDetailResponse, error) {
 	return &chatRoomDetail, nil
 }
 
-// 특정 채팅방 타임아웃 감지
+// 채팅 시간 타임아웃 모니터링
 func (s *GameService) MonitorChatTimeouts() {
 	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
 	defer ticker.Stop()
@@ -436,6 +436,7 @@ func (s *GameService) MonitorChatTimeouts() {
 	}
 }
 
+// 최종 선택 시간 타임아웃 모니터링
 func (s *GameService) MonitorFinalChoiceTimeouts() {
 	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
 	defer ticker.Stop()

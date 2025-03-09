@@ -372,6 +372,36 @@ func (s *ChatService) IsUserInRoom(userID int, roomID string) (bool, error) {
 	return lo.Contains(room.UserIDs, userID), nil
 }
 
+// 밸런스 게임 폼 삽입
+func (s *ChatService) InsertBalanceForm(form *models.BalanceGameForm) (primitive.ObjectID, error) {
+	return s.chatRepo.InsertBalanceForm(form)
+}
+
+// 밸런스 게임 폼 조회
+func (s *ChatService) GetBalanceForm(formID primitive.ObjectID) (*models.BalanceGameForm, error) {
+	return s.chatRepo.GetBalanceFormByID(formID)
+}
+
+// 밸런스 게임 폼 투표 삽입
+func (s *ChatService) InsertBalanceFormVote(vote *models.BalanceFormVote) error {
+	return s.chatRepo.InsertBalanceFormVote(vote)
+}
+
+// 밸런스 게임 폼 투표 취소
+func (s *ChatService) CancelBalanceFormVote(formID primitive.ObjectID, userID int) error {
+	return s.chatRepo.CancelVote(formID, userID)
+}
+
+// 밸런스 게임 폼 댓글 삽입
+func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, comment *models.Comment) error {
+	return s.chatRepo.AddBalanceFormComment(formID, comment)
+}
+
+// 밸런스 게임 폼 댓글 조회
+func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.Comment, int64, error) {
+	return s.chatRepo.GetBalanceFormComments(formID, page, pageSize)
+}
+
 // [Bridge user] 회원 정보 획득
 func getUserByUserID(userID string) (*models.User, error) {
 	client := &http.Client{
