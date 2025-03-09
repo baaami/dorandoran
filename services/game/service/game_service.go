@@ -510,7 +510,7 @@ func (s *GameService) MonitorBalanceGameTimers() {
 				RoomID:          roomID,
 				SenderID:        commontype.MasterID,
 				Message:         "밸런스 게임을 시작합니다!",
-				BalanceFormID:   &formID,
+				BalanceFormID:   formID,
 				UnreadCount:     len(headCnt) - len(joinedUserIDs),
 				InactiveUserIds: inactiveUserIDs,
 				ReaderIds:       joinedUserIDs,

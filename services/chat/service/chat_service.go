@@ -401,11 +401,11 @@ func (s *ChatService) CancelBalanceFormVote(formID primitive.ObjectID, userID in
 }
 
 // 밸런스 게임 폼 댓글 삽입
-func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, comment *models.Comment) error {
+func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, comment *models.BalanceFormComment) error {
 	return s.chatRepo.AddBalanceFormComment(formID, comment)
 }
 
 // 밸런스 게임 폼 댓글 조회
-func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.Comment, int64, error) {
+func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.BalanceFormComment, int64, error) {
 	return s.chatRepo.GetBalanceFormComments(formID, page, pageSize)
 }

@@ -14,6 +14,11 @@ const (
 )
 
 const (
+	BalanceFormVoteRed  = 0
+	BalanceFormVoteBlue = 1
+)
+
+const (
 	MasterID = 0
 )
 
@@ -21,7 +26,7 @@ const (
 	GameRunningTime        = 1 * time.Hour
 	CoupleRunningTime      = 24 * 3 * time.Hour
 	FinishFinalChoiceTimer = 30 * time.Second
-	BalanceGameTimer       = 15 * time.Minute
+	BalanceGameTimer       = 15 * time.Second
 )
 
 const (

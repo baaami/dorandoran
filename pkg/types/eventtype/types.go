@@ -28,16 +28,16 @@ const (
 )
 
 type ChatEvent struct {
-	MessageId       primitive.ObjectID  `bson:"_id,omitempty" json:"message_id"`
-	Type            string              `bson:"type" json:"type"`
-	RoomID          string              `bson:"room_id" json:"room_id"`
-	SenderID        int                 `bson:"sender_id" json:"sender_id"`
-	Message         string              `bson:"message" json:"message"`
-	UnreadCount     int                 `bson:"unread_count" json:"unread_count"`
-	InactiveUserIds []int               `bson:"inactive_user_ids" json:"inactive_user_ids"`
-	ReaderIds       []int               `bson:"reader_ids" json:"reader_ids"`
-	BalanceFormID   *primitive.ObjectID `bson:"balance_form_id,omitempty" json:"balance_form_id,omitempty"`
-	CreatedAt       time.Time           `bson:"created_at" json:"created_at"`
+	MessageId       primitive.ObjectID `bson:"_id,omitempty" json:"message_id"`
+	Type            string             `bson:"type" json:"type"`
+	RoomID          string             `bson:"room_id" json:"room_id"`
+	SenderID        int                `bson:"sender_id" json:"sender_id"`
+	Message         string             `bson:"message" json:"message"`
+	UnreadCount     int                `bson:"unread_count" json:"unread_count"`
+	InactiveUserIds []int              `bson:"inactive_user_ids" json:"inactive_user_ids"`
+	ReaderIds       []int              `bson:"reader_ids" json:"reader_ids"`
+	BalanceFormID   primitive.ObjectID `bson:"balance_form_id,omitempty" json:"balance_form_id,omitempty"`
+	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
 }
 
 type MatchEvent struct {

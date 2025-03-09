@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"solo/pkg/models"
+	"solo/pkg/types/commontype"
 	"strings"
 	"time"
 
@@ -598,7 +599,7 @@ func (r *ChatRepository) GetBalanceFormByID(formID primitive.ObjectID) (*models.
 	defer cursor.Close(ctx)
 
 	// 댓글 디코딩
-	var comments []models.Comment
+	var comments []models.BalanceFormComment
 	if err = cursor.All(ctx, &comments); err != nil {
 		log.Printf("Error decoding comments for balance form %s: %v", formID.Hex(), err)
 		return nil, err
@@ -636,7 +637,7 @@ func (r *ChatRepository) InsertBalanceForm(form *models.BalanceGameForm) (primit
 }
 
 // 댓글 추가
-func (r *ChatRepository) AddBalanceFormComment(formID primitive.ObjectID, comment *models.Comment) error {
+func (r *ChatRepository) AddBalanceFormComment(formID primitive.ObjectID, comment *models.BalanceFormComment) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -660,7 +661,7 @@ func (r *ChatRepository) AddBalanceFormComment(formID primitive.ObjectID, commen
 }
 
 // 밸런스 게임 폼의 댓글 페이징 조회
-func (r *ChatRepository) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.Comment, int64, error) {
+func (r *ChatRepository) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.BalanceFormComment, int64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -686,7 +687,7 @@ func (r *ChatRepository) GetBalanceFormComments(formID primitive.ObjectID, page 
 	}
 	defer cursor.Close(ctx)
 
-	var comments []models.Comment
+	var comments []models.BalanceFormComment
 	if err = cursor.All(ctx, &comments); err != nil {
 		log.Printf("Error decoding comments: %v", err)
 		return nil, 0, err
@@ -753,7 +754,7 @@ func (r *ChatRepository) InsertBalanceFormVote(vote *models.BalanceFormVote) err
 		// 3. 투표 수 증가
 		votesCollection := r.client.Database("chat_db").Collection("balance_forms")
 		updateField := "votes.blue_cnt"
-		if vote.IsRed {
+		if vote.Choiced == commontype.BalanceFormVoteRed {
 			updateField = "votes.red_cnt"
 		}
 
@@ -796,7 +797,7 @@ func (r *ChatRepository) CancelVote(formID primitive.ObjectID, userID int) error
 		// 2. 투표 수 감소
 		votesCollection := r.client.Database("chat_db").Collection("balance_forms")
 		updateField := "votes.blue_cnt"
-		if existingVote.IsRed {
+		if existingVote.Choiced == commontype.BalanceFormVoteRed {
 			updateField = "votes.red_cnt"
 		}
 

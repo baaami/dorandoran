@@ -7,14 +7,14 @@ import (
 )
 
 type Chat struct {
-	MessageId     primitive.ObjectID  `bson:"_id" json:"message_id"`
-	Type          string              `bson:"type" json:"type"`
-	RoomID        string              `bson:"room_id" json:"room_id"`
-	SenderID      int                 `bson:"sender_id" json:"sender_id"`
-	Message       string              `bson:"message" json:"message"`
-	UnreadCount   int                 `bson:"unread_count" json:"unread_count"`
-	CreatedAt     time.Time           `bson:"created_at" json:"created_at"`
-	BalanceFormID *primitive.ObjectID `bson:"balance_form_id,omitempty" json:"balance_form_id,omitempty"`
+	MessageId     primitive.ObjectID `bson:"_id" json:"message_id"`
+	Type          string             `bson:"type" json:"type"`
+	RoomID        string             `bson:"room_id" json:"room_id"`
+	SenderID      int                `bson:"sender_id" json:"sender_id"`
+	Message       string             `bson:"message" json:"message"`
+	UnreadCount   int                `bson:"unread_count" json:"unread_count"`
+	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`
+	BalanceFormID primitive.ObjectID `bson:"balance_form_id,omitempty" json:"balance_form_id,omitempty"`
 }
 
 type ChatReader struct {

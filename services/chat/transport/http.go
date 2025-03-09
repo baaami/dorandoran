@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"solo/pkg/middleware"
 	"solo/services/chat/handler"
 	"solo/services/chat/service"
 
@@ -14,17 +13,19 @@ func NewRouter(chatHandler *handler.ChatHandler, chatService *service.ChatServic
 	// 채팅방 목록 조회는 미들웨어 없이 접근 가능
 	e.GET("/room/list", chatHandler.GetChatRoomList)
 
-	// roomID를 사용하는 엔드포인트들을 그룹으로 묶어서 미들웨어 적용
-	roomGroup := e.Group("")
-	roomGroup.Use(middleware.RoomAccessChecker(chatService))
-	{
-		// 채팅방 관련 라우팅 (roomID 파라미터 사용)
-		roomGroup.GET("/room/:id", chatHandler.GetChatRoomByID)
-		roomGroup.DELETE("/room/delete/:id", chatHandler.DeleteChatRoom)
-		roomGroup.GET("/list/:id", chatHandler.GetChatMsgListByRoomID)
-		roomGroup.DELETE("/all/:id", chatHandler.DeleteChatByRoomID)
-		roomGroup.GET("/character/name/:id", chatHandler.GetCharacterNameByRoomID)
-	}
+	// 밸런스 게임 조회
+	e.GET("/balance/form/:formid", chatHandler.GetBalanceFormByID)
+	e.POST("/balance/form/vote/:formid", chatHandler.InsertBalanceFormVote)
+	e.DELETE("/balance/form/vote/:formid", chatHandler.CancelBalanceFormVote)
+	e.POST("/balance/form/comment/:formid", chatHandler.InsertBalanceFormComment)
+	e.GET("/balance/form/comments/:formid", chatHandler.GetBalanceFormComments)
+
+	// 채팅방 관련 라우팅 (roomID 파라미터 사용)
+	e.GET("/room/:id", chatHandler.GetChatRoomByID)
+	e.DELETE("/room/delete/:id", chatHandler.DeleteChatRoom)
+	e.GET("/list/:id", chatHandler.GetChatMsgListByRoomID)
+	e.DELETE("/all/:id", chatHandler.DeleteChatByRoomID)
+	e.GET("/character/name/:id", chatHandler.GetCharacterNameByRoomID)
 
 	return e
 }
