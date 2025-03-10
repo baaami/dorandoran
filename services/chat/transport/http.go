@@ -13,12 +13,11 @@ func NewRouter(chatHandler *handler.ChatHandler, chatService *service.ChatServic
 	// 채팅방 목록 조회는 미들웨어 없이 접근 가능
 	e.GET("/room/list", chatHandler.GetChatRoomList)
 
-	// 밸런스 게임 조회
 	e.GET("/balance/form/:formid", chatHandler.GetBalanceFormByID)
 	e.POST("/balance/form/vote/:formid", chatHandler.InsertBalanceFormVote)
 	e.DELETE("/balance/form/vote/:formid", chatHandler.CancelBalanceFormVote)
 	e.POST("/balance/form/comment/:formid", chatHandler.InsertBalanceFormComment)
-	e.GET("/balance/form/comments/:formid", chatHandler.GetBalanceFormComments)
+	e.GET("/balance/form/comment/:formid", chatHandler.GetBalanceFormComments)
 
 	// 채팅방 관련 라우팅 (roomID 파라미터 사용)
 	e.GET("/room/:id", chatHandler.GetChatRoomByID)
