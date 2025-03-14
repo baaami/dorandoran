@@ -137,7 +137,7 @@ func updateProfile(t *testing.T, sessionID string, userID string, gender int, bi
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request to user-service: %v", err)
+		return fmt.Errorf("failed to send request to doran-user: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -204,7 +204,7 @@ func TestMatchWebSocketAPI(t *testing.T) {
 	// 2. 100명의 참가자가 사용자 프로필 정보 입력
 	for i := 0; i < participantCount; i++ {
 		gender := i % 2 // 0 (남자), 1 (여자)
-		birthYear := rand.Intn(2010-1980+1) + 1980
+		birthYear := rand.Intn(2000-1980+1) + 1980
 		birth := fmt.Sprintf("%d%02d%02d", birthYear, rand.Intn(12)+1, rand.Intn(28)+1)
 		city := cities[rand.Intn(len(cities))]
 

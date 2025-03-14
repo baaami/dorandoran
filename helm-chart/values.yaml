@@ -1,0 +1,170 @@
+global:
+  imageTag: latest # GitHub Actions에서 최신 커밋 태그를 전달
+
+services:
+  gateway:
+    image: baaami/doran-gateway
+    replicas: 1
+    ports:
+      - port: 2719
+        targetPort: 80
+        name: http
+    env:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: "6379"
+
+  match:
+    image: baaami/doran-match
+    replicas: 1
+    ports:
+      - port: 2720
+        targetPort: 80
+        name: http
+    env:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: "6379"
+
+  game:
+    image: baaami/doran-game
+    replicas: 1
+    ports:
+      - port: 2721
+        targetPort: 80
+        name: http
+    env:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: "6379"
+      MONGO_HOST: doran-mongo
+      RABBITMQ_HOST: doran-rabbitmq
+  user:
+    image: baaami/doran-user
+    replicas: 1
+    env:
+      MYSQL_HOST: doran-mysql
+      RABBITMQ_HOST: doran-rabbitmq
+  chat:
+    image: baaami/doran-chat
+    replicas: 1
+    env:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: "6379"
+      MONGO_HOST: doran-mongo
+      RABBITMQ_HOST: doran-rabbitmq
+  auth:
+    image: baaami/doran-auth
+    replicas: 1
+    env:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: "6379"
+      RABBITMQ_HOST: doran-rabbitmq
+  push:
+    image: baaami/doran-push
+    replicas: 1
+    env:
+      ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
+      ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
+      MYSQL_HOST: doran-mysql
+      RABBITMQ_HOST: doran-rabbitmq
+  mysql:
+    image: mysql:8
+    replicas: 1
+    ports:
+      - port: 3306
+        targetPort: 3306
+        name: mysql
+    env:
+      MYSQL_DATABASE: users
+      MYSQL_ROOT_PASSWORD: sample
+
+  mongo:
+    image: mongo:4.2.16-bionic
+    replicas: 1
+    ports:
+      - port: 27017
+        targetPort: 27017
+        name: mongo
+    env:
+      MONGO_INITDB_DATABASE: logs
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: sample
+
+  rabbitmq:
+    image: rabbitmq:3.9-management-alpine
+    replicas: 1
+    ports:
+      - port: 5672
+        targetPort: 5672
+        name: amqp
+      - port: 15672
+        targetPort: 15672
+        name: management
+    env:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  redis:
+    image: redis:alpine
+    replicas: 1
+    ports:
+      - port: 6379
+        targetPort: 6379
+        name: redis
+    env:
+      REDIS_PASSWORD: admin
+
+service:
+  type: ClusterIP # 서비스 타입을 NodePort로 변경
+  ports:
+    - name: gateway
+      port: 2719
+      targetPort: 80
+    - name: match
+      port: 2720
+      targetPort: 80
+    - name: game
+      port: 2721
+      targetPort: 80
+
+serviceAccount:
+  create: true
+  name: ""
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: gateway # 올바른 서비스 이름 설정
+          servicePort: 2719
+    - host: ws1.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: match # 올바른 서비스 이름 설정
+          servicePort: 2720
+    - host: ws2.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: game # 올바른 서비스 이름 설정
+          servicePort: 2721
+  tls:
+    - hosts:
+        - api.example.com
+        - ws1.example.com
+        - ws2.example.com
+      secretName: tls-secret
+
+autoscaling:
+  enabled: false # autoscaling을 사용하지 않는다면 false로 설정
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

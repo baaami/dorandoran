@@ -1,133 +1,111 @@
 services:
-  gateway-service:
+  doran-gateway:
     build:
-      context: ./gateway-service
-      dockerfile: ./gateway-service.dockerfile
-    container_name: gateway-service
+      context: ./services/gateway
+    container_name: doran-gateway
     restart: always
     environment:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      RABBITMQ_HOST: doran-rabbitmq
     ports:
       - '2719:80'
     deploy:
       mode: replicated
       replicas: 1
 
-  match-socket-service:
+  doran-match:
     build:
-      context: ./match-socket-service
-      dockerfile: ./match-socket-service.dockerfile
-    container_name: match-socket-service
+      context: ./services/match
+    container_name: doran-match
     restart: always
     environment:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      RABBITMQ_HOST: doran-rabbitmq
     ports:
       - '2720:80'
     deploy:
       mode: replicated
       replicas: 1
 
-  chat-socket-service:
+  doran-game:
     build:
-      context: ./chat-socket-service
-      dockerfile: ./chat-socket-service.dockerfile
-    container_name: chat-socket-service
+      context: ./services/game
+    container_name: doran-game
     restart: always
     environment:
-      REDIS_HOST: redis
+      REDIS_HOST: doran-redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
+      MONGO_HOST: doran-mongo
+      RABBITMQ_HOST: doran-rabbitmq
     ports:
       - '2721:80'
     deploy:
       mode: replicated
       replicas: 1
 
-  user-service:
+  doran-user:
     build:
-      context: ./user-service
-      dockerfile: ./user-service.dockerfile
-    container_name: user-service
+      context: ./services/user
+    container_name: doran-user
+    restart: always
+    environment:
+      MYSQL_HOST: doran-mysql
+      RABBITMQ_HOST: doran-rabbitmq
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  doran-chat:
+    build:
+      context: ./services/chat
+    container_name: doran-chat
+    restart: always
+    environment:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: admin
+      MONGO_HOST: doran-mongo
+      RABBITMQ_HOST: doran-rabbitmq
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  doran-auth:
+    build:
+      context: ./services/auth
+    container_name: doran-auth
+    restart: always
+    environment:
+      REDIS_HOST: doran-redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: admin
+      RABBITMQ_HOST: doran-rabbitmq
+    deploy:
+      mode: replicated
+      replicas: 1
+
+  doran-push:
+    build:
+      context: ./services/push
+    container_name: doran-push
     restart: always
     environment:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
       ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
+      MYSQL_HOST: doran-mysql
+      RABBITMQ_HOST: doran-rabbitmq
     deploy:
       mode: replicated
       replicas: 1
 
-  chat-service:
-    build:
-      context: ./chat-service
-      dockerfile: ./chat-service.dockerfile
-    container_name: chat-service
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  consumer-service:
-    build:
-      context: ./consumer-service
-      dockerfile: ./consumer-service.dockerfile
-    container_name: consumer-service
-    restart: always
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  auth-service:
-    build:
-      context: ./auth-service
-      dockerfile: ./auth-service.dockerfile
-    container_name: auth-service
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  match-service:
-    build:
-      context: ./match-service
-      dockerfile: ./match-service.dockerfile
-    container_name: match-service
-    restart: always
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: admin
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  push-service:
-    build:
-      context: ./push-service
-      dockerfile: ./push-service.dockerfile
-    container_name: push-service
-    restart: always
-    environment:
-      ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
-      ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
-    deploy:
-      mode: replicated
-      replicas: 1
-
-  mysql:
+  doran-mysql:
     image: mysql:8
-    container_name: mysql
+    container_name: doran-mysql
     restart: always
     environment:
       MYSQL_DATABASE: users
@@ -137,12 +115,12 @@ services:
     deploy:
       mode: replicated
       replicas: 1
-    volumes:
-      - ./db-data/mysql/:/var/lib/mysql/
+    # volumes:
+    #   - ./db-data/mysql/:/var/lib/mysql/
 
-  mongo:
+  doran-mongo:
     image: 'mongo:4.2.16-bionic'
-    container_name: mongo
+    container_name: doran-mongo
     ports:
       - '27017:27017'
     environment:
@@ -150,9 +128,9 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: sample
 
-  rabbitmq:
+  doran-rabbitmq:
     image: 'rabbitmq:3.9-management-alpine'
-    container_name: rabbitmq
+    container_name: doran-rabbitmq
     ports:
       - '5672:5672'
       - '15672:15672' # RabbitMQ Management Plugin 포트
@@ -160,14 +138,14 @@ services:
       mode: replicated
       replicas: 1
     environment:
-      RABBITMQ_DEFAULT_USER: guest # 기본 사용자
-      RABBITMQ_DEFAULT_PASS: guest # 기본 비밀번호
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
 
-  redis:
+  doran-redis:
     image: redis:alpine
-    container_name: redis
+    container_name: doran-redis
     restart: always
     environment:
       REDIS_PASSWORD: admin
