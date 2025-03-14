@@ -44,6 +44,8 @@ func (r *ChatRepository) InitDatabase() error {
 		"balance_forms",
 		"balance_form_votes",
 		"balance_form_comments",
+		"balance_games",
+		"match_histories",
 		"room_counter",
 	}
 
@@ -85,6 +87,60 @@ func (r *ChatRepository) InitDatabase() error {
 	})
 	if err != nil {
 		log.Printf("Error creating index for balance_form_votes: %v", err)
+		return err
+	}
+
+	// 밸런스 게임 초기 데이터 생성
+	balanceGames := []models.BalanceGame{
+		{
+			ID:    primitive.NewObjectID(),
+			Title: "연봉과 워라밸",
+			Red:   "연봉 2배 받고 주 6일 근무",
+			Blue:  "현재 연봉 유지하고 주 4일 근무",
+		},
+		{
+			ID:    primitive.NewObjectID(),
+			Title: "이상형의 조건",
+			Red:   "외모는 평범하지만 완벽한 성격",
+			Blue:  "성격은 평범하지만 완벽한 외모",
+		},
+		{
+			ID:    primitive.NewObjectID(),
+			Title: "데이트 비용",
+			Red:   "데이트 비용 완벽히 더치페이",
+			Blue:  "데이트 비용 번갈아가며 내기",
+		},
+		{
+			ID:    primitive.NewObjectID(),
+			Title: "연애 스타일",
+			Red:   "매일 연락하는 애정표현 스타일",
+			Blue:  "적당한 거리를 두는 독립적인 스타일",
+		},
+		{
+			ID:    primitive.NewObjectID(),
+			Title: "기념일",
+			Red:   "모든 기념일을 챙기는 로맨티스트",
+			Blue:  "큰 기념일만 챙기는 실용주의자",
+		},
+	}
+
+	// 컬렉션 이름 설정
+	collection := r.client.Database("chat_db").Collection("balance_games")
+
+	// 기존 데이터 삭제
+	if err := collection.Drop(context.Background()); err != nil {
+		log.Printf("Failed to drop balance_games collection: %v", err)
+	}
+
+	// 새로운 데이터 삽입
+	documents := make([]interface{}, len(balanceGames))
+	for i, game := range balanceGames {
+		documents[i] = game
+	}
+
+	_, err = collection.InsertMany(context.Background(), documents)
+	if err != nil {
+		log.Printf("Failed to insert balance games: %v", err)
 		return err
 	}
 
@@ -824,4 +880,105 @@ func (r *ChatRepository) CancelVote(formID primitive.ObjectID, userID int) error
 	}
 
 	return mongo.WithSession(ctx, session, callback)
+}
+
+func (r *ChatRepository) SaveMatchHistory(matchHistory models.MatchHistory) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	_, err := collection.InsertOne(ctx, matchHistory)
+	if err != nil {
+		log.Printf("Error inserting match history: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *ChatRepository) UpdateMatchHistoryBalanceResult(roomSeq int, balanceResult models.BalanceGameResult) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	filter := bson.M{"room_seq": roomSeq}
+	update := bson.M{
+		"$push": bson.M{
+			"balance_results": balanceResult,
+		},
+	}
+
+	updateResult, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error updating balance result for room seq %d: %v", roomSeq, err)
+		return err
+	}
+
+	if updateResult.MatchedCount == 0 {
+		return errors.New("match history not found")
+	}
+
+	return nil
+}
+
+func (r *ChatRepository) UpdateMatchHistoryFinalMatch(roomSeq int, finalMatch []string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	filter := bson.M{"room_seq": roomSeq}
+	update := bson.M{
+		"$set": bson.M{
+			"final_match": finalMatch,
+		},
+	}
+
+	result, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error updating final match for room seq %d: %v", roomSeq, err)
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return errors.New("match history not found")
+	}
+
+	return nil
+}
+
+// GetRandomBalanceGameForm은 balance_games 컬렉션에서 랜덤한 밸런스 게임을 하나 가져옵니다
+func (r *ChatRepository) GetRandomBalanceGameForm() (*models.BalanceGame, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_games")
+
+	// $sample을 사용하여 랜덤하게 하나의 문서를 선택
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$sample", Value: bson.D{{Key: "size", Value: 1}}}},
+	}
+
+	cursor, err := collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		log.Printf("Error getting random balance game: %v", err)
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	// 결과 확인
+	if !cursor.Next(ctx) {
+		log.Printf("No balance games found in collection")
+		return nil, errors.New("no balance games available")
+	}
+
+	var game models.BalanceGame
+	if err := cursor.Decode(&game); err != nil {
+		log.Printf("Error decoding balance game: %v", err)
+		return nil, err
+	}
+
+	return &game, nil
 }
