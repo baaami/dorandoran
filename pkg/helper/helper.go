@@ -2,7 +2,9 @@ package helper
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"solo/pkg/utils/stype"
 	"strconv"
 	"strings"
 
@@ -49,4 +51,19 @@ func StringToIntArrary(strSlice []string) ([]int, error) {
 		intSlice = append(intSlice, num)
 	}
 	return intSlice, nil
+}
+
+// ["1:2", "3:4"] 형식으로 변환
+func ConvertUserChoicesToMatchStrings(choices []stype.UserChoice) []string {
+	matchStrings := make([]string, len(choices))
+
+	for i, choice := range choices {
+		// UserID:SelectedUserID 형식으로 문자열 생성
+		matchStrings[i] = fmt.Sprintf("%d:%d",
+			choice.UserID,
+			choice.SelectedUserID,
+		)
+	}
+
+	return matchStrings
 }

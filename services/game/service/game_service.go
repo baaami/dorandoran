@@ -58,7 +58,7 @@ func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter, chatRepo 
 	go service.MonitorFinalChoiceTimeouts()
 
 	// 밸런스 게임 타이머 모니터링
-	go service.MonitorBalanceGameTimers()
+	go service.MonitorBalanceGameStartTimer()
 
 	return service
 }
@@ -305,6 +305,19 @@ func (s *GameService) BroadcastFinalChoices(roomID string) error {
 
 	log.Printf("✅ Final choices broadcasted to Room %s", roomID)
 
+	chatRoom, err := s.chatRepo.GetRoomByID(roomID)
+	if err != nil {
+		return fmt.Errorf("❌ GetRoomByID 실패: %w", err)
+	}
+
+	matchStrings := helper.ConvertUserChoicesToMatchStrings(finalChoiceResults.Choices)
+
+	// 최종 선택 결과 저장
+	err = s.chatRepo.UpdateMatchHistoryFinalMatch(int(chatRoom.Seq), matchStrings)
+	if err != nil {
+		return fmt.Errorf("❌ UpdateFinalMatch 실패: %w", err)
+	}
+
 	// Redis에서 최종 선택 정보 삭제
 	err = s.redisClient.ClearFinalChoiceRoom(roomID)
 	if err != nil {
@@ -448,7 +461,7 @@ func (s *GameService) MonitorFinalChoiceTimeouts() {
 }
 
 // 밸런스 게임 타이머 모니터링
-func (s *GameService) MonitorBalanceGameTimers() {
+func (s *GameService) MonitorBalanceGameStartTimer() {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
@@ -467,13 +480,21 @@ func (s *GameService) MonitorBalanceGameTimers() {
 				continue
 			}
 
+			// 밸런스 게임 랜덤 획득
+			balanceGame, err := s.chatRepo.GetRandomBalanceGameForm()
+			if err != nil {
+				log.Printf("Failed to get random balance game form: %v", err)
+				continue
+			}
+
 			// 시간이 다 되었으면 밸런스 게임 시작 메시지 전송
 			balanceGameForm := &models.BalanceGameForm{
 				Question: models.Question{
-					Title: "썸, 누가 더 잘못인가?",
-					Red:   "헷갈리게한 사람 잘못",
-					Blue:  "헷갈린 사람 잘못",
+					Title: balanceGame.Title,
+					Red:   balanceGame.Red,
+					Blue:  balanceGame.Blue,
 				},
+				RoomID: roomID,
 			}
 
 			// 밸런스 게임 폼 저장
