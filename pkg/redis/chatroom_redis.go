@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -77,4 +78,77 @@ func (r *RedisClient) GetRoomStatus(roomID string) (int, error) {
 
 	log.Printf("Get status for room %s: %d", roomID, status)
 	return status, nil
+}
+
+// 밸런스 게임 시작 타이머 설정
+func (r *RedisClient) SetBalanceGameTimer(roomID string, duration time.Duration) error {
+	ctx := context.Background()
+
+	// 방 Timeout 목록에 추가
+	err := r.Client.Set(ctx, fmt.Sprintf("balance_game_timer:%s", roomID), duration.Seconds(), duration).Err()
+	if err != nil {
+		log.Printf("Failed to set balance game timer for RoomID %s: %v", roomID, err)
+		return err
+	}
+
+	// 밸런스 게임 타이머 목록에 추가
+	err = r.Client.SAdd(ctx, "rooms:balance_game", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to add RoomID %s to balance game rooms: %v", roomID, err)
+		return err
+	}
+
+	log.Printf("Balance game timer set for RoomID %s: %v seconds", roomID, duration.Seconds())
+	return nil
+}
+
+// 밸런스 게임 타이머가 설정된 모든 방 조회
+func (r *RedisClient) GetAllBalanceGameRooms() ([]string, error) {
+	ctx := context.Background()
+
+	roomIDs, err := r.Client.SMembers(ctx, "rooms:balance_game").Result()
+	if err != nil {
+		log.Printf("Failed to get balance game rooms from Redis: %v", err)
+		return nil, err
+	}
+
+	return roomIDs, nil
+}
+
+// 밸런스 게임 타이머 남은 시간 조회
+func (r *RedisClient) GetBalanceGameRemainingTime(roomID string) (int, error) {
+	ctx := context.Background()
+
+	ttl, err := r.Client.TTL(ctx, fmt.Sprintf("balance_game_timer:%s", roomID)).Result()
+	if err != nil {
+		log.Printf("Failed to get remaining time for balance game in room %s: %v", roomID, err)
+		return 0, err
+	}
+
+	if ttl <= 0 {
+		return 0, nil
+	}
+
+	return int(ttl.Seconds()), nil
+}
+
+// 밸런스 게임 타이머에서 방 제거
+func (r *RedisClient) RemoveBalanceGameRoom(roomID string) error {
+	ctx := context.Background()
+
+	// 타이머 키 삭제
+	err := r.Client.Del(ctx, fmt.Sprintf("balance_game_timer:%s", roomID)).Err()
+	if err != nil {
+		log.Printf("Failed to delete balance game timer for room %s: %v", roomID, err)
+		return err
+	}
+
+	// 방 목록에서 제거
+	err = r.Client.SRem(ctx, "rooms:balance_game", roomID).Err()
+	if err != nil {
+		log.Printf("Failed to remove room %s from balance game rooms: %v", roomID, err)
+		return err
+	}
+
+	return nil
 }

@@ -4,18 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
-	"solo/pkg/dto"
 	"solo/pkg/helper"
+	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
-	"solo/pkg/types/stype"
+	"solo/pkg/utils/stype"
+
 	"solo/services/chat/repo"
 
 	"github.com/gorilla/websocket"
@@ -57,6 +56,9 @@ func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter, chatRepo 
 
 	// 최종 선택 시간 타임아웃 모니터링
 	go service.MonitorFinalChoiceTimeouts()
+
+	// 밸런스 게임 타이머 모니터링
+	go service.MonitorBalanceGameTimers()
 
 	return service
 }
@@ -240,12 +242,7 @@ func (s *GameService) BroadCastFinalChoiceStart(roomID string) error {
 		return fmt.Errorf("❌ Redis SetRoomStatus(RoomStatusChoiceIng) 실패: %w", err)
 	}
 
-	roomDetail, err := GetRoomDetail(roomID)
-	if err != nil {
-		return fmt.Errorf("❌ Redis GetRoomDetail 실패: %w", err)
-	}
-
-	err = s.redisClient.SetFinalChoiceTimeout(roomID, time.Until(roomDetail.FinishFinalChoiceAt))
+	err = s.redisClient.SetFinalChoiceTimeout(roomID, time.Until(room.FinishFinalChoiceAt))
 	if err != nil {
 		return fmt.Errorf("❌ Redis SetFinalChoiceTimeout 실패: %w", err)
 	}
@@ -353,43 +350,7 @@ func (s *GameService) ProcessFinalChoice(userID int, finalChoiceMsg stype.FinalC
 	return nil
 }
 
-// TODO: Bridige network 사용하지 않도록!!
-func GetRoomDetail(roomID string) (*dto.RoomDetailResponse, error) {
-	var chatRoomDetail dto.RoomDetailResponse
-
-	// Matching 필터 획득
-	client := http.Client{}
-
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://doran-chat/room/%s", roomID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	// 요청 실행
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	err = json.Unmarshal(body, &chatRoomDetail)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	return &chatRoomDetail, nil
-}
-
-// 특정 채팅방 타임아웃 감지
+// 채팅 시간 타임아웃 모니터링
 func (s *GameService) MonitorChatTimeouts() {
 	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
 	defer ticker.Stop()
@@ -435,6 +396,7 @@ func (s *GameService) MonitorChatTimeouts() {
 	}
 }
 
+// 최종 선택 시간 타임아웃 모니터링
 func (s *GameService) MonitorFinalChoiceTimeouts() {
 	ticker := time.NewTicker(3 * time.Second) // 최대 1초 내에 이벤트 감지
 	defer ticker.Stop()
@@ -480,6 +442,91 @@ func (s *GameService) MonitorFinalChoiceTimeouts() {
 			err = s.redisClient.RemoveChoiceRoomFromRedis(roomID)
 			if err != nil {
 				log.Printf("Failed to remove expired room %s from Redis: %v", roomID, err)
+			}
+		}
+	}
+}
+
+// 밸런스 게임 타이머 모니터링
+func (s *GameService) MonitorBalanceGameTimers() {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Redis에서 밸런스 게임 타이머가 설정된 모든 방 가져오기
+		rooms, err := s.redisClient.GetAllBalanceGameRooms()
+		if err != nil {
+			log.Printf("Failed to get balance game rooms: %v", err)
+			continue
+		}
+
+		for _, roomID := range rooms {
+			// 남은 시간 확인
+			remainingTime, err := s.redisClient.GetBalanceGameRemainingTime(roomID)
+			if err != nil || remainingTime > 0 {
+				continue
+			}
+
+			// 시간이 다 되었으면 밸런스 게임 시작 메시지 전송
+			balanceGameForm := &models.BalanceGameForm{
+				Question: models.Question{
+					Title: "썸, 누가 더 잘못인가?",
+					Red:   "헷갈리게한 사람 잘못",
+					Blue:  "헷갈린 사람 잘못",
+				},
+			}
+
+			// 밸런스 게임 폼 저장
+			formID, err := s.chatRepo.InsertBalanceForm(balanceGameForm)
+			if err != nil {
+				log.Printf("Failed to insert balance game form: %v", err)
+				continue
+			}
+
+			// Redis에서 비활성 사용자 목록 조회
+			inactiveUserIDs, err := s.redisClient.GetInActiveUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to GetInActiveUserIDs, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			// 방에 접속해있는 사용자 ID 리스트 가져오기
+			joinedUserIDs, err := s.redisClient.GetJoinedUser(roomID)
+			if err != nil {
+				log.Printf("Failed to GetJoinedUser, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			headCnt, err := s.redisClient.GetRoomUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to GetRoomUserIDs, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			// 채팅 메시지 생성
+			chatEvent := eventtypes.ChatEvent{
+				MessageId:       primitive.NewObjectID(),
+				Type:            commontype.ChatTypeForm,
+				RoomID:          roomID,
+				SenderID:        commontype.MasterID,
+				Message:         "밸런스 게임을 시작합니다!",
+				BalanceFormID:   formID,
+				UnreadCount:     len(headCnt) - len(joinedUserIDs),
+				InactiveUserIds: inactiveUserIDs,
+				ReaderIds:       joinedUserIDs,
+				CreatedAt:       time.Now(),
+			}
+
+			// RabbitMQ를 통해 메시지 전송
+			err = s.emitter.PublishChatMessageEvent(chatEvent)
+			if err != nil {
+				log.Printf("Failed to publish balance game start message: %v", err)
+			}
+
+			// Redis에서 해당 방의 밸런스 게임 타이머 제거
+			err = s.redisClient.RemoveBalanceGameRoom(roomID)
+			if err != nil {
+				log.Printf("Failed to remove balance game timer: %v", err)
 			}
 		}
 	}

@@ -36,6 +36,7 @@ type ChatEvent struct {
 	UnreadCount     int                `bson:"unread_count" json:"unread_count"`
 	InactiveUserIds []int              `bson:"inactive_user_ids" json:"inactive_user_ids"`
 	ReaderIds       []int              `bson:"reader_ids" json:"reader_ids"`
+	BalanceFormID   primitive.ObjectID `bson:"balance_form_id,omitempty" json:"balance_form_id,omitempty"`
 	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
 }
 

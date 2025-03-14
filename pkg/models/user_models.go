@@ -1,4 +1,4 @@
-package repository
+package models
 
 type Address struct {
 	City     string `gorm:"size:100" json:"city"`

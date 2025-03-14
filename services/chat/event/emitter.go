@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"solo/pkg/helper"
+	"solo/pkg/models"
 	"solo/pkg/mq"
-	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
 )
 
@@ -37,7 +37,7 @@ func (e *Emitter) publish(exchangeName, routingKey string, payload eventtypes.Ev
 	return nil
 }
 
-func (e *Emitter) PublishChatRoomCreateEvent(data commontype.ChatRoom) error {
+func (e *Emitter) PublishChatRoomCreateEvent(data models.ChatRoom) error {
 	payload := eventtypes.EventPayload{
 		EventType: eventtypes.EventTypeRoomCreate,
 		Data:      helper.ToJSON(data),
@@ -45,7 +45,7 @@ func (e *Emitter) PublishChatRoomCreateEvent(data commontype.ChatRoom) error {
 	return e.publish(mq.ExchangeChatRoomCreateEvents, "", payload)
 }
 
-func (e *Emitter) PublishCoupleRoomCreateEvent(data commontype.ChatRoom) error {
+func (e *Emitter) PublishCoupleRoomCreateEvent(data models.ChatRoom) error {
 	payload := eventtypes.EventPayload{
 		EventType: eventtypes.EventTypeCoupleRoomCreate,
 		Data:      helper.ToJSON(data),

@@ -3,6 +3,7 @@ package event
 import (
 	"encoding/json"
 	"log"
+	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
@@ -27,14 +28,15 @@ func (e *EventHandler) HandleChatEvent(body json.RawMessage) {
 
 	log.Printf("💬 [DEBUG] Processing ChatEvent: %+v", chatEvent)
 
-	chat := commontype.Chat{
-		MessageId:   chatEvent.MessageId,
-		Type:        chatEvent.Type,
-		RoomID:      chatEvent.RoomID,
-		SenderID:    chatEvent.SenderID,
-		Message:     chatEvent.Message,
-		UnreadCount: chatEvent.UnreadCount,
-		CreatedAt:   chatEvent.CreatedAt,
+	chat := models.Chat{
+		MessageId:     chatEvent.MessageId,
+		Type:          chatEvent.Type,
+		RoomID:        chatEvent.RoomID,
+		SenderID:      chatEvent.SenderID,
+		Message:       chatEvent.Message,
+		UnreadCount:   chatEvent.UnreadCount,
+		CreatedAt:     chatEvent.CreatedAt,
+		BalanceFormID: chatEvent.BalanceFormID,
 	}
 
 	_, err := e.chatService.AddChatMsg(chat)

@@ -3,7 +3,7 @@ package event
 import (
 	"encoding/json"
 	"log"
-	"solo/pkg/types/commontype"
+	"solo/pkg/models"
 	"solo/services/match/service"
 )
 
@@ -16,7 +16,7 @@ func NewEventHandler(service *service.MatchService) *EventHandler {
 }
 
 func (h *EventHandler) HandleRoomCreateEvent(body json.RawMessage) {
-	var chatRoom commontype.ChatRoom
+	var chatRoom models.ChatRoom
 	err := json.Unmarshal(body, &chatRoom)
 	if err != nil {
 		log.Printf("failed to unmarshal room.create event: %v", err)

@@ -4,12 +4,15 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/models"
 	"solo/pkg/types/commontype"
 	"solo/services/chat/service"
 
 	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type ChatHandler struct {
@@ -171,4 +174,137 @@ func (h *ChatHandler) GetCharacterNameByRoomID(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, gamerInfo)
+}
+
+// 밸런스 게임 조회
+func (h *ChatHandler) GetBalanceFormByID(c echo.Context) error {
+	formID := c.Param("formid")
+	objectID, err := primitive.ObjectIDFromHex(formID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
+	}
+
+	form, err := h.chatService.GetBalanceForm(objectID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve balance form"})
+	}
+
+	return c.JSON(http.StatusOK, form)
+}
+
+// 밸런스 게임 투표 삽입
+func (h *ChatHandler) InsertBalanceFormVote(c echo.Context) error {
+	formID := c.Param("formid")
+	objectID, err := primitive.ObjectIDFromHex(formID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
+	}
+
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	var voteDTO dto.BalanceFormVoteDTO
+	if err := c.Bind(&voteDTO); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	}
+
+	vote := models.BalanceFormVote{
+		FormID:    objectID,
+		UserID:    userID,
+		Choiced:   voteDTO.Choiced,
+		CreatedAt: time.Now(),
+	}
+
+	err = h.chatService.InsertBalanceFormVote(&vote)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to insert balance form vote"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Balance form vote inserted successfully"})
+}
+
+// 밸런스 게임 투표 취소
+func (h *ChatHandler) CancelBalanceFormVote(c echo.Context) error {
+	formID := c.Param("formid")
+	objectID, err := primitive.ObjectIDFromHex(formID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
+	}
+
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	err = h.chatService.CancelBalanceFormVote(objectID, userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to cancel balance form vote"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Balance form vote canceled successfully"})
+}
+
+// 밸런스 게임 투표 댓글 삽입
+func (h *ChatHandler) InsertBalanceFormComment(c echo.Context) error {
+	formID := c.Param("formid")
+	objectID, err := primitive.ObjectIDFromHex(formID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
+	}
+
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	var commentDTO dto.BalanceFormCommentDTO
+	if err := c.Bind(&commentDTO); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+	}
+
+	comment := models.BalanceFormComment{
+		FormID:    objectID,
+		SenderID:  userID,
+		Message:   commentDTO.Comment,
+		CreatedAt: time.Now(),
+	}
+
+	err = h.chatService.InsertBalanceFormComment(objectID, &comment)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to insert balance form comment"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Balance form comment inserted successfully"})
+}
+
+// 밸런스 게임 투표 댓글 조회
+func (h *ChatHandler) GetBalanceFormComments(c echo.Context) error {
+	formID := c.Param("formid")
+	objectID, err := primitive.ObjectIDFromHex(formID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
+	}
+
+	pageStr := c.QueryParam("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	comments, totalCount, err := h.chatService.GetBalanceFormComments(objectID, page, commontype.DEFAULT_PAGE_SIZE)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve balance form comments"})
+	}
+
+	response := dto.BalanceFormCommentListResponse{
+		Data:        comments,
+		CurrentPage: page,
+		NextPage:    page + 1,
+		HasNextPage: page < int(totalCount),
+		TotalPages:  int(math.Ceil(float64(totalCount) / float64(commontype.DEFAULT_PAGE_SIZE))),
+	}
+
+	return c.JSON(http.StatusOK, response)
 }

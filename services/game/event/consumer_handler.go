@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"log"
 	"solo/pkg/helper"
+	"solo/pkg/models"
 	"solo/pkg/redis"
-	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
-	"solo/pkg/types/stype"
+	"solo/pkg/utils/stype"
+
 	"solo/services/game/service"
 )
 
@@ -62,7 +63,7 @@ func (e *EventHandler) HandleChatLatestEvent(payload json.RawMessage) {
 }
 
 func (e *EventHandler) HandleCoupleRoomCreateEvent(payload json.RawMessage) {
-	var chatRoom commontype.ChatRoom
+	var chatRoom models.ChatRoom
 	if err := json.Unmarshal(payload, &chatRoom); err != nil {
 		log.Printf("❌ Failed to unmarshal chat room create event: %v", err)
 		return

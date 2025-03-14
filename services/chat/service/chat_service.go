@@ -1,41 +1,41 @@
 package service
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"strconv"
 	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
 	"solo/services/chat/repo"
+	"solo/services/user/repository"
 
 	"github.com/samber/lo"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type MQEmitter interface {
-	PublishChatRoomCreateEvent(data commontype.ChatRoom) error
-	PublishCoupleRoomCreateEvent(data commontype.ChatRoom) error
+	PublishChatRoomCreateEvent(data models.ChatRoom) error
+	PublishCoupleRoomCreateEvent(data models.ChatRoom) error
 	PublishChatLatestEvent(data eventtypes.ChatLatestEvent) error
 	PublishRoomLeaveEvent(data eventtypes.RoomLeaveEvent) error
 }
 
 type ChatService struct {
 	chatRepo    *repo.ChatRepository
+	userRepo    *repository.UserRepository
 	redisClient *redis.RedisClient
 	emitter     MQEmitter
 }
 
-func NewChatService(chatRepo *repo.ChatRepository, redisClient *redis.RedisClient, emitter MQEmitter) *ChatService {
+func NewChatService(chatRepo *repo.ChatRepository, userRepo *repository.UserRepository, redisClient *redis.RedisClient, emitter MQEmitter) *ChatService {
 	return &ChatService{
 		chatRepo:    chatRepo,
+		userRepo:    userRepo,
 		redisClient: redisClient,
 		emitter:     emitter,
 	}
@@ -50,19 +50,19 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	var roomName string
 	var startTime time.Time
 	var finishTime time.Time
-	var gamers []commontype.GamerInfo
+	var gamers []models.GamerInfo
 
 	if matchEvent.MatchType == commontype.MATCH_GAME {
 		log.Printf("Create Game Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
-		finishTime = startTime.Add(20 * time.Second)
+		finishTime = startTime.Add(commontype.GameRunningTime)
 
 		seq, _ = s.chatRepo.GetNextSequence("chatRoomSeq")
 		roomName = fmt.Sprintf("%d기", seq)
 	} else {
 		log.Printf("Create Couple Room, users: %v", matchEvent.MatchedUsers)
 		startTime = time.Now()
-		finishTime = startTime.Add(10 * time.Minute)
+		finishTime = startTime.Add(commontype.CoupleRunningTime)
 
 		seq = 0
 		roomName = "커플 채팅방"
@@ -73,7 +73,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 	female := 0
 
 	for _, user := range matchEvent.MatchedUsers {
-		var gamer commontype.GamerInfo
+		var gamer models.GamerInfo
 
 		if matchEvent.MatchType == commontype.MATCH_GAME {
 			gamer.UserID = user.ID
@@ -97,7 +97,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		gamers = append(gamers, gamer)
 	}
 
-	room := commontype.ChatRoom{
+	room := models.ChatRoom{
 		ID:                  chatRoomID,
 		Name:                roomName,
 		Seq:                 seq,
@@ -106,7 +106,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		Gamers:              gamers,
 		CreatedAt:           startTime,
 		FinishChatAt:        finishTime,
-		FinishFinalChoiceAt: finishTime.Add(30 * time.Second),
+		FinishFinalChoiceAt: finishTime.Add(commontype.FinishFinalChoiceTimer),
 		ModifiedAt:          startTime,
 	}
 
@@ -138,6 +138,15 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		return err
 	}
 
+	// 밸런스 게임 타이머 설정 (15분)
+	if matchEvent.MatchType == commontype.MATCH_GAME {
+		err = s.redisClient.SetBalanceGameTimer(room.ID, commontype.BalanceGameTimer)
+		if err != nil {
+			log.Printf("Failed to set balance game timer: %v", err)
+			return err
+		}
+	}
+
 	if matchEvent.MatchType == commontype.MATCH_GAME {
 		err := s.emitter.PublishChatRoomCreateEvent(room)
 		if err != nil {
@@ -166,7 +175,7 @@ func extractUserIDs(users []commontype.WaitingUser) []int {
 }
 
 // 특정 유저가 속한 채팅방 목록 조회
-func (s *ChatService) GetChatRoomList(userID int) ([]commontype.ChatRoom, error) {
+func (s *ChatService) GetChatRoomList(userID int) ([]models.ChatRoom, error) {
 	rooms, err := s.chatRepo.GetRoomsByUserID(userID)
 	if err != nil {
 		log.Printf("Failed to get chat rooms for user %d: %v", userID, err)
@@ -175,7 +184,7 @@ func (s *ChatService) GetChatRoomList(userID int) ([]commontype.ChatRoom, error)
 	return rooms, nil
 }
 
-func (s *ChatService) GetLatestMessage(roomID string) (*commontype.Chat, error) {
+func (s *ChatService) GetLatestMessage(roomID string) (*models.Chat, error) {
 	return s.chatRepo.GetLastMessageByRoomID(roomID)
 }
 
@@ -183,11 +192,11 @@ func (s *ChatService) GetUnreadCount(roomID string, userID int) (int, error) {
 	return s.chatRepo.GetUnreadCountByUserAndRoom(userID, roomID)
 }
 
-func (s *ChatService) GetGamerInfo(userID int, roomID string) (*commontype.GamerInfo, error) {
+func (s *ChatService) GetGamerInfo(userID int, roomID string) (*models.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
 }
 
-func (s *ChatService) GetChatRoomByID(roomID string) (*commontype.ChatRoom, error) {
+func (s *ChatService) GetChatRoomByID(roomID string) (*models.ChatRoom, error) {
 	return s.chatRepo.GetRoomByID(roomID)
 }
 
@@ -205,7 +214,7 @@ func (s *ChatService) GetChatRoomDetailByID(roomID string) (*dto.RoomDetailRespo
 	var gamerList []commontype.Gamer
 
 	for _, userID := range room.UserIDs {
-		user, err := getUserByUserID(strconv.Itoa(userID))
+		user, err := s.userRepo.GetUserByID(userID)
 		if err != nil {
 			log.Printf("Failed to get user %d: %v", userID, err)
 		}
@@ -222,7 +231,7 @@ func (s *ChatService) GetChatRoomDetailByID(roomID string) (*dto.RoomDetailRespo
 			Name:    user.Name,
 			Gender:  user.Gender,
 			Birth:   user.Birth,
-			Address: user.Address,
+			Address: commontype.Address(user.Address),
 			GameInfo: commontype.GameInfo{
 				CharacterID:        gamer.CharacterID,
 				CharacterName:      gamer.CharacterName,
@@ -264,7 +273,7 @@ func (s *ChatService) HandleRoomJoin(roomID string, userID int, joinTime time.Ti
 
 	var messageIDs []primitive.ObjectID
 	for _, message := range messages {
-		reader := commontype.ChatReader{
+		reader := models.ChatReader{
 			MessageId: message.MessageId,
 			RoomID:    roomID,
 			UserId:    userID,
@@ -305,7 +314,7 @@ func (s *ChatService) DeleteChatRoom(roomID string) error {
 }
 
 // 채팅 메시지 추가
-func (s *ChatService) AddChatMsg(chatMsg commontype.Chat) (primitive.ObjectID, error) {
+func (s *ChatService) AddChatMsg(chatMsg models.Chat) (primitive.ObjectID, error) {
 	messageID, err := s.chatRepo.InsertChatMessage(chatMsg)
 	if err != nil {
 		log.Printf("Failed to insert chat message: %v", err)
@@ -317,7 +326,7 @@ func (s *ChatService) AddChatMsg(chatMsg commontype.Chat) (primitive.ObjectID, e
 // 채팅 메시지 읽음 처리
 func (s *ChatService) HandleChatRead(messageID primitive.ObjectID, roomID string, readerIDs []int, readAt time.Time) error {
 	for _, userID := range readerIDs {
-		reader := commontype.ChatReader{
+		reader := models.ChatReader{
 			MessageId: messageID,
 			RoomID:    roomID,
 			UserId:    userID,
@@ -335,7 +344,7 @@ func (s *ChatService) HandleChatRead(messageID primitive.ObjectID, roomID string
 }
 
 // 특정 채팅방의 메시지 목록 조회 (페이징 포함)
-func (s *ChatService) GetChatMsgListByRoomID(roomID string, pageNumber int, pageSize int) ([]*commontype.Chat, int64, error) {
+func (s *ChatService) GetChatMsgListByRoomID(roomID string, pageNumber int, pageSize int) ([]*models.Chat, int64, error) {
 	messages, totalCount, err := s.chatRepo.GetByRoomIDWithPagination(roomID, pageNumber, pageSize)
 	if err != nil {
 		log.Printf("Failed to get chat messages for room %s: %v", roomID, err)
@@ -354,7 +363,7 @@ func (s *ChatService) DeleteChatByRoomID(roomID string) error {
 }
 
 // 특정 유저의 게임 캐릭터 정보 조회
-func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*commontype.GamerInfo, error) {
+func (s *ChatService) GetCharacterNameByRoomID(userID int, roomID string) (*models.GamerInfo, error) {
 	return s.chatRepo.GetUserGameInfoInRoom(userID, roomID)
 }
 
@@ -371,55 +380,32 @@ func (s *ChatService) IsUserInRoom(userID int, roomID string) (bool, error) {
 	return lo.Contains(room.UserIDs, userID), nil
 }
 
-// [Bridge user] 회원 정보 획득
-func getUserByUserID(userID string) (*commontype.User, error) {
-	client := &http.Client{
-		Timeout: time.Second * 10, // 요청 타임아웃 설정
-	}
+// 밸런스 게임 폼 삽입
+func (s *ChatService) InsertBalanceForm(form *models.BalanceGameForm) (primitive.ObjectID, error) {
+	return s.chatRepo.InsertBalanceForm(form)
+}
 
-	// 요청 URL 생성
-	url := "http://doran-user/find"
+// 밸런스 게임 폼 조회
+func (s *ChatService) GetBalanceForm(formID primitive.ObjectID) (*models.BalanceGameForm, error) {
+	return s.chatRepo.GetBalanceFormByID(formID)
+}
 
-	// GET 요청 생성
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
-	}
+// 밸런스 게임 폼 투표 삽입
+func (s *ChatService) InsertBalanceFormVote(vote *models.BalanceFormVote) error {
+	return s.chatRepo.InsertBalanceFormVote(vote)
+}
 
-	// 사용자 ID를 요청의 헤더에 추가
-	req.Header.Set("X-User-ID", userID)
+// 밸런스 게임 폼 투표 취소
+func (s *ChatService) CancelBalanceFormVote(formID primitive.ObjectID, userID int) error {
+	return s.chatRepo.CancelVote(formID, userID)
+}
 
-	// 요청 실행
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
+// 밸런스 게임 폼 댓글 삽입
+func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, comment *models.BalanceFormComment) error {
+	return s.chatRepo.AddBalanceFormComment(formID, comment)
+}
 
-	// 응답 처리
-	if resp.StatusCode == http.StatusNotFound {
-		// 유저가 존재하지 않는 경우
-		return nil, nil
-	} else if resp.StatusCode != http.StatusOK {
-		// 다른 에러가 발생한 경우
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	// 응답 본문에서 유저 정보 디코딩
-	var user commontype.User
-
-	// 응답 본문 로깅 추가
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %v", err)
-	}
-
-	// 본문을 다시 디코딩
-	err = json.Unmarshal(body, &user)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	// 유저가 존재하는 경우
-	return &user, nil
+// 밸런스 게임 폼 댓글 조회
+func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.BalanceFormComment, int64, error) {
+	return s.chatRepo.GetBalanceFormComments(formID, page, pageSize)
 }
