@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-push
+  labels:
+    app: {{ .Release.Name }}-push
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-push
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-push
+    spec:
+      containers:
+        - name: push
+          image: "{{ .Values.image }}:{{ .Values.global.imageTag | default "latest" }}"
+          ports:
+            {{- range .Values.ports }}
+            - containerPort: {{ .targetPort }}
+              name: {{ .name }}
+            {{- end }}
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}

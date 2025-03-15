@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-chat
+  labels:
+    app: {{ .Release.Name }}-chat
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-chat
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-chat
+    spec:
+      containers:
+        - name: chat
+          image: "{{ .Values.image }}:{{ .Values.global.imageTag | default "latest" }}"
+          ports:
+            {{- range .Values.ports }}
+            - containerPort: {{ .targetPort }}
+              name: {{ .name }}
+            {{- end }}
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}

@@ -1,0 +1,7 @@
+image: baaami/doran-user
+replicas: 1
+service:
+  type: ClusterIP
+env:
+  MYSQL_HOST: doran-mysql
+  RABBITMQ_HOST: doran-rabbitmq

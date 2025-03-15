@@ -1,0 +1,8 @@
+image: baaami/doran-auth
+replicas: 1
+service:
+  type: ClusterIP
+env:
+  REDIS_HOST: doran-redis
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: doran-rabbitmq

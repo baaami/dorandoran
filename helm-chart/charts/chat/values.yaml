@@ -1,0 +1,13 @@
+image: baaami/doran-chat
+replicas: 1
+service:
+  type: ClusterIP
+ports:
+  - port: 2719
+    targetPort: 80
+    name: http
+env:
+  REDIS_HOST: doran-redis
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: doran-rabbitmq
+  MONGO_HOST: doran-mongo

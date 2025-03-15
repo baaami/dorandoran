@@ -1,0 +1,15 @@
+image: baaami/doran-push
+replicas: 1
+service:
+  type: ClusterIP
+env:
+  REDIS_HOST: doran-redis
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: doran-rabbitmq
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    cpu: "100m"
+    memory: "256Mi"
