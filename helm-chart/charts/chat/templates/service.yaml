@@ -14,4 +14,4 @@ spec:
     - protocol: TCP
       port: {{ $service.service.port }}
       targetPort: {{ $service.service.port }}
-      name: http
+      name: {{ .Release.Name }}-http
