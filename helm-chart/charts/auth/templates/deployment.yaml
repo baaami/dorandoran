@@ -1,26 +1,35 @@
+{{- $name := "auth" }}
+{{- $service := .Values }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-auth
+  name: {{ .Release.Name }}-{{ $name }}
   labels:
-    app: {{ .Release.Name }}-auth
+    app: {{ .Release.Name }}-{{ $name }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: {{ $service.replicas }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-auth
+      app: {{ .Release.Name }}-{{ $name }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}-auth
+        app: {{ .Release.Name }}-{{ $name }}
     spec:
       containers:
-        - name: auth
-          image: "{{ .Values.image }}:{{ .Values.global.imageTag | default "latest" }}"
+        - name: {{ $name }}
+          {{- if contains "baaami" $service.image }}
+          image: "{{ $service.image }}:{{ .Values.global.imageTag }}"
+          {{- else }}
+          image: "{{ $service.image }}"
+          {{- end }}
+          {{- if $service.service.port }}
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - containerPort: {{ $service.service.port }}
+              name: http
+          {{- end }}
           env:
-            {{- range $key, $value := .Values.env }}
+            {{- range $key, $value := $service.env }}
             - name: {{ $key }}
               value: "{{ $value }}"
             {{- end }}

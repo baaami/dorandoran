@@ -1,15 +1,17 @@
+{{- $name := "user" }}
+{{- $service := .Values }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-user
+  name: {{ .Release.Name }}-{{ $name }}
   labels:
-    app: {{ .Release.Name }}-user
+    app: {{ .Release.Name }}-{{ $name }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ $service.service.type }}
   selector:
-    app: {{ .Release.Name }}-user
+    app: {{ .Release.Name }}-{{ $name }}
   ports:
     - protocol: TCP
-      port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
+      port: {{ $service.service.port }}
+      targetPort: {{ $service.service.port }}
       name: http
