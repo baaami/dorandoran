@@ -23,6 +23,7 @@ type MQEmitter interface {
 	PublishCoupleRoomCreateEvent(data models.ChatRoom) error
 	PublishChatLatestEvent(data eventtypes.ChatLatestEvent) error
 	PublishRoomLeaveEvent(data eventtypes.RoomLeaveEvent) error
+	PublishVoteCommentChatEvent(event eventtypes.VoteCommentChatEvent) error
 }
 
 type ChatService struct {
@@ -426,7 +427,28 @@ func (s *ChatService) CancelBalanceFormVote(formID primitive.ObjectID, userID in
 
 // 밸런스 게임 폼 댓글 삽입
 func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, comment *models.BalanceFormComment) error {
-	return s.chatRepo.AddBalanceFormComment(formID, comment)
+	err := s.chatRepo.AddBalanceFormComment(formID, comment)
+	if err != nil {
+		log.Printf("Failed to insert balance form comment: %v", err)
+		return err
+	}
+
+	roomID, err := s.chatRepo.GetRoomIdByBalanceFormID(formID)
+	if err != nil {
+		log.Printf("Failed to get room by balance form id: %v", err)
+		return err
+	}
+
+	err = s.emitter.PublishVoteCommentChatEvent(eventtypes.VoteCommentChatEvent{
+		FormID: formID,
+		RoomID: roomID,
+	})
+	if err != nil {
+		log.Printf("Failed to publish vote comment chat event: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // 밸런스 게임 폼 댓글 조회

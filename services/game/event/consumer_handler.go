@@ -42,6 +42,27 @@ func (e *EventHandler) HandleChatEvent(payload json.RawMessage) {
 	}
 }
 
+func (e *EventHandler) HandleVoteChatEvent(payload json.RawMessage) {
+	var chatEvent eventtypes.ChatEvent
+	if err := json.Unmarshal(payload, &chatEvent); err != nil {
+		log.Printf("❌ Failed to unmarshal chat event: %v", err)
+		return
+	}
+
+	log.Printf("💬 [DEBUG] Processing ChatEvent: %+v", chatEvent)
+
+	wsMessage := stype.WebSocketMessage{
+		Kind:    stype.MessageKindVoteCommentMessage,
+		Payload: payload,
+	}
+
+	// 메시지를 WebSocket으로 전송
+	err := e.gameService.SendMessageToRoom(chatEvent.RoomID, wsMessage)
+	if err != nil {
+		log.Printf("❌ Failed to send message via WebSocket: %v", err)
+	}
+}
+
 func (e *EventHandler) HandleChatLatestEvent(payload json.RawMessage) {
 	var chatLatestEvent eventtypes.ChatLatestEvent
 	if err := json.Unmarshal(payload, &chatLatestEvent); err != nil {
@@ -133,5 +154,25 @@ func (e *EventHandler) HandleFinalChoiceTimeoutEvent(payload json.RawMessage) {
 	err := e.gameService.BroadcastFinalChoices(finalChoiceTimeout.RoomID)
 	if err != nil {
 		log.Printf("❌ Failed to broadcast final choice room: %v", err)
+	}
+}
+
+func (e *EventHandler) HandleVoteCommentChatEvent(payload json.RawMessage) {
+	var voteCommentChatEvent eventtypes.VoteCommentChatEvent
+	if err := json.Unmarshal(payload, &voteCommentChatEvent); err != nil {
+		log.Printf("❌ Failed to unmarshal vote comment chat event: %v", err)
+		return
+	}
+
+	log.Printf("💬 [DEBUG] Processing VoteCommentChatEvent: %+v", voteCommentChatEvent)
+
+	wsMessage := stype.WebSocketMessage{
+		Kind:    stype.MessageKindVoteCommentMessage,
+		Payload: payload,
+	}
+
+	err := e.gameService.SendMessageToRoom(voteCommentChatEvent.RoomID, wsMessage)
+	if err != nil {
+		log.Printf("❌ Failed to send vote comment chat message via WebSocket: %v", err)
 	}
 }

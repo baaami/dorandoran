@@ -17,7 +17,7 @@ func NewRouter(chatHandler *handler.ChatHandler, chatService *service.ChatServic
 	e.POST("/balance/form/vote/:formid", chatHandler.InsertBalanceFormVote)
 	e.DELETE("/balance/form/vote/:formid", chatHandler.CancelBalanceFormVote)
 	e.POST("/balance/form/comment/:formid", chatHandler.InsertBalanceFormComment)
-	e.GET("/balance/form/comment/:formid", chatHandler.GetBalanceFormComments)
+	e.GET("/balance/form/comment/list/:formid", chatHandler.GetBalanceFormComments)
 
 	// 채팅방 관련 라우팅 (roomID 파라미터 사용)
 	e.GET("/room/:id", chatHandler.GetChatRoomByID)
