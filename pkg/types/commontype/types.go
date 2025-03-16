@@ -14,6 +14,7 @@ const (
 )
 
 const (
+	BalanceFormVoteNone = -1
 	BalanceFormVoteRed  = 0
 	BalanceFormVoteBlue = 1
 )

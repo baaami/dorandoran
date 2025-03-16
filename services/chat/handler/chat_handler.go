@@ -184,7 +184,12 @@ func (h *ChatHandler) GetBalanceFormByID(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
 	}
 
-	form, err := h.chatService.GetBalanceForm(objectID)
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	form, err := h.chatService.GetBalanceForm(objectID, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve balance form"})
 	}

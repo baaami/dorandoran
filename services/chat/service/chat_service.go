@@ -387,8 +387,31 @@ func (s *ChatService) InsertBalanceForm(form *models.BalanceGameForm) (primitive
 }
 
 // 밸런스 게임 폼 조회
-func (s *ChatService) GetBalanceForm(formID primitive.ObjectID) (*models.BalanceGameForm, error) {
-	return s.chatRepo.GetBalanceFormByID(formID)
+func (s *ChatService) GetBalanceForm(formID primitive.ObjectID, userID int) (*dto.BalanceGameFormDTO, error) {
+	form, err := s.chatRepo.GetBalanceFormByID(formID)
+	if err != nil {
+		return nil, err
+	}
+
+	myVote := commontype.BalanceFormVoteNone
+	userVote, err := s.chatRepo.GetUserVote(formID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if userVote != nil {
+		myVote = userVote.Choiced
+	}
+
+	dto := dto.BalanceGameFormDTO{
+		ID:       form.ID,
+		RoomID:   form.RoomID,
+		Question: form.Question,
+		Votes:    form.Votes,
+		Comments: form.Comments,
+		MyVote:   myVote,
+	}
+
+	return &dto, nil
 }
 
 // 밸런스 게임 폼 투표 삽입
