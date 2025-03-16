@@ -3,10 +3,6 @@ replicas: 1
 service:
   type: ClusterIP
   port: 80
-ports:
-  - port: 2719
-    targetPort: 80
-    name: http
 env:
   REDIS_HOST: doran-redis
   REDIS_PORT: "6379"
