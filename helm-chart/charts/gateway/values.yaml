@@ -9,3 +9,22 @@ ports:
 env:
   REDIS_HOST: doran-redis
   REDIS_PORT: "6379"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: api.gateway.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: gateway
+          servicePort: 2719
+  tls:
+    - hosts:
+        - api.gateway.com
+      secretName: tls-secret

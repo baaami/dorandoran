@@ -37,3 +37,22 @@ autoscaling:
       - type: Pods
         value: 1                         # 한 번에 1개의 Pod 제거
         periodSeconds: 60
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: api.game.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: game
+          servicePort: 2721
+  tls:
+    - hosts:
+        - api.game.com
+      secretName: tls-secret
