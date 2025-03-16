@@ -18,10 +18,7 @@ spec:
         - name: chat
           image: "{{ .Values.image }}:{{ .Values.global.imageTag | default "latest" }}"
           ports:
-            {{- range .Values.ports }}
-            - containerPort: {{ .targetPort }}
-              name: {{ .name }}
-            {{- end }}
+            - containerPort: {{ .Values.service.port }}
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}

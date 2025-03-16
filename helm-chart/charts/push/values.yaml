@@ -2,6 +2,7 @@ image: baaami/doran-push
 replicas: 1
 service:
   type: ClusterIP
+  port: 80
 env:
   REDIS_HOST: doran-redis
   REDIS_PORT: "6379"

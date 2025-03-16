@@ -2,6 +2,7 @@ image: baaami/doran-chat
 replicas: 1
 service:
   type: ClusterIP
+  port: 80
 ports:
   - port: 2719
     targetPort: 80

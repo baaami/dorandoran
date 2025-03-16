@@ -5,13 +5,10 @@ metadata:
   labels:
     app: {{ .Release.Name }}-auth
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type }}
   selector:
     app: {{ .Release.Name }}-auth
   ports:
-    {{- range .Values.ports }}
     - protocol: TCP
-      port: {{ .port }}
-      targetPort: {{ .targetPort }}
-      name: {{ .name }}
-    {{- end }}
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
