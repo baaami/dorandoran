@@ -95,7 +95,7 @@ func (h *ChatHandler) GetChatRoomList(c echo.Context) error {
 func (h *ChatHandler) GetChatRoomByID(c echo.Context) error {
 	roomID := c.Param("id")
 
-	room, err := h.chatService.GetChatRoomByID(roomID)
+	room, err := h.chatService.GetChatRoomDetailByID(roomID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to find chat room"})
 	}
