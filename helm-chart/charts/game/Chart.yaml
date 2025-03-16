@@ -1,0 +1,4 @@
+apiVersion: v2
+name: game
+description: Game Service
+version: 0.1.0

@@ -1,0 +1,9 @@
+image: baaami/doran-auth
+replicas: 1
+service:
+  type: ClusterIP
+  port: 80  # 기본 HTTP 포트만 설정
+env:
+  REDIS_HOST: doran-redis
+  REDIS_PORT: "6379"
+  RABBITMQ_HOST: doran-rabbitmq

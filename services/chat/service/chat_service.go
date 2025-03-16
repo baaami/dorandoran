@@ -64,6 +64,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		startTime = time.Now()
 		finishTime = startTime.Add(commontype.CoupleRunningTime)
 
+		// TODO: 몇 기 게임방에서 커플 매칭이되었는지 추가
 		seq = 0
 		roomName = "커플 채팅방"
 	}
@@ -408,4 +409,33 @@ func (s *ChatService) InsertBalanceFormComment(formID primitive.ObjectID, commen
 // 밸런스 게임 폼 댓글 조회
 func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int, pageSize int) ([]models.BalanceFormComment, int64, error) {
 	return s.chatRepo.GetBalanceFormComments(formID, page, pageSize)
+}
+
+func (s *ChatService) SaveMatchHistory(matchHistory models.MatchHistory) {
+	s.chatRepo.SaveMatchHistory(matchHistory)
+}
+
+func (s *ChatService) AddBalanceGameResult(roomSeq int, gameID primitive.ObjectID, winnerTeam int) error {
+	result := models.BalanceGameResult{
+		GameID:     gameID,
+		WinnerTeam: winnerTeam,
+	}
+
+	err := s.chatRepo.UpdateMatchHistoryBalanceResult(roomSeq, result)
+	if err != nil {
+		log.Printf("Failed to add balance game result for room seq %d: %v", roomSeq, err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []string) error {
+	err := s.chatRepo.UpdateMatchHistoryFinalMatch(roomSeq, finalMatch)
+	if err != nil {
+		log.Printf("Failed to update final match for room seq %d: %v", roomSeq, err)
+		return err
+	}
+
+	return nil
 }

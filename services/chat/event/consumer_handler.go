@@ -8,6 +8,8 @@ import (
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
 	"solo/services/chat/service"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EventHandler struct {
@@ -58,6 +60,26 @@ func (e *EventHandler) HandleMatchEvent(body json.RawMessage) {
 	if err != nil {
 		log.Printf("Failed to create room: %v", err)
 	}
+}
+
+func (e *EventHandler) HandleRoomCreateEvent(body json.RawMessage) {
+	var chatRoom models.ChatRoom
+	err := json.Unmarshal(body, &chatRoom)
+	if err != nil {
+		log.Printf("failed to unmarshal room.create event: %v", err)
+		return
+	}
+
+	matchHistory := models.MatchHistory{
+		ID:             primitive.NewObjectID(),
+		RoomSeq:        int(chatRoom.Seq),
+		UserIDs:        chatRoom.UserIDs,
+		BalanceResults: []models.BalanceGameResult{}, // 밸런스 게임 종료 시 업데이트
+		FinalMatch:     []string{},                   // 최종 선택 이후 업데이트
+		CreatedAt:      chatRoom.CreatedAt,
+	}
+
+	e.chatService.SaveMatchHistory(matchHistory)
 }
 
 func (e *EventHandler) HandleRoomTimeout(body json.RawMessage) {

@@ -1,0 +1,4 @@
+apiVersion: v2
+name: user
+description: User Service
+version: 0.1.0

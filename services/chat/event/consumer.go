@@ -20,8 +20,12 @@ func NewConsumer(mqClient *mq.RabbitMQ, redisClient *redis.RedisClient, chatServ
 }
 
 func (c *Consumer) StartListening() {
-	// Exchange 및 Queue 설정
-	err := c.mqClient.DeclareExchange(mq.ExchangeAppTopic, mq.ExchangeTypeTopic)
+	err := c.mqClient.DeclareExchange(mq.ExchangeChatRoomCreateEvents, mq.ExchangeTypeFanout)
+	if err != nil {
+		log.Fatalf("❌ Failed to declare exchange %s: %v", mq.ExchangeTypeFanout, err)
+	}
+
+	err = c.mqClient.DeclareExchange(mq.ExchangeAppTopic, mq.ExchangeTypeTopic)
 	if err != nil {
 		log.Fatalf("❌ Failed to declare exchange %s: %v", mq.ExchangeAppTopic, err)
 	}
@@ -48,10 +52,16 @@ func (c *Consumer) StartListening() {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueChat, mq.ExchangeMatchEvents, err)
 	}
 
+	_, err = c.mqClient.DeclareQueue(mq.QueueChat, mq.ExchangeChatRoomCreateEvents, []string{})
+	if err != nil {
+		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueChat, mq.ExchangeChatRoomCreateEvents, err)
+	}
+
 	// 이벤트 핸들러 등록
 	handlers := mq.EventHandlerMap{
 		mq.EventTypeChat:               c.eventHandler.HandleChatEvent,
 		mq.EventTypeMatch:              c.eventHandler.HandleMatchEvent,
+		mq.EventTypeRoomCreate:         c.eventHandler.HandleRoomCreateEvent,
 		mq.EventTypeRoomTimeout:        c.eventHandler.HandleRoomTimeout,
 		mq.EventTypeFinalChoiceTimeout: c.eventHandler.HandleFinalChoiceTimeout,
 		mq.EventTypeRoomJoin:           c.eventHandler.HandleRoomJoin,
