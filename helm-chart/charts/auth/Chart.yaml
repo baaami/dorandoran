@@ -1,0 +1,4 @@
+apiVersion: v2
+name: auth
+description: Auth Service
+version: 0.1.0
