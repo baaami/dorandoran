@@ -16,5 +16,15 @@ func GetMySQLDSN() string {
 		host = "doran-mysql"
 	}
 
-	return fmt.Sprintf("root:sample@tcp(%s:3306)/users?parseTime=true", host)
+	user := os.Getenv("MYSQL_ROOT_USER")
+	if user == "" {
+		user = "root"
+	}
+
+	password := os.Getenv("MYSQL_ROOT_PASSWORD")
+	if password == "" {
+		password = "sample"
+	}
+
+	return fmt.Sprintf("%s:%s@tcp(%s:3306)/users?parseTime=true", user, password, host)
 }

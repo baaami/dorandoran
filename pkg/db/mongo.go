@@ -20,8 +20,8 @@ func ConnectMongo() (*mongo.Client, error) {
 
 	clientOptions := options.Client().ApplyURI(mongoURL)
 	clientOptions.SetAuth(options.Credential{
-		Username: "admin",
-		Password: "sample",
+		Username: os.Getenv("MONGO_INITDB_ROOT_USERNAME"),
+		Password: os.Getenv("MONGO_INITDB_ROOT_PASSWORD"),
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

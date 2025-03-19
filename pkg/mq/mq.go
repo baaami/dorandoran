@@ -25,7 +25,17 @@ func ConnectToRabbitMQ() (*RabbitMQ, error) {
 		rabbitmqHost = "doran-rabbitmq"
 	}
 
-	conn, err := amqp.Dial(fmt.Sprintf("amqp://guest:guest@%s", rabbitmqHost))
+	rabbitmqUser := os.Getenv("RABBITMQ_DEFAULT_USER")
+	if rabbitmqUser == "" {
+		rabbitmqUser = "guest"
+	}
+
+	rabbitmqPassword := os.Getenv("RABBITMQ_DEFAULT_PASS")
+	if rabbitmqPassword == "" {
+		rabbitmqPassword = "guest"
+	}
+
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s", rabbitmqUser, rabbitmqPassword, rabbitmqHost))
 	if err != nil {
 		log.Printf("❌ Failed to connect to RabbitMQ: %v", err)
 		return nil, err

@@ -9,11 +9,18 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - '2719:80'
+      - "2719:80"
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-redis:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
 
   doran-match:
     build:
@@ -25,11 +32,18 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - '2720:80'
+      - "2720:80"
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-redis:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
 
   doran-game:
     build:
@@ -42,11 +56,22 @@ services:
       REDIS_PASSWORD: admin
       MONGO_HOST: doran-mongo
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: sample
     ports:
-      - '2721:80'
+      - "2721:80"
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-redis:
+        condition: service_healthy
+      doran-mongo:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
 
   doran-user:
     build:
@@ -55,10 +80,19 @@ services:
     restart: always
     environment:
       MYSQL_HOST: doran-mysql
+      MYSQL_ROOT_USER: root
+      MYSQL_ROOT_PASSWORD: sample
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-mysql:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
 
   doran-chat:
     build:
@@ -71,9 +105,24 @@ services:
       REDIS_PASSWORD: admin
       MONGO_HOST: doran-mongo
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: sample
+      MYSQL_ROOT_USER: root
+      MYSQL_ROOT_PASSWORD: sample
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-redis:
+        condition: service_healthy
+      doran-mongo:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
+      doran-mysql:
+        condition: service_healthy
 
   doran-auth:
     build:
@@ -85,9 +134,16 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: admin
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-redis:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
 
   doran-push:
     build:
@@ -98,10 +154,19 @@ services:
       ONESIGNAL_APP_ID: ${ONESIGNAL_APP_ID}
       ONESIGNAL_API_KEY: ${ONESIGNAL_API_KEY}
       MYSQL_HOST: doran-mysql
+      MYSQL_ROOT_USER: root
+      MYSQL_ROOT_PASSWORD: sample
       RABBITMQ_HOST: doran-rabbitmq
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      doran-mysql:
+        condition: service_healthy
+      doran-rabbitmq:
+        condition: service_healthy
 
   doran-mysql:
     image: mysql:8
@@ -109,31 +174,67 @@ services:
     restart: always
     environment:
       MYSQL_DATABASE: users
+      MYSQL_ROOT_USER: root
       MYSQL_ROOT_PASSWORD: sample
     ports:
-      - '3306:3306'
+      - "3306:3306"
     deploy:
       mode: replicated
       replicas: 1
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     # volumes:
     #   - ./db-data/mysql/:/var/lib/mysql/
 
   doran-mongo:
-    image: 'mongo:4.2.16-bionic'
+    image: "mongo:4.2.16-bionic"
     container_name: doran-mongo
     ports:
-      - '27017:27017'
+      - "27017:27017"
     environment:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: sample
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongo",
+          "--host",
+          "localhost",
+          "-u",
+          "admin",
+          "-p",
+          "sample",
+          "--eval",
+          "db.adminCommand('ping')",
+          "--quiet",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   doran-rabbitmq:
-    image: 'rabbitmq:3.9-management-alpine'
+    image: "rabbitmq:3.9-management-alpine"
     container_name: doran-rabbitmq
     ports:
-      - '5672:5672'
-      - '15672:15672' # RabbitMQ Management Plugin 포트
+      - "5672:5672"
+      - "15672:15672" # RabbitMQ Management Plugin 포트
     deploy:
       mode: replicated
       replicas: 1
@@ -142,6 +243,12 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   doran-redis:
     image: redis:alpine
@@ -150,16 +257,21 @@ services:
     environment:
       REDIS_PASSWORD: admin
     ports:
-      - '6379:6379'
-    command:
-      [
-        'redis-server',
-        '--requirepass',
-        'admin',
-        '--save',
-        '', # RDB 영속성 비활성화
-        '--appendonly',
-        'no'
+      - "6379:6379"
+    command: [
+        "redis-server",
+        "--requirepass",
+        "admin",
+        "--save",
+        "", # RDB 영속성 비활성화
+        "--appendonly",
+        "no",
       ] # AOF 영속성 비활성화
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     # volumes:
     #   - ./db-data/redis:/data # Redis 데이터 저장소 마운트
