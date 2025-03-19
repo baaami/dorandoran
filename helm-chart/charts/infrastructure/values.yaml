@@ -4,7 +4,6 @@ mysql:
   replicas: 1
   env:
     MYSQL_DATABASE: users
-    MYSQL_ROOT_PASSWORD: sample
 
 mongo:
   enabled: true
@@ -12,20 +11,15 @@ mongo:
   replicas: 1
   env:
     MONGO_INITDB_DATABASE: logs
-    MONGO_INITDB_ROOT_USERNAME: admin
-    MONGO_INITDB_ROOT_PASSWORD: sample
 
 rabbitmq:
   enabled: true
   image: rabbitmq:3.9-management-alpine
   replicas: 1
   env:
-    RABBITMQ_DEFAULT_USER: guest
-    RABBITMQ_DEFAULT_PASS: guest
 
 redis:
   enabled: true
   image: redis:alpine
   replicas: 1
   env:
-    REDIS_PASSWORD: admin
