@@ -32,6 +32,7 @@ const (
 	RoutingKeyRoomJoin           = "room.join"
 	RoutingKeyRoomTimeout        = "room.timeout"
 	RoutingKeyChatLatest         = "chat.latest"
+	RoutingKeyVoteCommentChat    = "vote.comment.chat"
 )
 
 // Event Types
@@ -46,4 +47,5 @@ const (
 	EventTypeRoomTimeout        = "room.timeout"
 	EventTypeRoomRemainTime     = "room.remain.time"
 	EventTypeFinalChoiceTimeout = "final.choice.timeout"
+	EventTypeVoteCommentChat    = "vote.comment.chat"
 )

@@ -41,43 +41,4 @@ service:
 serviceAccount:
   create: true
   name: ""
-
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-  hosts:
-    - host: api.gateway.com
-      paths:
-        - path: /
-          pathType: Prefix
-          serviceName: gateway
-          servicePort: 2719
-    - host: api.match.com
-      paths:
-        - path: /
-          pathType: Prefix
-          serviceName: match
-          servicePort: 2720
-    - host: api.game.com
-      paths:
-        - path: /
-          pathType: Prefix
-          serviceName: game
-          servicePort: 2721
-  tls:
-    - hosts:
-        - api.gateway.com
-        - api.match.com
-        - api.game.com
-      secretName: tls-secret
-
-autoscaling:
-  enabled: false # autoscaling을 사용하지 않는다면 false로 설정
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
+  

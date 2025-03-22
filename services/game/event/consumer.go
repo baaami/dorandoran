@@ -39,6 +39,7 @@ func (c *Consumer) StartListening() {
 			mq.RoutingKeyChatLatest,
 			mq.RoutingKeyRoomLeave,
 			mq.RoutingKeyRoomTimeout,
+			mq.RoutingKeyVoteCommentChat,
 		})
 	if err != nil {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueGame, mq.ExchangeAppTopic, err)
@@ -57,6 +58,7 @@ func (c *Consumer) StartListening() {
 		eventtypes.EventTypeRoomLeave:          c.eventHandler.HandleRoomLeaveEvent,
 		eventtypes.EventTypeRoomTimeout:        c.eventHandler.HandleRoomTimeoutEvent,
 		eventtypes.EventTypeFinalChoiceTimeout: c.eventHandler.HandleFinalChoiceTimeoutEvent,
+		eventtypes.EventTypeVoteCommentChat:    c.eventHandler.HandleVoteCommentChatEvent,
 	}
 
 	// 메시지 소비 시작

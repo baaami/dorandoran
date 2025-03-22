@@ -776,6 +776,22 @@ func (r *ChatRepository) GetUserVote(formID primitive.ObjectID, userID int) (*mo
 	return &vote, nil
 }
 
+func (r *ChatRepository) GetRoomIdByBalanceFormID(formID primitive.ObjectID) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_forms")
+
+	var form models.BalanceGameForm
+	err := collection.FindOne(ctx, bson.M{"_id": formID}).Decode(&form)
+	if err != nil {
+		log.Printf("Error finding balance form by ID %s: %v", formID.Hex(), err)
+		return "", err
+	}
+
+	return form.RoomID, nil
+}
+
 // 투표 기록 삽입
 func (r *ChatRepository) InsertBalanceFormVote(vote *models.BalanceFormVote) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
