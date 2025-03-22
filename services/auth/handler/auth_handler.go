@@ -3,9 +3,10 @@ package handler
 import (
 	"log"
 	"net/http"
-	"solo/pkg/models"
+	"solo/pkg/dto"
 	"solo/pkg/types/commontype"
 	"solo/services/auth/service"
+	user_service "solo/services/user/service"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -13,10 +14,11 @@ import (
 
 type AuthHandler struct {
 	authService *service.AuthService
+	userService *user_service.UserService
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *service.AuthService, userService *user_service.UserService) *AuthHandler {
+	return &AuthHandler{authService: authService, userService: userService}
 }
 
 func (h *AuthHandler) KakaoLoginHandler(c echo.Context) error {
@@ -45,15 +47,22 @@ func (h *AuthHandler) KakaoLoginHandler(c echo.Context) error {
 	}
 
 	// user-service에서 유저 조회
-	loginUser, err := h.authService.GetExistUserByUserSrv(commontype.KAKAO, snsID)
+	loginUser, err := h.userService.GetUserBySNS(commontype.KAKAO, snsID)
 	if err != nil {
 		log.Printf("Error checking user existence: %v\n", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
 	// 유저가 존재하지 않는 경우 회원가입
-	if loginUser == (models.User{}) {
-		loginUser, err = h.authService.RegisterNewUser(commontype.KAKAO, snsID)
+	if loginUser == nil {
+		newUser := dto.UserDTO{
+			SnsType:    commontype.KAKAO,
+			SnsID:      snsID,
+			GameStatus: commontype.USER_STATUS_STANDBY,
+			GamePoint:  commontype.DEFAULT_GAME_POINT,
+		}
+
+		loginUser, err = h.userService.RegisterUser(newUser)
 		if err != nil {
 			log.Printf("Failed to register new user, err: %s", err.Error())
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register new user"})
@@ -93,15 +102,21 @@ func (h *AuthHandler) NaverLoginHandler(c echo.Context) error {
 	}
 
 	// user-service에서 유저 조회
-	loginUser, err := h.authService.GetExistUserByUserSrv(commontype.NAVER, snsID)
+	loginUser, err := h.userService.GetUserBySNS(commontype.NAVER, snsID)
 	if err != nil {
 		log.Printf("Error checking user existence: %v\n", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
 	// 유저가 존재하지 않는 경우 회원가입
-	if loginUser == (models.User{}) {
-		loginUser, err = h.authService.RegisterNewUser(commontype.NAVER, snsID)
+	if loginUser == nil {
+		newUser := dto.UserDTO{
+			SnsType:    commontype.NAVER,
+			SnsID:      snsID,
+			GameStatus: commontype.USER_STATUS_STANDBY,
+			GamePoint:  commontype.DEFAULT_GAME_POINT,
+		}
+		loginUser, err = h.userService.RegisterUser(newUser)
 		if err != nil {
 			log.Printf("Failed to register new user, err: %s", err.Error())
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to register new user"})
