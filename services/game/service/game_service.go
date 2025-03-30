@@ -60,6 +60,9 @@ func NewGameService(redisClient *redis.RedisClient, emitter MQEmitter, chatRepo 
 	// 밸런스 게임 타이머 모니터링
 	go service.MonitorBalanceGameStartTimer()
 
+	// 밸런스 게임 종료 모니터링
+	go service.MonitorBalanceGameFinishTimer()
+
 	return service
 }
 
@@ -548,6 +551,99 @@ func (s *GameService) MonitorBalanceGameStartTimer() {
 			err = s.redisClient.RemoveBalanceGameRoom(roomID)
 			if err != nil {
 				log.Printf("Failed to remove balance game timer: %v", err)
+			}
+
+			// 밸런스 게임 종료 타이머 설정 (15분)
+			err = s.redisClient.SetBalanceGameFinishTimer(formID.Hex(), 30*time.Second)
+			if err != nil {
+				log.Printf("Failed to set balance game finish timer: %v", err)
+			}
+		}
+	}
+}
+
+// 밸런스 게임 종료 모니터링
+func (s *GameService) MonitorBalanceGameFinishTimer() {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		// Redis에서 밸런스 게임 종료 타이머가 설정된 모든 form 가져오기
+		forms, err := s.redisClient.GetAllBalanceGameFinishForms()
+		if err != nil {
+			log.Printf("Failed to get balance game finish forms: %v", err)
+			continue
+		}
+
+		for _, formID := range forms {
+			// 남은 시간 확인
+			remainingTime, err := s.redisClient.GetBalanceGameFinishRemainingTime(formID)
+			if err != nil || remainingTime > 0 {
+				continue
+			}
+
+			// form ID를 ObjectID로 변환
+			formObjectID, err := primitive.ObjectIDFromHex(formID)
+			if err != nil {
+				log.Printf("Failed to convert form ID to ObjectID: %v", err)
+				continue
+			}
+
+			// form 정보 조회
+			form, err := s.chatRepo.GetBalanceFormByID(formObjectID)
+			if err != nil {
+				log.Printf("Failed to get balance form: %v", err)
+				continue
+			}
+
+			roomID := form.RoomID
+
+			// Redis에서 비활성 사용자 목록 조회
+			inactiveUserIDs, err := s.redisClient.GetInActiveUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to GetInActiveUserIDs, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			// 방에 접속해있는 사용자 ID 리스트 가져오기
+			joinedUserIDs, err := s.redisClient.GetJoinedUser(roomID)
+			if err != nil {
+				log.Printf("Failed to GetJoinedUser, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			headCnt, err := s.redisClient.GetRoomUserIDs(roomID)
+			if err != nil {
+				log.Printf("Failed to GetRoomUserIDs, room: %s, err: %v", roomID, err)
+				continue
+			}
+
+			// 채팅 메시지 생성
+			chatEvent := eventtypes.ChatEvent{
+				MessageId:       primitive.NewObjectID(),
+				Type:            commontype.ChatTypeFormResult,
+				RoomID:          roomID,
+				SenderID:        commontype.MasterID,
+				Message:         "밸런스 게임이 종료되었습니다!",
+				BalanceFormID:   form.ID,
+				UnreadCount:     len(headCnt) - len(joinedUserIDs),
+				InactiveUserIds: inactiveUserIDs,
+				ReaderIds:       joinedUserIDs,
+				CreatedAt:       time.Now(),
+			}
+
+			// RabbitMQ를 통해 메시지 전송
+			err = s.emitter.PublishChatMessageEvent(chatEvent)
+			if err != nil {
+				log.Printf("Failed to publish balance game finish message: %v", err)
+			}
+
+			log.Printf("🎮 Balance game in room %s has finished! Form ID: %s", form.RoomID, formID)
+
+			// Redis에서 해당 form의 밸런스 게임 종료 타이머 제거
+			err = s.redisClient.RemoveBalanceGameFinishForm(formID)
+			if err != nil {
+				log.Printf("Failed to remove balance game finish timer: %v", err)
 			}
 		}
 	}

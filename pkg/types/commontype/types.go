@@ -7,10 +7,11 @@ const (
 )
 
 const (
-	ChatTypeChat  = "chat"
-	ChatTypeForm  = "form"
-	ChatTypeJoin  = "join"
-	ChatTypeLeave = "leave"
+	ChatTypeChat       = "chat"
+	ChatTypeForm       = "form"
+	ChatTypeFormResult = "form_result"
+	ChatTypeJoin       = "join"
+	ChatTypeLeave      = "leave"
 )
 
 const (

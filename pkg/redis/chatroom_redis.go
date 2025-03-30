@@ -152,3 +152,76 @@ func (r *RedisClient) RemoveBalanceGameRoom(roomID string) error {
 
 	return nil
 }
+
+// 밸런스 게임 종료 타이머 설정
+func (r *RedisClient) SetBalanceGameFinishTimer(formID string, duration time.Duration) error {
+	ctx := context.Background()
+
+	// form Timeout 목록에 추가
+	err := r.Client.Set(ctx, fmt.Sprintf("balance_game_finish:%s", formID), duration.Seconds(), duration).Err()
+	if err != nil {
+		log.Printf("Failed to set balance game finish timer for FormID %s: %v", formID, err)
+		return err
+	}
+
+	// 밸런스 게임 종료 타이머 목록에 추가
+	err = r.Client.SAdd(ctx, "forms:balance_game_finish", formID).Err()
+	if err != nil {
+		log.Printf("Failed to add FormID %s to balance game finish forms: %v", formID, err)
+		return err
+	}
+
+	log.Printf("Balance game finish timer set for FormID %s: %v seconds", formID, duration.Seconds())
+	return nil
+}
+
+// 밸런스 게임 종료 타이머가 설정된 모든 form 조회
+func (r *RedisClient) GetAllBalanceGameFinishForms() ([]string, error) {
+	ctx := context.Background()
+
+	formIDs, err := r.Client.SMembers(ctx, "forms:balance_game_finish").Result()
+	if err != nil {
+		log.Printf("Failed to get balance game finish forms from Redis: %v", err)
+		return nil, err
+	}
+
+	return formIDs, nil
+}
+
+// 밸런스 게임 종료 타이머 남은 시간 조회
+func (r *RedisClient) GetBalanceGameFinishRemainingTime(formID string) (int, error) {
+	ctx := context.Background()
+
+	ttl, err := r.Client.TTL(ctx, fmt.Sprintf("balance_game_finish:%s", formID)).Result()
+	if err != nil {
+		log.Printf("Failed to get remaining time for balance game finish in form %s: %v", formID, err)
+		return 0, err
+	}
+
+	if ttl <= 0 {
+		return 0, nil
+	}
+
+	return int(ttl.Seconds()), nil
+}
+
+// 밸런스 게임 종료 타이머에서 form 제거
+func (r *RedisClient) RemoveBalanceGameFinishForm(formID string) error {
+	ctx := context.Background()
+
+	// 타이머 키 삭제
+	err := r.Client.Del(ctx, fmt.Sprintf("balance_game_finish:%s", formID)).Err()
+	if err != nil {
+		log.Printf("Failed to delete balance game finish timer for form %s: %v", formID, err)
+		return err
+	}
+
+	// form 목록에서 제거
+	err = r.Client.SRem(ctx, "forms:balance_game_finish", formID).Err()
+	if err != nil {
+		log.Printf("Failed to remove form %s from balance game finish forms: %v", formID, err)
+		return err
+	}
+
+	return nil
+}
