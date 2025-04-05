@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: mongo
+  replicas: {{ .Values.mongo.replicas }}
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: mongo
+        image: {{ .Values.mongo.image }}
+        env:
+        - name: MONGO_INITDB_DATABASE
+          value: {{ .Values.mongo.env.MONGO_INITDB_DATABASE }}
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: {{ .Values.mongo.env.MONGO_INITDB_ROOT_USERNAME }}
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          value: {{ .Values.mongo.env.MONGO_INITDB_ROOT_PASSWORD }}
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-data
+          mountPath: /data/db
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+      volumes:
+      - name: mongo-data
+        hostPath:
+          path: {{ .Values.mongo.persistence.path }}
+          type: DirectoryOrCreate
