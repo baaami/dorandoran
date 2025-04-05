@@ -92,7 +92,7 @@ func (h *EventHandler) HandleRoomTimeoutEvent(body json.RawMessage) {
 		return
 	}
 
-	log.Printf("✅ Timeout push notification sent to %d users for room %s",
+	log.Printf("Chat Timeout push notification sent to %d users for room %s",
 		len(alertEnabledUsers),
 		eventData.RoomID,
 	)

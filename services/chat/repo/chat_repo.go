@@ -998,3 +998,63 @@ func (r *ChatRepository) GetRandomBalanceGameForm() (*models.BalanceGame, error)
 
 	return &game, nil
 }
+
+// GetBalanceFormsByRoomID returns all balance forms for a given room
+func (r *ChatRepository) GetBalanceFormsByRoomID(roomID string) ([]models.BalanceGameForm, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_forms")
+	cursor, err := collection.Find(ctx, bson.M{"room_id": roomID})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var forms []models.BalanceGameForm
+	if err = cursor.All(ctx, &forms); err != nil {
+		return nil, err
+	}
+
+	return forms, nil
+}
+
+// DeleteBalanceFormVotes deletes all votes for a balance form
+func (r *ChatRepository) DeleteBalanceFormVotes(formID primitive.ObjectID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_form_votes")
+	_, err := collection.DeleteMany(ctx, bson.M{"form_id": formID})
+	return err
+}
+
+// DeleteBalanceFormComments deletes all comments for a balance form
+func (r *ChatRepository) DeleteBalanceFormComments(formID primitive.ObjectID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_form_comments")
+	_, err := collection.DeleteMany(ctx, bson.M{"form_id": formID})
+	return err
+}
+
+// DeleteBalanceFormsByRoomID deletes all balance forms for a room
+func (r *ChatRepository) DeleteBalanceFormsByRoomID(roomID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("balance_forms")
+	_, err := collection.DeleteMany(ctx, bson.M{"room_id": roomID})
+	return err
+}
+
+// DeleteMessageReaders deletes all message readers for a room
+func (r *ChatRepository) DeleteMessageReaders(roomID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("message_readers")
+	_, err := collection.DeleteMany(ctx, bson.M{"room_id": roomID})
+	return err
+}

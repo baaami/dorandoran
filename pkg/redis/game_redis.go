@@ -183,6 +183,7 @@ func (r *RedisClient) GetRoomUserIDs(roomID string) ([]string, error) {
 	return userIDs, nil
 }
 
+// 최종 선택 타이머 설정
 func (r *RedisClient) SetFinalChoiceTimeout(roomID string, duration time.Duration) error {
 	ctx := context.Background()
 

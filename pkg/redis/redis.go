@@ -114,24 +114,6 @@ func (r *RedisClient) SetRoomStatus(roomID string, status int) error {
 	return nil
 }
 
-// 채팅방 타임아웃 설정
-func (r *RedisClient) SetRoomTimeout(roomID string, duration time.Duration) error {
-	err := r.Client.Set(ctx, roomID, duration.Seconds(), duration).Err()
-	if err != nil {
-		log.Printf("Failed to set room timeout for RoomID %s: %v", roomID, err)
-		return err
-	}
-
-	err = r.Client.SAdd(ctx, "rooms:list", roomID).Err()
-	if err != nil {
-		log.Printf("Failed to add RoomID %s to rooms list: %v", roomID, err)
-		return err
-	}
-
-	log.Printf("Room timeout set for RoomID %s: %v seconds", roomID, duration.Seconds())
-	return nil
-}
-
 func (r *RedisClient) RemoveRoomFromRedis(roomID string) error {
 	ctx := context.Background()
 
