@@ -1,17 +1,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mongo
+  name: doran-mongo
+  labels:
+    app: doran-mongo
 spec:
-  serviceName: mongo
+  serviceName: doran-mongo
   replicas: {{ .Values.mongo.replicas }}
   selector:
     matchLabels:
-      app: mongo
+      app: doran-mongo
   template:
     metadata:
       labels:
-        app: mongo
+        app: doran-mongo
     spec:
       securityContext:
         fsGroup: 999
@@ -36,5 +38,5 @@ spec:
       volumes:
       - name: mongo-data
         hostPath:
-          path: {{ .Values.mongo.persistence.path }}
+          path: /data/mongo
           type: DirectoryOrCreate

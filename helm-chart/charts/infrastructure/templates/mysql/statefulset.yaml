@@ -1,17 +1,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mysql
+  name: doran-mysql
+  labels:
+    app: doran-mysql
 spec:
-  serviceName: mysql
+  serviceName: doran-mysql
   replicas: {{ .Values.mysql.replicas }}
   selector:
     matchLabels:
-      app: mysql
+      app: doran-mysql
   template:
     metadata:
       labels:
-        app: mysql
+        app: doran-mysql
     spec:
       securityContext:
         fsGroup: 999
@@ -34,5 +36,5 @@ spec:
       volumes:
       - name: mysql-data
         hostPath:
-          path: {{ .Values.mysql.persistence.path }}
+          path: /data/mysql
           type: DirectoryOrCreate 

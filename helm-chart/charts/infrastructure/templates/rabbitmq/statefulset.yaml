@@ -1,17 +1,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: rabbitmq
+  name: doran-rabbitmq
+  labels:
+    app: doran-rabbitmq
 spec:
-  serviceName: rabbitmq
+  serviceName: doran-rabbitmq
   replicas: {{ .Values.rabbitmq.replicas }}
   selector:
     matchLabels:
-      app: rabbitmq
+      app: doran-rabbitmq
   template:
     metadata:
       labels:
-        app: rabbitmq
+        app: doran-rabbitmq
     spec:
       securityContext:
         fsGroup: 999
@@ -35,5 +37,5 @@ spec:
       volumes:
       - name: rabbitmq-data
         hostPath:
-          path: {{ .Values.rabbitmq.persistence.path }}
+          path: /data/rabbitmq
           type: DirectoryOrCreate
