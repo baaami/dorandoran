@@ -554,7 +554,7 @@ func (s *GameService) MonitorBalanceGameStartTimer() {
 			}
 
 			// 밸런스 게임 종료 타이머 설정 (15분)
-			err = s.redisClient.SetBalanceGameFinishTimer(formID.Hex(), 30*time.Second)
+			err = s.redisClient.SetBalanceGameFinishTimer(formID.Hex(), commontype.BalanceGameEndTimer)
 			if err != nil {
 				log.Printf("Failed to set balance game finish timer: %v", err)
 			}

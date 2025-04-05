@@ -106,6 +106,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		Type:                matchEvent.MatchType,
 		UserIDs:             extractUserIDs(matchEvent.MatchedUsers),
 		Gamers:              gamers,
+		Status:              commontype.RoomStatusGameStart,
 		CreatedAt:           startTime,
 		FinishChatAt:        finishTime,
 		FinishFinalChoiceAt: finishTime.Add(commontype.FinishFinalChoiceTimer),
@@ -142,7 +143,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 
 	// 밸런스 게임 타이머 설정 (15분)
 	if matchEvent.MatchType == commontype.MATCH_GAME {
-		err = s.redisClient.SetBalanceGameTimer(room.ID, commontype.BalanceGameTimer)
+		err = s.redisClient.SetBalanceGameTimer(room.ID, commontype.BalanceGameStartTimer)
 		if err != nil {
 			log.Printf("Failed to set balance game timer: %v", err)
 			return err
@@ -483,4 +484,29 @@ func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []string) error {
 	}
 
 	return nil
+}
+
+// GetBalanceFormsByRoomID returns all balance forms for a given room
+func (s *ChatService) GetBalanceFormsByRoomID(roomID string) ([]models.BalanceGameForm, error) {
+	return s.chatRepo.GetBalanceFormsByRoomID(roomID)
+}
+
+// DeleteBalanceFormVotes deletes all votes for a balance form
+func (s *ChatService) DeleteBalanceFormVotes(formID primitive.ObjectID) error {
+	return s.chatRepo.DeleteBalanceFormVotes(formID)
+}
+
+// DeleteBalanceFormComments deletes all comments for a balance form
+func (s *ChatService) DeleteBalanceFormComments(formID primitive.ObjectID) error {
+	return s.chatRepo.DeleteBalanceFormComments(formID)
+}
+
+// DeleteBalanceFormsByRoomID deletes all balance forms for a room
+func (s *ChatService) DeleteBalanceFormsByRoomID(roomID string) error {
+	return s.chatRepo.DeleteBalanceFormsByRoomID(roomID)
+}
+
+// DeleteMessageReaders deletes all message readers for a room
+func (s *ChatService) DeleteMessageReaders(roomID string) error {
+	return s.chatRepo.DeleteMessageReaders(roomID)
 }

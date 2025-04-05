@@ -27,8 +27,10 @@ const (
 const (
 	GameRunningTime        = 1 * time.Hour
 	CoupleRunningTime      = 24 * 3 * time.Hour
+	BalanceGameStartTimer  = 10 * time.Minute
+	BalanceGameEndTimer    = 15 * time.Minute
 	FinishFinalChoiceTimer = 30 * time.Second
-	BalanceGameTimer       = 15 * time.Second
+	RemoveRoomDataTimer    = 10 * time.Minute
 )
 
 const (
@@ -61,9 +63,11 @@ const DEFAULT_PAGE_SIZE = 20
 const DEFAULT_TEMP_SERVER_ID = "game-server-1"
 
 const (
-	RoomStatusGameIng = iota
+	RoomStatusGameStart = iota
+	RoomStatusGameIng
 	RoomStatusChoiceIng
 	RoomStatusChoiceComplete
+	RoomStatusGameEnd
 )
 
 const (
