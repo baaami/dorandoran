@@ -1,17 +1,19 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: redis
+  name: doran-redis
+  labels:
+    app: doran-redis
 spec:
-  serviceName: redis
+  serviceName: doran-redis
   replicas: {{ .Values.redis.replicas }}
   selector:
     matchLabels:
-      app: redis
+      app: doran-redis
   template:
     metadata:
       labels:
-        app: redis
+        app: doran-redis
     spec:
       securityContext:
         fsGroup: 1001
@@ -32,5 +34,5 @@ spec:
       volumes:
       - name: redis-data
         hostPath:
-          path: {{ .Values.redis.persistence.path }}
+          path: /data/redis
           type: DirectoryOrCreate
