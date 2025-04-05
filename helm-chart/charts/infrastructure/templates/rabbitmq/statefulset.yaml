@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doran-rabbitmq
+  labels:
+    app: doran-rabbitmq
+spec:
+  serviceName: doran-rabbitmq
+  replicas: {{ .Values.rabbitmq.replicas }}
+  selector:
+    matchLabels:
+      app: doran-rabbitmq
+  template:
+    metadata:
+      labels:
+        app: doran-rabbitmq
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: rabbitmq
+        image: {{ .Values.rabbitmq.image }}
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: {{ .Values.rabbitmq.env.RABBITMQ_DEFAULT_USER }}
+        - name: RABBITMQ_DEFAULT_PASS
+          value: {{ .Values.rabbitmq.env.RABBITMQ_DEFAULT_PASS }}
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+      volumes:
+      - name: rabbitmq-data
+        hostPath:
+          path: /data/rabbitmq
+          type: DirectoryOrCreate

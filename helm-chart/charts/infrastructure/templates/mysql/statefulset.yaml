@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doran-mysql
+  labels:
+    app: doran-mysql
+spec:
+  serviceName: doran-mysql
+  replicas: {{ .Values.mysql.replicas }}
+  selector:
+    matchLabels:
+      app: doran-mysql
+  template:
+    metadata:
+      labels:
+        app: doran-mysql
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+      - name: mysql
+        image: {{ .Values.mysql.image }}
+        env:
+        - name: MYSQL_DATABASE
+          value: {{ .Values.mysql.env.MYSQL_DATABASE }}
+        - name: MYSQL_ROOT_PASSWORD
+          value: {{ .Values.mysql.env.MYSQL_ROOT_PASSWORD }}
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+      volumes:
+      - name: mysql-data
+        hostPath:
+          path: /data/mysql
+          type: DirectoryOrCreate 

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: doran-redis
+  labels:
+    app: doran-redis
+spec:
+  serviceName: doran-redis
+  replicas: {{ .Values.redis.replicas }}
+  selector:
+    matchLabels:
+      app: doran-redis
+  template:
+    metadata:
+      labels:
+        app: doran-redis
+    spec:
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: redis
+        image: {{ .Values.redis.image }}
+        env:
+        - name: REDIS_PASSWORD
+          value: {{ .Values.redis.env.REDIS_PASSWORD }}
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: redis-data
+        hostPath:
+          path: /data/redis
+          type: DirectoryOrCreate

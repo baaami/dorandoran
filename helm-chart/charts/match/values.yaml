@@ -9,3 +9,22 @@ ports:
 env:
   REDIS_HOST: doran-redis
   REDIS_PORT: "6379"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: api.match.com
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: match
+          servicePort: 2720
+  tls:
+    - hosts:
+        - api.match.com
+      secretName: tls-secret

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -95,7 +96,7 @@ func (h *ChatHandler) GetChatRoomList(c echo.Context) error {
 func (h *ChatHandler) GetChatRoomByID(c echo.Context) error {
 	roomID := c.Param("id")
 
-	room, err := h.chatService.GetChatRoomByID(roomID)
+	room, err := h.chatService.GetChatRoomDetailByID(roomID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to find chat room"})
 	}
@@ -184,7 +185,12 @@ func (h *ChatHandler) GetBalanceFormByID(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
 	}
 
-	form, err := h.chatService.GetBalanceForm(objectID)
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	form, err := h.chatService.GetBalanceForm(objectID, userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve balance form"})
 	}
@@ -219,6 +225,12 @@ func (h *ChatHandler) InsertBalanceFormVote(c echo.Context) error {
 
 	err = h.chatService.InsertBalanceFormVote(&vote)
 	if err != nil {
+		if err.Error() == "user already voted" {
+			return c.JSON(http.StatusConflict, map[string]string{
+				"error":   "user already voted",
+				"message": "이미 투표한 사용자입니다",
+			})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to insert balance form vote"})
 	}
 
@@ -273,6 +285,7 @@ func (h *ChatHandler) InsertBalanceFormComment(c echo.Context) error {
 
 	err = h.chatService.InsertBalanceFormComment(objectID, &comment)
 	if err != nil {
+		log.Printf("Failed to insert balance form comment: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to insert balance form comment"})
 	}
 
@@ -284,6 +297,7 @@ func (h *ChatHandler) GetBalanceFormComments(c echo.Context) error {
 	formID := c.Param("formid")
 	objectID, err := primitive.ObjectIDFromHex(formID)
 	if err != nil {
+		log.Printf("Failed to convert form ID to ObjectID: %v", err)
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid form ID format"})
 	}
 
@@ -295,6 +309,7 @@ func (h *ChatHandler) GetBalanceFormComments(c echo.Context) error {
 
 	comments, totalCount, err := h.chatService.GetBalanceFormComments(objectID, page, commontype.DEFAULT_PAGE_SIZE)
 	if err != nil {
+		log.Printf("Failed to retrieve balance form comments: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve balance form comments"})
 	}
 

@@ -5,6 +5,10 @@ mysql:
   env:
     MYSQL_DATABASE: users
     MYSQL_ROOT_PASSWORD: sample
+  persistence:
+    enabled: true
+    path: /data/mysql
+    size: 10Gi
 
 mongo:
   enabled: true
@@ -14,6 +18,10 @@ mongo:
     MONGO_INITDB_DATABASE: logs
     MONGO_INITDB_ROOT_USERNAME: admin
     MONGO_INITDB_ROOT_PASSWORD: sample
+  persistence:
+    enabled: true
+    path: /data/mongo
+    size: 10Gi
 
 rabbitmq:
   enabled: true
@@ -22,6 +30,10 @@ rabbitmq:
   env:
     RABBITMQ_DEFAULT_USER: guest
     RABBITMQ_DEFAULT_PASS: guest
+  persistence:
+    enabled: true
+    path: /data/rabbitmq
+    size: 5Gi
 
 redis:
   enabled: true
@@ -29,3 +41,7 @@ redis:
   replicas: 1
   env:
     REDIS_PASSWORD: admin
+  persistence:
+    enabled: true
+    path: /data/redis
+    size: 5Gi

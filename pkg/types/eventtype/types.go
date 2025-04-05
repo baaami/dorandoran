@@ -25,6 +25,7 @@ const (
 	EventTypeRoomTimeout        = "room.timeout"
 	EventTypeRoomRemainTime     = "room.remain.time"
 	EventTypeFinalChoiceTimeout = "final.choice.timeout"
+	EventTypeVoteCommentChat    = "vote.comment.chat"
 )
 
 type ChatEvent struct {
@@ -38,6 +39,11 @@ type ChatEvent struct {
 	ReaderIds       []int              `bson:"reader_ids" json:"reader_ids"`
 	BalanceFormID   primitive.ObjectID `bson:"balance_form_id,omitempty" json:"balance_form_id,omitempty"`
 	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
+}
+
+type VoteCommentChatEvent struct {
+	FormID primitive.ObjectID `bson:"form_id" json:"form_id"`
+	RoomID string             `bson:"room_id" json:"room_id"`
 }
 
 type MatchEvent struct {

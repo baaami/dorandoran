@@ -11,6 +11,7 @@ const (
 	MessageKindPing               = "ping"
 	MessageKindPong               = "pong"
 	MessageKindMessage            = "message"
+	MessageKindVoteCommentMessage = "vote_comment_message"
 	MessageKindJoin               = "join"
 	MessageKindLeave              = "leave"
 	MessageKindCheckRead          = "check_read"
