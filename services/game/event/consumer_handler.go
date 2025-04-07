@@ -2,11 +2,12 @@ package event
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"solo/pkg/helper"
 	"solo/pkg/models"
 	"solo/pkg/redis"
 	eventtypes "solo/pkg/types/eventtype"
+	"solo/pkg/utils/printer"
 	"solo/pkg/utils/stype"
 
 	"solo/services/game/service"
@@ -24,53 +25,51 @@ func NewEventHandler(gameService *service.GameService, redisClient *redis.RedisC
 func (e *EventHandler) HandleChatEvent(payload json.RawMessage) {
 	var chatEvent eventtypes.ChatEvent
 	if err := json.Unmarshal(payload, &chatEvent); err != nil {
-		log.Printf("❌ Failed to unmarshal chat event: %v", err)
+		printer.PrintError("Failed to unmarshal chat event", err)
 		return
 	}
 
-	log.Printf("💬 [DEBUG] Processing ChatEvent: %+v", chatEvent)
+	printer.PrintChatEvent(chatEvent)
 
 	wsMessage := stype.WebSocketMessage{
 		Kind:    stype.MessageKindMessage,
 		Payload: payload,
 	}
 
-	// 메시지를 WebSocket으로 전송
 	err := e.gameService.SendMessageToRoom(chatEvent.RoomID, wsMessage)
 	if err != nil {
-		log.Printf("❌ Failed to send message via WebSocket: %v", err)
+		printer.PrintError("Failed to send message via WebSocket", err)
 	}
 }
 
 func (e *EventHandler) HandleVoteChatEvent(payload json.RawMessage) {
 	var chatEvent eventtypes.ChatEvent
 	if err := json.Unmarshal(payload, &chatEvent); err != nil {
-		log.Printf("❌ Failed to unmarshal chat event: %v", err)
+		printer.PrintError("Failed to unmarshal chat event", err)
 		return
 	}
 
-	log.Printf("💬 [DEBUG] Processing ChatEvent: %+v", chatEvent)
+	printer.PrintChatEvent(chatEvent)
 
 	wsMessage := stype.WebSocketMessage{
 		Kind:    stype.MessageKindVoteCommentMessage,
 		Payload: payload,
 	}
 
-	// 메시지를 WebSocket으로 전송
 	err := e.gameService.SendMessageToRoom(chatEvent.RoomID, wsMessage)
 	if err != nil {
-		log.Printf("❌ Failed to send message via WebSocket: %v", err)
+		printer.PrintError("Failed to send message via WebSocket", err)
 	}
 }
 
 func (e *EventHandler) HandleChatLatestEvent(payload json.RawMessage) {
 	var chatLatestEvent eventtypes.ChatLatestEvent
 	if err := json.Unmarshal(payload, &chatLatestEvent); err != nil {
-		log.Printf("❌ Failed to unmarshal chat.latest event: %v", err)
+		printer.PrintError("Failed to unmarshal chat.latest event", err)
 		return
 	}
 
-	log.Printf("📢 Broadcasting chat.latest for Room %s", chatLatestEvent.RoomID)
+	printer.PrintSuccess("Broadcasting chat.latest for Room " + chatLatestEvent.RoomID)
 
 	wsMessage := stype.WebSocketMessage{
 		Kind:    stype.MessageKindChatLastest,
@@ -79,14 +78,14 @@ func (e *EventHandler) HandleChatLatestEvent(payload json.RawMessage) {
 
 	err := e.gameService.SendMessageToRoom(chatLatestEvent.RoomID, wsMessage)
 	if err != nil {
-		log.Printf("❌ Failed to send chat.latest message via WebSocket: %v", err)
+		printer.PrintError("Failed to send chat.latest message via WebSocket", err)
 	}
 }
 
 func (e *EventHandler) HandleCoupleRoomCreateEvent(payload json.RawMessage) {
 	var chatRoom models.ChatRoom
 	if err := json.Unmarshal(payload, &chatRoom); err != nil {
-		log.Printf("❌ Failed to unmarshal chat room create event: %v", err)
+		printer.PrintError("Failed to unmarshal chat room create event", err)
 		return
 	}
 
@@ -94,7 +93,7 @@ func (e *EventHandler) HandleCoupleRoomCreateEvent(payload json.RawMessage) {
 		RoomID: chatRoom.ID,
 	}
 
-	log.Printf("💖 Couple Room Created, Room ID: %s", coupleRoom.RoomID)
+	printer.PrintSuccess("Couple Room Created, Room ID: " + coupleRoom.RoomID)
 
 	wsMessage := stype.WebSocketMessage{
 		Kind:    stype.MessageKindCoupleMatchSuccess,
@@ -103,18 +102,18 @@ func (e *EventHandler) HandleCoupleRoomCreateEvent(payload json.RawMessage) {
 
 	err := e.gameService.SendMessageToRoom(coupleRoom.RoomID, wsMessage)
 	if err != nil {
-		log.Printf("❌ Failed to send Couple Match Success message via WebSocket: %v", err)
+		printer.PrintError("Failed to send Couple Match Success message via WebSocket", err)
 	}
 }
 
 func (e *EventHandler) HandleRoomLeaveEvent(payload json.RawMessage) {
 	var roomLeave eventtypes.RoomLeaveEvent
 	if err := json.Unmarshal(payload, &roomLeave); err != nil {
-		log.Printf("❌ Failed to unmarshal room leave event: %v", err)
+		printer.PrintError("Failed to unmarshal room leave event", err)
 		return
 	}
 
-	log.Printf("📢 Broadcasting room leave event, Room ID: %s, User ID: %v", roomLeave.RoomID, roomLeave.LeaveUserID)
+	printer.PrintSuccess(fmt.Sprintf("Broadcasting room leave event, Room ID: %s, User ID: %d", roomLeave.RoomID, roomLeave.LeaveUserID))
 
 	wsMessage := stype.WebSocketMessage{
 		Kind:    stype.MessageKindLeave,
@@ -123,48 +122,50 @@ func (e *EventHandler) HandleRoomLeaveEvent(payload json.RawMessage) {
 
 	err := e.gameService.SendMessageToRoom(roomLeave.RoomID, wsMessage)
 	if err != nil {
-		log.Printf("❌ Failed to send room leave message via WebSocket: %v", err)
+		printer.PrintError("Failed to send room leave message via WebSocket", err)
 	}
 }
 
 func (e *EventHandler) HandleRoomTimeoutEvent(payload json.RawMessage) {
 	var roomTimeout eventtypes.RoomTimeoutEvent
 	if err := json.Unmarshal(payload, &roomTimeout); err != nil {
-		log.Printf("❌ Failed to unmarshal room timeout event: %v", err)
+		printer.PrintError("Failed to unmarshal room timeout event", err)
 		return
 	}
 
-	log.Printf("⏳ Processing Room Timeout for Room %s", roomTimeout.RoomID)
+	printer.PrintSuccess("Processing Room Timeout for Room " + roomTimeout.RoomID)
 
 	err := e.gameService.BroadCastFinalChoiceStart(roomTimeout.RoomID)
 	if err != nil {
-		log.Printf("❌ Failed to process Room Timeout: %v", err)
+		printer.PrintError("Failed to process Room Timeout", err)
 	}
 }
 
 func (e *EventHandler) HandleFinalChoiceTimeoutEvent(payload json.RawMessage) {
 	var finalChoiceTimeout eventtypes.FinalChoiceEvent
 	if err := json.Unmarshal(payload, &finalChoiceTimeout); err != nil {
-		log.Printf("❌ Failed to unmarshal final choice timeout event: %v", err)
+		printer.PrintError("Failed to unmarshal final choice timeout event", err)
 		return
 	}
 
-	log.Printf("💡 Broadcasting final choice timeout for Room %s", finalChoiceTimeout.RoomID)
+	printer.PrintSuccess("Broadcasting final choice timeout for Room " + finalChoiceTimeout.RoomID)
 
 	err := e.gameService.BroadcastFinalChoices(finalChoiceTimeout.RoomID)
 	if err != nil {
-		log.Printf("❌ Failed to broadcast final choice room: %v", err)
+		printer.PrintError("Failed to broadcast final choice room", err)
 	}
 }
 
 func (e *EventHandler) HandleVoteCommentChatEvent(payload json.RawMessage) {
 	var voteCommentChatEvent eventtypes.VoteCommentChatEvent
 	if err := json.Unmarshal(payload, &voteCommentChatEvent); err != nil {
-		log.Printf("❌ Failed to unmarshal vote comment chat event: %v", err)
+		printer.PrintError("Failed to unmarshal vote comment chat event", err)
 		return
 	}
 
-	log.Printf("💬 [DEBUG] Processing VoteCommentChatEvent: %+v", voteCommentChatEvent)
+	printer.PrintSuccess(fmt.Sprintf("Processing vote comment chat event - FormID: %s, RoomID: %s",
+		voteCommentChatEvent.FormID.Hex(),
+		voteCommentChatEvent.RoomID))
 
 	wsMessage := stype.WebSocketMessage{
 		Kind:    stype.MessageKindVoteCommentMessage,
@@ -173,6 +174,6 @@ func (e *EventHandler) HandleVoteCommentChatEvent(payload json.RawMessage) {
 
 	err := e.gameService.SendMessageToRoom(voteCommentChatEvent.RoomID, wsMessage)
 	if err != nil {
-		log.Printf("❌ Failed to send vote comment chat message via WebSocket: %v", err)
+		printer.PrintError("Failed to send vote comment chat message via WebSocket", err)
 	}
 }

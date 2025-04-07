@@ -6,6 +6,7 @@ const (
 	ExchangeMatchEvents            = "match_events"
 	ExchangeChatRoomCreateEvents   = "chat_room_create_events"
 	ExchangeCoupleRoomCreateEvents = "couple_room_create_events"
+	ExchangeLog                    = "log"
 )
 
 // Exchange Types
@@ -21,6 +22,7 @@ const (
 	QueueUser  = "user_queue"
 	QueuePush  = "push_queue"
 	QueueMatch = "match_queue"
+	QueueLog   = "log"
 )
 
 // Routing Keys
