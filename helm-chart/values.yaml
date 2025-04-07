@@ -22,6 +22,9 @@ auth:
 push:
   enabled: true
 
+logger:
+  enabled: true
+
 infrastructure:
   enabled: true
 

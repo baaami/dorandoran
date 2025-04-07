@@ -45,6 +45,9 @@ dependencies:
   - name: push
     version: 0.1.0
     condition: push.enabled
+  - name: logger
+    version: 0.1.0
+    condition: logger.enabled
   - name: infrastructure
     version: 0.1.0
     condition: infrastructure.enabled

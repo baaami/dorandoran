@@ -5,7 +5,10 @@ import (
 	"os"
 	"time"
 
+	"solo/pkg/helper"
 	"solo/pkg/mq"
+
+	eventtypes "solo/pkg/types/eventtype"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -114,8 +117,13 @@ func Log(level string, logEventType LogEventType, message string, logData interf
 		Log:          logData,
 	}
 
+	eventPayload := eventtypes.EventPayload{
+		EventType: eventtypes.EventTypeLog,
+		Data:      helper.ToJSON(baseLog),
+	}
+
 	// JSON으로 변환
-	jsonData, err := json.Marshal(baseLog)
+	jsonData, err := json.Marshal(eventPayload)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to marshal log data")
 		return

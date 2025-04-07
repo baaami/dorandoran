@@ -22,7 +22,7 @@ const (
 	QueueUser  = "user_queue"
 	QueuePush  = "push_queue"
 	QueueMatch = "match_queue"
-	QueueLog   = "log"
+	QueueLog   = "log_queue"
 )
 
 // Routing Keys

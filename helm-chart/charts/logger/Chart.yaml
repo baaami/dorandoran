@@ -1,0 +1,4 @@
+apiVersion: v2
+name: logger
+description: Logger Service
+version: 0.1.0

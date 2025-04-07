@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/logger"
 	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
@@ -163,6 +164,8 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 			return err
 		}
 	}
+
+	logger.Info(logger.LogEventGameRoomCreate, "Game room created", room)
 
 	log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)
 	return nil

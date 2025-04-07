@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"solo/pkg/db"
+	"solo/pkg/logger"
 	"solo/pkg/mq"
 	"solo/pkg/redis"
 	"solo/services/chat/event"
@@ -25,6 +26,8 @@ const webPort = 80
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+
+	logger.InitLogger(logger.ServiceTypeChat)
 
 	mongoClient, err := db.ConnectMongo()
 	if err != nil {

@@ -103,6 +103,18 @@ services:
       mode: replicated
       replicas: 1
 
+  doran-logger:
+    build:
+      context: ./services/logger
+    container_name: doran-logger
+    restart: always
+    environment:
+      RABBITMQ_HOST: doran-rabbitmq
+      MONGO_HOST: doran-mongo
+    deploy:
+      mode: replicated
+      replicas: 1
+
   doran-mysql:
     image: mysql:8
     container_name: doran-mysql
