@@ -8,6 +8,7 @@ import (
 	"solo/pkg/types/commontype"
 	eventtypes "solo/pkg/types/eventtype"
 	"solo/services/chat/service"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -97,6 +98,68 @@ func (e *EventHandler) HandleRoomTimeout(body json.RawMessage) {
 	}
 }
 
+func (e *EventHandler) cleanupRoomData(roomID string) {
+	// 방 상태 확인
+	room, err := e.chatService.GetChatRoomByID(roomID)
+	if err != nil {
+		log.Printf("❌ Failed to get room status: %v", err)
+		return
+	}
+
+	if room.Status != commontype.RoomStatusGameEnd {
+		log.Printf("Room %s is not in GameEnd status, skipping cleanup", roomID)
+		return
+	}
+
+	// 밸런스 게임 폼 ID 목록 조회
+	balanceForms, err := e.chatService.GetBalanceFormsByRoomID(roomID)
+	if err != nil {
+		log.Printf("❌ Failed to get balance forms: %v", err)
+		return
+	}
+
+	// 각 밸런스 게임 폼에 대한 데이터 삭제
+	for _, form := range balanceForms {
+		// 밸런스 게임 투표 삭제
+		err = e.chatService.DeleteBalanceFormVotes(form.ID)
+		if err != nil {
+			log.Printf("❌ Failed to delete balance form votes: %v", err)
+		}
+
+		// 밸런스 게임 댓글 삭제
+		err = e.chatService.DeleteBalanceFormComments(form.ID)
+		if err != nil {
+			log.Printf("❌ Failed to delete balance form comments: %v", err)
+		}
+	}
+
+	// 밸런스 게임 폼 삭제
+	err = e.chatService.DeleteBalanceFormsByRoomID(roomID)
+	if err != nil {
+		log.Printf("❌ Failed to delete balance forms: %v", err)
+	}
+
+	// 메시지 읽음 정보 삭제
+	err = e.chatService.DeleteMessageReaders(roomID)
+	if err != nil {
+		log.Printf("❌ Failed to delete message readers: %v", err)
+	}
+
+	// 채팅 메시지 삭제
+	err = e.chatService.DeleteChatByRoomID(roomID)
+	if err != nil {
+		log.Printf("❌ Failed to delete messages: %v", err)
+	}
+
+	// 채팅방 삭제
+	err = e.chatService.DeleteChatRoom(roomID)
+	if err != nil {
+		log.Printf("❌ Failed to delete room: %v", err)
+	}
+
+	log.Printf("Successfully cleaned up all data for room %s", roomID)
+}
+
 func (e *EventHandler) HandleFinalChoiceTimeout(body json.RawMessage) {
 	var eventData eventtypes.FinalChoiceTimeoutEvent
 	if err := json.Unmarshal(body, &eventData); err != nil {
@@ -115,6 +178,17 @@ func (e *EventHandler) HandleFinalChoiceTimeout(body json.RawMessage) {
 	if err != nil {
 		log.Printf("Failed to remove RoomID %s from rooms list, err: %v", eventData.RoomID, err)
 	}
+
+	err = e.chatService.UpdateChatRoomStatus(eventData.RoomID, commontype.RoomStatusGameEnd)
+	if err != nil {
+		log.Printf("Failed to update chat room status: %d, err: %s", commontype.RoomStatusGameEnd, err.Error())
+	}
+
+	// 10분 후에 데이터 삭제 작업 실행
+	go func() {
+		time.Sleep(commontype.RemoveRoomDataTimer)
+		e.cleanupRoomData(eventData.RoomID)
+	}()
 }
 
 func (e *EventHandler) HandleRoomJoin(body json.RawMessage) {

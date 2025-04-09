@@ -68,3 +68,11 @@ func (e *Emitter) PublishRoomLeaveEvent(data eventtypes.RoomLeaveEvent) error {
 	}
 	return e.publish(mq.ExchangeAppTopic, mq.RoutingKeyRoomLeave, payload)
 }
+
+func (e *Emitter) PublishVoteCommentChatEvent(event eventtypes.VoteCommentChatEvent) error {
+	payload := eventtypes.EventPayload{
+		EventType: eventtypes.EventTypeVoteCommentChat,
+		Data:      helper.ToJSON(event),
+	}
+	return e.publish(mq.ExchangeAppTopic, mq.RoutingKeyVoteCommentChat, payload)
+}
