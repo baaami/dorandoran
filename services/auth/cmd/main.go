@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"solo/pkg/db"
+	"solo/pkg/logger"
 	"solo/pkg/redis"
 	"solo/services/auth/handler"
 	"solo/services/auth/repository"
@@ -22,6 +23,8 @@ type Config struct {
 }
 
 func main() {
+	logger.InitLogger(logger.ServiceTypeAuth)
+
 	dbConn, err := db.ConnectMySQL()
 	if err != nil {
 		log.Panic("MySQL 연결 실패: ", err)

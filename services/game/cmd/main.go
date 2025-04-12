@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"solo/pkg/db"
+	"solo/pkg/logger"
 	"solo/pkg/mq"
 	"solo/pkg/redis"
 	"solo/services/chat/repo"
@@ -20,6 +21,8 @@ import (
 const webPort = 80
 
 func main() {
+	logger.InitLogger(logger.ServiceTypeGame)
+
 	// MongoDB 연결 해제 시 사용되는 컨텍스트 생성
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

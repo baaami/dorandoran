@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"solo/pkg/logger"
 	"solo/pkg/mq"
 	"solo/pkg/redis"
 	"solo/services/match/event"
@@ -15,6 +16,8 @@ import (
 const webPort = 80
 
 func main() {
+	logger.InitLogger(logger.ServiceTypeMatch)
+
 	mqClient, err := mq.ConnectToRabbitMQ()
 	if err != nil {
 		log.Panic("RabbitMQ 연결 실패: ", err)

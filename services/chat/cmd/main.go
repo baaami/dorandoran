@@ -24,10 +24,10 @@ import (
 const webPort = 80
 
 func main() {
+	logger.InitLogger(logger.ServiceTypeChat)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
-	logger.InitLogger(logger.ServiceTypeChat)
 
 	mongoClient, err := db.ConnectMongo()
 	if err != nil {

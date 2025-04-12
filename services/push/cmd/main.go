@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"solo/pkg/db"
+	"solo/pkg/logger"
 	"solo/pkg/mq"
 	"solo/services/push/event"
 	"solo/services/user/repository"
@@ -10,6 +11,8 @@ import (
 )
 
 func main() {
+	logger.InitLogger(logger.ServiceTypePush)
+
 	dbConn, err := db.ConnectMySQL()
 	if err != nil {
 		log.Panic("MySQL 연결 실패: ", err)

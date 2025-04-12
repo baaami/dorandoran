@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"solo/pkg/db"
+	"solo/pkg/logger"
 	"solo/pkg/mq"
 	"solo/services/user/event"
 	"solo/services/user/handler"
@@ -16,6 +17,8 @@ import (
 const webPort = 80
 
 func main() {
+	logger.InitLogger(logger.ServiceTypeUser)
+
 	dbConn, err := db.ConnectMySQL()
 	if err != nil {
 		log.Panic("MySQL 연결 실패: ", err)

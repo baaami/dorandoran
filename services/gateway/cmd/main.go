@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"solo/pkg/logger"
 	"solo/pkg/redis"
 	"solo/services/gateway/handler"
 	"solo/services/gateway/transport"
@@ -12,6 +13,8 @@ import (
 const webPort = 80
 
 func main() {
+	logger.InitLogger(logger.ServiceTypeGateway)
+
 	redisClient, err := redis.NewRedisClient()
 	if err != nil {
 		log.Panic("Redis 연결 실패: ", err)
