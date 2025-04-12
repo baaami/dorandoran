@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"solo/pkg/helper"
+	"solo/pkg/logger"
 	"solo/pkg/models"
 	"solo/pkg/redis"
 	eventtypes "solo/pkg/types/eventtype"
@@ -139,6 +140,8 @@ func (e *EventHandler) HandleRoomTimeoutEvent(payload json.RawMessage) {
 	if err != nil {
 		printer.PrintError("Failed to process Room Timeout", err)
 	}
+
+	logger.Info(logger.LogEventFinalChoiceStart, fmt.Sprintf("Final choice start: %s", roomTimeout.RoomID), roomTimeout)
 }
 
 func (e *EventHandler) HandleFinalChoiceTimeoutEvent(payload json.RawMessage) {

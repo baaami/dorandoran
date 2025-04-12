@@ -39,11 +39,11 @@ type ServiceType int
 const (
 	// 게임 관련 이벤트
 	LogEventGameRoomCreate LogEventType = iota
-	LogEventGameRoomTimeout
-	LogEventGameStart
-	LogEventGameEnd
-	LogEventBalanceVote
-	LogEventFinalChoice
+	LogEventGameRoomChatTimeout
+	LogEventBalanceGameStart
+	LogEventBalanceGameEnd
+	LogEventFinalChoiceStart
+	LogEventFinalChoiceEnd
 
 	// 매칭 관련 이벤트
 	LogEventMatchSuccess
@@ -51,12 +51,10 @@ const (
 
 	// 커플 매칭 이벤트
 	LogEventCoupleRoomCreate
+	LogEventCoupleRoomTimeout
 
-	// 경고 이벤트
-	LogEventWarning
-
-	// 에러 이벤트
-	LogEventError
+	// 채팅방 관련 이벤트
+	LogEventRoomLeave
 )
 
 // LogEventType은 로그 이벤트 타입을 나타내는 정수입니다
@@ -69,7 +67,7 @@ type BaseLog struct {
 	Service      int         `json:"service"`
 	LogEventType int         `json:"log_event_type"`
 	Message      string      `json:"message"`
-	Log          interface{} `json:"log"`
+	DetailInfo   interface{} `json:"detail_info"`
 }
 
 // InitLogger는 로거를 초기화합니다
@@ -106,7 +104,7 @@ func InitLogger(serviceType ServiceType) error {
 }
 
 // Log는 BaseLog 구조체와 동일한 형식으로 로그를 출력합니다
-func Log(level string, logEventType LogEventType, message string, logData interface{}) {
+func Log(level string, logEventType LogEventType, message string, detailInfo interface{}) {
 	// BaseLog 구조체 생성
 	baseLog := BaseLog{
 		Level:        level,
@@ -114,7 +112,7 @@ func Log(level string, logEventType LogEventType, message string, logData interf
 		Service:      int(currentService),
 		LogEventType: int(logEventType),
 		Message:      message,
-		Log:          logData,
+		DetailInfo:   detailInfo,
 	}
 
 	eventPayload := eventtypes.EventPayload{

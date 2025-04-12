@@ -107,6 +107,23 @@ func (h *ChatHandler) GetChatRoomByID(c echo.Context) error {
 	return c.JSON(http.StatusOK, room)
 }
 
+// 채팅방 나가기
+func (h *ChatHandler) LeaveChatRoom(c echo.Context) error {
+	roomID := c.Param("id")
+
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	err = h.chatService.LeaveChatRoom(roomID, userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to leave chat room"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Chat room left successfully"})
+}
+
 // 채팅방 삭제
 func (h *ChatHandler) DeleteChatRoom(c echo.Context) error {
 	roomID := c.Param("id")

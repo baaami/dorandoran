@@ -6,6 +6,7 @@ import (
 	"log"
 	"solo/pkg/dto"
 	"solo/pkg/helper"
+	"solo/pkg/logger"
 	"solo/pkg/mq"
 	"solo/pkg/redis"
 	"solo/pkg/utils/stype"
@@ -168,6 +169,8 @@ func (s *MatchService) notifyMatchSuccess(users []commontype.WaitingUser) {
 	if err != nil {
 		log.Printf("❌ Failed to publish match success event: %v", err)
 	}
+
+	logger.Info(logger.LogEventMatchSuccess, fmt.Sprintf("Match success: %s", matchEvent.MatchId), matchEvent)
 }
 
 func generateMatchID(users []commontype.WaitingUser) string {
