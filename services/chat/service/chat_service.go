@@ -108,7 +108,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		Type:                matchEvent.MatchType,
 		UserIDs:             helper.ExtractUserIDs(matchEvent.MatchedUsers),
 		Gamers:              gamers,
-		Status:              commontype.RoomStatusChoiceIng,
+		Status:              commontype.RoomStatusGameIng,
 		CreatedAt:           startTime,
 		FinishChatAt:        finishTime,
 		FinishFinalChoiceAt: finishTime.Add(commontype.FinishFinalChoiceTimer),
