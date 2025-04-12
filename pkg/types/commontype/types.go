@@ -65,7 +65,6 @@ const DEFAULT_TEMP_SERVER_ID = "game-server-1"
 const (
 	RoomStatusGameIng = iota
 	RoomStatusChoiceIng
-	RoomStatusChoiceComplete
 	RoomStatusGameEnd
 )
 
