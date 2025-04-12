@@ -669,10 +669,13 @@ func (s *GameService) MonitorBalanceGameFinishTimer() {
 }
 
 func (s *GameService) sendCoupleMatchEvent(matchStrings []string) error {
-	var matchedUsers []commontype.MatchedUser
+
+	log.Printf("🔍 matchStrings: %v", matchStrings)
 
 	// matchStrings 분석하여 매칭된 사용자 정보 추출
 	for _, matchStr := range matchStrings {
+		var matchedUsers []commontype.MatchedUser
+
 		// 매칭 문자열 파싱 (예: "1:2")
 		users := strings.Split(matchStr, ":")
 		if len(users) != 2 {
@@ -720,6 +723,8 @@ func (s *GameService) sendCoupleMatchEvent(matchStrings []string) error {
 			MatchType:    commontype.MATCH_COUPLE,
 			MatchedUsers: matchedUsers,
 		}
+
+		log.Printf("🔍 matchEvent: %v", matchEvent)
 
 		err = s.emitter.PublishMatchEvent(matchEvent)
 		if err != nil {
