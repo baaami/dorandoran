@@ -63,8 +63,7 @@ const DEFAULT_PAGE_SIZE = 20
 const DEFAULT_TEMP_SERVER_ID = "game-server-1"
 
 const (
-	RoomStatusGameStart = iota
-	RoomStatusGameIng
+	RoomStatusGameIng = iota
 	RoomStatusChoiceIng
 	RoomStatusChoiceComplete
 	RoomStatusGameEnd
