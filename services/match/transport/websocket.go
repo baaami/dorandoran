@@ -23,7 +23,7 @@ func NewRouter(matchHandler *handler.MatchHandler, redisClient *redis.RedisClien
 
 	e.Use(middleware.SessionMiddleware(redisClient))
 
-	e.GET("/ws/match", matchHandler.HandleMatchSocket)
+	e.GET("/", matchHandler.HandleMatchSocket)
 
 	return e
 }

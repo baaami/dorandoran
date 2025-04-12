@@ -18,13 +18,13 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
   hosts:
-    - host: api.match.com
+    - host: api.solo.com
       paths:
-        - path: /
+        - path: /ws/match
           pathType: Prefix
           serviceName: match
           servicePort: 2720
   tls:
     - hosts:
-        - api.match.com
+        - api.solo.com
       secretName: tls-secret

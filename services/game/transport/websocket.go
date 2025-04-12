@@ -23,7 +23,7 @@ func NewRouter(gameHandler *handler.GameHandler, redisClient *redis.RedisClient)
 
 	e.Use(middleware.SessionMiddleware(redisClient))
 
-	e.GET("/ws/chat", gameHandler.HandleGameSocket)
+	e.GET("/", gameHandler.HandleGameSocket)
 
 	return e
 }

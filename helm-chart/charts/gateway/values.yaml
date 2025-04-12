@@ -18,13 +18,13 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
   hosts:
-    - host: api.gateway.com
+    - host: api.solo.com
       paths:
-        - path: /
+        - path: /api/v1
           pathType: Prefix
           serviceName: gateway
           servicePort: 2719
   tls:
     - hosts:
-        - api.gateway.com
+        - api.solo.com
       secretName: tls-secret
