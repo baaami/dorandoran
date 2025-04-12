@@ -160,12 +160,7 @@ func (e *EventHandler) HandleFinalChoiceTimeout(body json.RawMessage) {
 
 	printer.PrintFinalChoiceTimeoutEvent(eventData)
 
-	err := e.chatService.UpdateChatRoomStatus(eventData.RoomID, commontype.RoomStatusChoiceComplete)
-	if err != nil {
-		printer.PrintError("Failed to update chat room status", err)
-	}
-
-	err = e.redisClient.RemoveChoiceRoomFromRedis(eventData.RoomID)
+	err := e.redisClient.RemoveChoiceRoomFromRedis(eventData.RoomID)
 	if err != nil {
 		printer.PrintError("Failed to remove RoomID from rooms list", err)
 	}
