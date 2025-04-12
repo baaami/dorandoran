@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/logger"
 	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
@@ -164,6 +165,8 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		}
 	}
 
+	logger.Info(logger.LogEventGameRoomCreate, fmt.Sprintf("Chat room created: %s with users: %v", room.ID, room.UserIDs), room)
+
 	log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)
 	return nil
 }
@@ -308,6 +311,18 @@ func (s *ChatService) HandleRoomJoin(roomID string, userID int, joinTime time.Ti
 
 // 채팅방 나가기
 func (s *ChatService) LeaveChatRoom(roomID string, userID int) error {
+	roomLeaveEvent := eventtypes.RoomLeaveEvent{
+		RoomID:      roomID,
+		LeaveUserID: userID,
+	}
+
+	err := s.emitter.PublishRoomLeaveEvent(roomLeaveEvent)
+	if err != nil {
+		return err
+	}
+
+	logger.Info(logger.LogEventRoomLeave, fmt.Sprintf("Room leave, roomID: %s, userID: %d", roomID, userID), roomLeaveEvent)
+
 	return s.chatRepo.LeaveRoom(roomID, userID)
 }
 

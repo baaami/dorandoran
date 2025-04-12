@@ -109,7 +109,6 @@ func (r *RedisClient) GetJoinedUser(roomID string) ([]int, error) {
 		userIDs = append(userIDs, id)
 	}
 
-	log.Printf("Users in room %s: %v", roomID, userIDs)
 	return userIDs, nil
 }
 
@@ -119,7 +118,6 @@ func (r *RedisClient) AddChatTimeoutUser(roomID string, userID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to add timeout user %d to room %s: %v", userID, roomID, err)
 	}
-	log.Printf("User %d marked as timeout in room %s", userID, roomID)
 	return nil
 }
 
@@ -138,7 +136,6 @@ func (r *RedisClient) ClearChatTimeout(roomID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to clear room timeout data for room %s: %v", roomID, err)
 	}
-	log.Printf("Cleared timeout data for room %s", roomID)
 	return nil
 }
 

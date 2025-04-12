@@ -5,7 +5,8 @@ AUTH_BINARY=authApp
 MATCH_BINARY=matchApp
 GAME_BINARY=gameApp
 PUSH_BINARY=pushApp
-SERVICES=doran-gateway doran-user doran-chat doran-auth doran-match doran-game doran-push
+LOGGER_BINARY=loggerApp
+SERVICES=doran-gateway doran-user doran-chat doran-auth doran-match doran-game doran-push doran-logger
 INFRAS=mysql mongo redis
 
 ## up: starts all containers in the background without forcing build
@@ -15,7 +16,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_user build_chat build_auth build_match build_game build_push build_push
+up_build: build_gateway build_user build_chat build_auth build_match build_game build_push build_logger
 	@echo "Stopping docker images (if running...)"
 	docker-compose down
 	@echo "Building (when required) and starting docker images..."
@@ -23,7 +24,7 @@ up_build: build_gateway build_user build_chat build_auth build_match build_game 
 	@echo "Docker images built and started!"
 
 ## up_service: stops all services except MySQL, MongoDB, RabbitMQ, builds and restarts them
-up_service: build_gateway build_user build_chat build_auth build_match build_game build_push
+up_service: build_gateway build_user build_chat build_auth build_match build_game build_push build_logger
 	@echo "Stopping services except for MySQL, MongoDB, RabbitMQ..."
 	docker-compose stop ${SERVICES}
 	docker-compose rm -f ${SERVICES}
@@ -84,3 +85,8 @@ build_push:
 	cd services/push && env GOOS=linux CGO_ENABLED=0 go build -o ${PUSH_BINARY} ./cmd
 	@echo "Done!"	
 
+## build_logger: builds the logger binary as a linux executable
+build_logger:
+	@echo "Building logger binary..."
+	cd services/logger && env GOOS=linux CGO_ENABLED=0 go build -o ${LOGGER_BINARY} ./cmd
+	@echo "Done!"

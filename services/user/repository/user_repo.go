@@ -85,7 +85,7 @@ func (r *UserRepository) GetUserAlert(id int) (bool, error) {
 
 // 유저 업데이트
 func (r *UserRepository) UpdateUser(user models.User) error {
-	if err := r.db.Model(&models.User{ID: user.ID}).Updates(user).Error; err != nil {
+	if err := r.db.Model(&models.User{ID: user.ID}).Select("*").Updates(user).Error; err != nil {
 		log.Printf("❌ Failed to update user ID %d: %v", user.ID, err)
 		return err
 	}

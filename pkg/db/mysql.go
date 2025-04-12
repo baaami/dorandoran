@@ -18,7 +18,7 @@ func ConnectMySQL() (*gorm.DB, error) {
 
 	// MySQL 연결
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		log.Printf("❌ MySQL 연결 실패: %v", err)

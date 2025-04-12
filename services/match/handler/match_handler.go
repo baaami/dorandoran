@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"solo/pkg/logger"
 	"solo/pkg/models"
 	"solo/pkg/types/commontype"
 	"solo/services/match/service"
@@ -88,6 +89,7 @@ func (h *MatchHandler) HandleMatchSocket(c echo.Context) error {
 			if ctx.Err() == context.DeadlineExceeded {
 				log.Printf("Matching timed out for user %d", userID)
 				h.matchService.SendMatchFailureMessage(conn)
+				logger.Debug(logger.LogEventMatchFail, fmt.Sprintf("Matching timed out for user %d", userID), nil)
 			}
 			return nil
 		default:
@@ -98,6 +100,7 @@ func (h *MatchHandler) HandleMatchSocket(c echo.Context) error {
 				} else if ctx.Err() == context.DeadlineExceeded || isTimeoutError(err) {
 					log.Printf("WebSocket read timeout for user %d", userID)
 					h.matchService.SendMatchFailureMessage(conn)
+					logger.Debug(logger.LogEventMatchFail, fmt.Sprintf("Matching timed out for user %d", userID), nil)
 					continue
 				} else {
 					log.Printf("WebSocket connection closed by client, user id: %d", userID)

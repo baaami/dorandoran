@@ -1,0 +1,35 @@
+{{- $name := "logger" }}
+{{- $service := .Values }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ $name }}
+  labels:
+    app: {{ .Release.Name }}-{{ $name }}
+spec:
+  replicas: {{ $service.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-{{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-{{ $name }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          {{- if contains "baaami" $service.image }}
+          image: "{{ $service.image }}:{{ .Values.global.imageTag }}"
+          {{- else }}
+          image: "{{ $service.image }}"
+          {{- end }}
+          {{- if $service.service.port }}
+          ports:
+            - containerPort: {{ $service.service.port }}
+              name: {{ .Release.Name }}-http
+          {{- end }}
+          env:
+            {{- range $key, $value := $service.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+            {{- end }}

@@ -1,0 +1,8 @@
+image: baaami/doran-logger
+replicas: 1
+service:
+  type: ClusterIP
+  port: 80
+env:
+  RABBITMQ_HOST: doran-rabbitmq
+  MONGO_HOST: doran-mongo

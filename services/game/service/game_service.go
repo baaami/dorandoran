@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"solo/pkg/helper"
+	"solo/pkg/logger"
 	"solo/pkg/models"
 	"solo/pkg/redis"
 	"solo/pkg/types/commontype"
@@ -403,6 +404,8 @@ func (s *GameService) MonitorChatTimeouts() {
 				log.Printf("Failed to handle timeout for RoomID %s: %v", roomID, err)
 			}
 
+			logger.Info(logger.LogEventGameRoomChatTimeout, fmt.Sprintf("Chat room timeout: %s", roomID), event)
+
 			// TODO: Redis에서 최종 선택 완료 시 방 삭제
 			err = s.redisClient.RemoveRoomFromRedis(roomID)
 			if err != nil {
@@ -454,6 +457,8 @@ func (s *GameService) MonitorFinalChoiceTimeouts() {
 			if err != nil {
 				log.Printf("Failed to handle timeout for RoomID %s: %v", roomID, err)
 			}
+
+			logger.Info(logger.LogEventFinalChoiceEnd, fmt.Sprintf("Final choice timeout: %s", roomID), event)
 
 			err = s.redisClient.RemoveChoiceRoomFromRedis(roomID)
 			if err != nil {
@@ -558,6 +563,8 @@ func (s *GameService) MonitorBalanceGameStartTimer() {
 			if err != nil {
 				log.Printf("Failed to set balance game finish timer: %v", err)
 			}
+
+			logger.Info(logger.LogEventBalanceGameStart, fmt.Sprintf("Balance game start: %s", roomID), chatEvent)
 		}
 	}
 }
@@ -645,6 +652,8 @@ func (s *GameService) MonitorBalanceGameFinishTimer() {
 			if err != nil {
 				log.Printf("Failed to remove balance game finish timer: %v", err)
 			}
+
+			logger.Info(logger.LogEventBalanceGameEnd, fmt.Sprintf("Balance game end: %s", roomID), chatEvent)
 		}
 	}
 }

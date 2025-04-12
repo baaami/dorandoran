@@ -26,6 +26,7 @@ const (
 	EventTypeRoomRemainTime     = "room.remain.time"
 	EventTypeFinalChoiceTimeout = "final.choice.timeout"
 	EventTypeVoteCommentChat    = "vote.comment.chat"
+	EventTypeLog                = "log"
 )
 
 type ChatEvent struct {
