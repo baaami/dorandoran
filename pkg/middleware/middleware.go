@@ -9,12 +9,11 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// SessionMiddleware for Echo framework
 func SessionMiddleware(redisClient *redis.RedisClient) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			// 인증이 필요 없는 경로 처리
-			if strings.HasPrefix(c.Path(), "/auth") || strings.HasPrefix(c.Path(), "/profile") {
+			if strings.Contains(c.Path(), "/auth") || strings.Contains(c.Path(), "/profile") {
 				return next(c)
 			}
 
