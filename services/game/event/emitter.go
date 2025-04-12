@@ -83,3 +83,11 @@ func (e *Emitter) PublishRoomTimeoutEvent(timeoutEvent eventtypes.RoomTimeoutEve
 	}
 	return e.publish(mq.ExchangeAppTopic, mq.RoutingKeyRoomTimeout, payload)
 }
+
+func (e *Emitter) PublishMatchEvent(event eventtypes.MatchEvent) error {
+	payload := eventtypes.EventPayload{
+		EventType: eventtypes.EventTypeMatch,
+		Data:      helper.ToJSON(event),
+	}
+	return e.publish(mq.ExchangeMatchEvents, "", payload)
+}

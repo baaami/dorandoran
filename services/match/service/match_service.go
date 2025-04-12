@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/samber/lo"
 )
 
 type MQEmitter interface {
@@ -145,6 +146,14 @@ func (s *MatchService) startMatchMonitoring() {
 
 			// 매칭된 사용자들 MQ로 이벤트 발행
 			if len(matchedUsers) > 0 {
+				matchedUsers := lo.Map(matchedUsers, func(user commontype.WaitingUser, _ int) commontype.MatchedUser {
+					return commontype.MatchedUser{
+						ID:     user.ID,
+						Name:   user.Name,
+						Gender: user.Gender,
+						Birth:  user.Birth,
+					}
+				})
 				s.notifyMatchSuccess(matchedUsers)
 			}
 		}
@@ -152,7 +161,7 @@ func (s *MatchService) startMatchMonitoring() {
 }
 
 // 매칭 성공 이벤트 MQ 발행
-func (s *MatchService) notifyMatchSuccess(users []commontype.WaitingUser) {
+func (s *MatchService) notifyMatchSuccess(users []commontype.MatchedUser) {
 	matchEvent := eventtypes.MatchEvent{
 		MatchId:      generateMatchID(users),
 		MatchType:    commontype.MATCH_GAME,
@@ -173,7 +182,7 @@ func (s *MatchService) notifyMatchSuccess(users []commontype.WaitingUser) {
 	logger.Info(logger.LogEventMatchSuccess, fmt.Sprintf("Match success: %s", matchEvent.MatchId), matchEvent)
 }
 
-func generateMatchID(users []commontype.WaitingUser) string {
+func generateMatchID(users []commontype.MatchedUser) string {
 	timestamp := time.Now().Format("20060102150405")
 	var userIDs []string
 	for _, user := range users {

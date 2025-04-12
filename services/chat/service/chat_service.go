@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/helper"
 	"solo/pkg/logger"
 	"solo/pkg/models"
 	"solo/pkg/redis"
@@ -105,7 +106,7 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 		Name:                roomName,
 		Seq:                 seq,
 		Type:                matchEvent.MatchType,
-		UserIDs:             extractUserIDs(matchEvent.MatchedUsers),
+		UserIDs:             helper.ExtractUserIDs(matchEvent.MatchedUsers),
 		Gamers:              gamers,
 		Status:              commontype.RoomStatusGameStart,
 		CreatedAt:           startTime,
@@ -169,15 +170,6 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 
 	log.Printf("Chat room created: %s with users: %v", room.ID, room.UserIDs)
 	return nil
-}
-
-// 매칭된 유저 ID 목록 추출
-func extractUserIDs(users []commontype.WaitingUser) []int {
-	ids := make([]int, len(users))
-	for i, user := range users {
-		ids[i] = user.ID
-	}
-	return ids
 }
 
 // 특정 유저가 속한 채팅방 목록 조회

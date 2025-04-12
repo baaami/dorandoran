@@ -112,6 +112,13 @@ type Address struct {
 	Street   string `gorm:"size:100" json:"street"`
 }
 
+type MatchedUser struct {
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Gender int    `json:"gender"`
+	Birth  string `json:"birth"`
+}
+
 type WaitingUser struct {
 	ID          int     `json:"id"`
 	Name        string  `json:"name"`

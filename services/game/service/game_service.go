@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"solo/pkg/dto"
 	"solo/pkg/helper"
 	"solo/pkg/logger"
 	"solo/pkg/models"
@@ -27,6 +31,7 @@ type MQEmitter interface {
 	PublishChatMessageEvent(event eventtypes.ChatEvent) error
 	PublishFinalChoiceTimeoutEvent(event eventtypes.FinalChoiceTimeoutEvent) error
 	PublishRoomTimeoutEvent(timeoutEvent eventtypes.RoomTimeoutEvent) error
+	PublishMatchEvent(event eventtypes.MatchEvent) error
 }
 
 // Client 구조체 - WebSocket 클라이언트
@@ -315,6 +320,11 @@ func (s *GameService) BroadcastFinalChoices(roomID string) error {
 	}
 
 	matchStrings := helper.ConvertUserChoicesToMatchStrings(finalChoiceResults.Choices)
+
+	err = s.sendCoupleMatchEvent(matchStrings)
+	if err != nil {
+		return fmt.Errorf("❌ sendCoupleMatchEvent 실패: %w", err)
+	}
 
 	// 최종 선택 결과 저장
 	err = s.chatRepo.UpdateMatchHistoryFinalMatch(int(chatRoom.Seq), matchStrings)
@@ -656,4 +666,109 @@ func (s *GameService) MonitorBalanceGameFinishTimer() {
 			logger.Info(logger.LogEventBalanceGameEnd, fmt.Sprintf("Balance game end: %s", roomID), chatEvent)
 		}
 	}
+}
+
+func (s *GameService) sendCoupleMatchEvent(matchStrings []string) error {
+	var matchedUsers []commontype.MatchedUser
+
+	// matchStrings 분석하여 매칭된 사용자 정보 추출
+	for _, matchStr := range matchStrings {
+		// 매칭 문자열 파싱 (예: "1:2")
+		users := strings.Split(matchStr, ":")
+		if len(users) != 2 {
+			continue
+		}
+
+		user1ID, err := strconv.Atoi(users[0])
+		if err != nil {
+			continue
+		}
+
+		user2ID, err := strconv.Atoi(users[1])
+		if err != nil {
+			continue
+		}
+
+		user1, err := GetUserInfo(user1ID)
+		if err != nil {
+			continue
+		}
+
+		user2, err := GetUserInfo(user2ID)
+		if err != nil {
+			continue
+		}
+
+		// 매칭된 사용자 정보 추가
+		matchedUsers = append(matchedUsers, commontype.MatchedUser{
+			ID:     user1ID,
+			Name:   user1.Name,
+			Gender: user1.Gender,
+			Birth:  user1.Birth,
+		})
+
+		matchedUsers = append(matchedUsers, commontype.MatchedUser{
+			ID:     user2ID,
+			Name:   user2.Name,
+			Gender: user2.Gender,
+			Birth:  user2.Birth,
+		})
+
+		// 매칭 이벤트 생성 및 발행
+		matchEvent := eventtypes.MatchEvent{
+			MatchId:      helper.GenerateMatchID(matchedUsers),
+			MatchType:    commontype.MATCH_COUPLE,
+			MatchedUsers: matchedUsers,
+		}
+
+		err = s.emitter.PublishMatchEvent(matchEvent)
+		if err != nil {
+			return fmt.Errorf("❌ PublishMatchEvent 실패: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func GetUserInfo(userID int) (commontype.MatchedUser, error) {
+	// User 서비스 API 엔드포인트 설정
+	userServiceURL := "http://doran-user/find"
+	client := &http.Client{}
+
+	// 요청 생성
+	req, err := http.NewRequest("GET", userServiceURL, nil)
+	if err != nil {
+		return commontype.MatchedUser{}, fmt.Errorf("❌ 요청 생성 실패: %w", err)
+	}
+
+	// X-User-ID 헤더 설정
+	req.Header.Set("X-User-ID", strconv.Itoa(userID))
+
+	// 요청 실행
+	resp, err := client.Do(req)
+	if err != nil {
+		return commontype.MatchedUser{}, fmt.Errorf("❌ API 요청 실패: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 응답 상태 코드 확인
+	if resp.StatusCode != http.StatusOK {
+		return commontype.MatchedUser{}, fmt.Errorf("❌ API 응답 오류: %d", resp.StatusCode)
+	}
+
+	// 응답 데이터 파싱
+	var user dto.UserDTO
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return commontype.MatchedUser{}, fmt.Errorf("❌ 응답 데이터 파싱 실패: %w", err)
+	}
+
+	// MatchedUser 객체로 변환
+	matchedUser := commontype.MatchedUser{
+		ID:     user.ID,
+		Name:   user.Name,
+		Gender: user.Gender,
+		Birth:  user.Birth,
+	}
+
+	return matchedUser, nil
 }

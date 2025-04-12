@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"solo/pkg/types/commontype"
 	"solo/pkg/utils/stype"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/samber/lo"
 )
@@ -66,4 +68,26 @@ func ConvertUserChoicesToMatchStrings(choices []stype.UserChoice) []string {
 	}
 
 	return matchStrings
+}
+
+func GenerateMatchID(users []commontype.MatchedUser) string {
+	timestamp := time.Now().Format("20060102150405")
+	var userIDs []string
+	for _, user := range users {
+		userIDs = append(userIDs, strconv.Itoa(user.ID))
+	}
+	return fmt.Sprintf("%s_%s", timestamp, joinIDs(userIDs))
+}
+
+// 매칭된 유저 ID 목록 추출
+func ExtractUserIDs(users []commontype.MatchedUser) []int {
+	ids := make([]int, len(users))
+	for i, user := range users {
+		ids[i] = user.ID
+	}
+	return ids
+}
+
+func joinIDs(ids []string) string {
+	return strings.Join(ids, "_")
 }

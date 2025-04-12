@@ -50,7 +50,7 @@ type VoteCommentChatEvent struct {
 type MatchEvent struct {
 	MatchId      string                   `bson:"match_id" json:"match_id"`
 	MatchType    int                      `bson:"match_type" json:"match_type"`
-	MatchedUsers []commontype.WaitingUser `bson:"matched_users" json:"matched_users"`
+	MatchedUsers []commontype.MatchedUser `bson:"matched_users" json:"matched_users"`
 }
 
 type RoomLeaveEvent struct {
