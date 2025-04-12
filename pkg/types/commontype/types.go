@@ -25,10 +25,10 @@ const (
 )
 
 const (
-	GameRunningTime        = 3 * time.Minute
+	GameRunningTime        = 2 * time.Minute
 	CoupleRunningTime      = 24 * 3 * time.Hour
 	BalanceGameStartTimer  = 30 * time.Second
-	BalanceGameEndTimer    = 15 * time.Second
+	BalanceGameEndTimer    = 1 * time.Minute
 	FinishFinalChoiceTimer = 30 * time.Second
 	RemoveRoomDataTimer    = 10 * time.Minute
 )
