@@ -12,8 +12,8 @@ import (
 func SessionMiddleware(redisClient *redis.RedisClient) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// 인증이 필요 없는 경로 처리
-			if strings.Contains(c.Path(), "/auth") || strings.Contains(c.Path(), "/profile") {
+			// TODO: 인증이 필요 없는 경로 처리, 추후 보안 강화 예정
+			if strings.Contains(c.Path(), "auth") || strings.Contains(c.Path(), "profile") {
 				return next(c)
 			}
 
