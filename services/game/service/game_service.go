@@ -408,6 +408,11 @@ func (s *GameService) MonitorChatTimeouts() {
 				InactiveUserIds: inactiveUsers,
 			}
 
+			err = s.chatRepo.UpdateChatRoomStatus(roomID, commontype.RoomStatusChoiceIng)
+			if err != nil {
+				log.Printf("Failed to update chat room status, err: %v", err)
+			}
+
 			// 만료된 방에 대해 timeout 이벤트 발행
 			err = s.emitter.PublishRoomTimeoutEvent(event)
 			if err != nil {
@@ -460,6 +465,11 @@ func (s *GameService) MonitorFinalChoiceTimeouts() {
 			event := eventtypes.FinalChoiceTimeoutEvent{
 				RoomID:  roomID,
 				UserIDs: roomTotalUserIds,
+			}
+
+			err = s.chatRepo.UpdateChatRoomStatus(roomID, commontype.RoomStatusGameEnd)
+			if err != nil {
+				log.Printf("Failed to update chat room status, err: %v", err)
 			}
 
 			// 만료된 방에 대해 timeout 이벤트 발행
