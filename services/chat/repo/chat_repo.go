@@ -898,6 +898,7 @@ func (r *ChatRepository) CancelVote(formID primitive.ObjectID, userID int) error
 	return mongo.WithSession(ctx, session, callback)
 }
 
+// 매칭 기록 저장
 func (r *ChatRepository) SaveMatchHistory(matchHistory models.MatchHistory) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -913,6 +914,7 @@ func (r *ChatRepository) SaveMatchHistory(matchHistory models.MatchHistory) erro
 	return nil
 }
 
+// 매칭 기록 밸런스 게임 결과 업데이트
 func (r *ChatRepository) UpdateMatchHistoryBalanceResult(roomSeq int, balanceResult models.BalanceGameResult) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -939,6 +941,26 @@ func (r *ChatRepository) UpdateMatchHistoryBalanceResult(roomSeq int, balanceRes
 	return nil
 }
 
+// 매칭 기록 최종 매칭 조회
+func (r *ChatRepository) GetMatchHistoryFinalMatch(roomSeq int) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	filter := bson.M{"room_seq": roomSeq}
+
+	var matchHistory models.MatchHistory
+	err := collection.FindOne(ctx, filter).Decode(&matchHistory)
+	if err != nil {
+		log.Printf("Error finding match history for room seq %d: %v", roomSeq, err)
+		return nil, err
+	}
+
+	return matchHistory.FinalMatch, nil
+}
+
+// 매칭 기록 최종 매칭 업데이트
 func (r *ChatRepository) UpdateMatchHistoryFinalMatch(roomSeq int, finalMatch []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

@@ -70,6 +70,33 @@ func ConvertUserChoicesToMatchStrings(choices []stype.UserChoice) []string {
 	return matchStrings
 }
 
+// UserChoice 형식으로 변환
+func ConvertMatchStringsToUserChoices(matchStrings []string) []stype.UserChoice {
+	choices := make([]stype.UserChoice, len(matchStrings))
+	for i, matchString := range matchStrings {
+		parts := strings.Split(matchString, ":")
+		if len(parts) != 2 {
+			log.Printf("Invalid match string format: %s", matchString)
+			continue
+		}
+		userID, err := strconv.Atoi(parts[0])
+		if err != nil {
+			log.Printf("Invalid user ID format: %s", parts[0])
+			continue
+		}
+		selectedUserID, err := strconv.Atoi(parts[1])
+		if err != nil {
+			log.Printf("Invalid selected user ID format: %s", parts[1])
+			continue
+		}
+		choices[i] = stype.UserChoice{
+			UserID:         userID,
+			SelectedUserID: selectedUserID,
+		}
+	}
+	return choices
+}
+
 func GenerateMatchID(users []commontype.MatchedUser) string {
 	timestamp := time.Now().Format("20060102150405")
 	var userIDs []string

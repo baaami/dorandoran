@@ -464,10 +464,12 @@ func (s *ChatService) GetBalanceFormComments(formID primitive.ObjectID, page int
 	return s.chatRepo.GetBalanceFormComments(formID, page, pageSize)
 }
 
+// 매칭 기록 저장
 func (s *ChatService) SaveMatchHistory(matchHistory models.MatchHistory) {
 	s.chatRepo.SaveMatchHistory(matchHistory)
 }
 
+// 매칭 기록 밸런스 게임 결과 업데이트
 func (s *ChatService) AddBalanceGameResult(roomSeq int, gameID primitive.ObjectID, winnerTeam int) error {
 	result := models.BalanceGameResult{
 		GameID:     gameID,
@@ -483,6 +485,7 @@ func (s *ChatService) AddBalanceGameResult(roomSeq int, gameID primitive.ObjectI
 	return nil
 }
 
+// 매칭 기록 최종 매칭 업데이트
 func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []string) error {
 	err := s.chatRepo.UpdateMatchHistoryFinalMatch(roomSeq, finalMatch)
 	if err != nil {
@@ -491,6 +494,11 @@ func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []string) error {
 	}
 
 	return nil
+}
+
+// 매칭 기록 최종 매칭 조회
+func (s *ChatService) GetFinalChoiceResult(roomSeq int) ([]string, error) {
+	return s.chatRepo.GetMatchHistoryFinalMatch(roomSeq)
 }
 
 // GetBalanceFormsByRoomID returns all balance forms for a given room

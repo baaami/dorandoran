@@ -223,6 +223,7 @@ func (r *RedisClient) RemoveChoiceRoomFromRedis(roomID string) error {
 	return nil
 }
 
+// 유저 최종 선택 저장
 func (r *RedisClient) SaveUserChoice(roomID string, userID, selectedUserID int) error {
 	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
 	err := r.Client.HSet(ctx, choiceKey, strconv.Itoa(userID), strconv.Itoa(selectedUserID)).Err()
@@ -233,6 +234,7 @@ func (r *RedisClient) SaveUserChoice(roomID string, userID, selectedUserID int) 
 	return nil
 }
 
+// 유저 최종 선택 완료 여부 확인
 func (r *RedisClient) IsAllChoicesCompleted(roomID string, totalUsers int64) (bool, error) {
 	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
 	choiceCount, err := r.Client.HLen(ctx, choiceKey).Result()
@@ -244,6 +246,7 @@ func (r *RedisClient) IsAllChoicesCompleted(roomID string, totalUsers int64) (bo
 	return choiceCount == totalUsers, nil
 }
 
+// 유저 최종 선택 결과 조회
 func (r *RedisClient) GetAllChoices(roomID string) (*stype.FinalChoiceResultMessage, error) {
 	choiceKey := fmt.Sprintf("final_choice_room:%s", roomID)
 	choicesMap, err := r.Client.HGetAll(ctx, choiceKey).Result()

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"solo/pkg/dto"
+	"solo/pkg/helper"
 	"solo/pkg/models"
 	"solo/pkg/types/commontype"
+	"solo/pkg/utils/stype"
 	"solo/services/chat/service"
 
 	"github.com/labstack/echo/v4"
@@ -339,4 +341,28 @@ func (h *ChatHandler) GetBalanceFormComments(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, response)
+}
+
+// 매칭 기록 최종 매칭 조회
+func (h *ChatHandler) GetFinalChoiceResult(c echo.Context) error {
+	roomID := c.Param("id")
+
+	room, err := h.chatService.GetChatRoomByID(roomID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve chat room"})
+	}
+
+	matchArray, err := h.chatService.GetFinalChoiceResult(int(room.Seq))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve final match"})
+	}
+
+	match := helper.ConvertMatchStringsToUserChoices(matchArray)
+
+	finalChoiceResult := stype.FinalChoiceResultMessage{
+		RoomID:  roomID,
+		Choices: match,
+	}
+
+	return c.JSON(http.StatusOK, finalChoiceResult)
 }

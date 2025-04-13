@@ -358,7 +358,7 @@ func (s *GameService) ProcessFinalChoice(userID int, finalChoiceMsg stype.FinalC
 		return fmt.Errorf("❌ Redis GetRoomUserIDs 실패: %w", err)
 	}
 
-	// 모든 유저가 선택을 완료했는지 확인
+	// 모든 유저가 최종 선택을 완료했는지 확인
 	allChosen, err := s.redisClient.IsAllChoicesCompleted(roomID, int64(len(roomTotalUserIDs)))
 	if err != nil {
 		return fmt.Errorf("❌ Redis IsAllChoicesCompleted 실패: %w", err)
