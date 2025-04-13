@@ -45,12 +45,19 @@ type BalanceGameResult struct {
 	WinnerTeam int                `bson:"winner_team" json:"winner_team"`         // 승리 팀 (0: red, 1: blue)
 }
 
+type FinalMatch struct {
+	RoomID   string `bson:"room_id" json:"room_id"`
+	MaleID   int    `bson:"male_id" json:"male_id"`
+	FemaleID int    `bson:"female_id" json:"female_id"`
+}
+
 type MatchHistory struct {
 	ID             primitive.ObjectID  `bson:"_id,omitempty" json:"id"`
 	RoomSeq        int                 `bson:"room_seq" json:"room_seq"`
 	UserIDs        []int               `bson:"user_ids" json:"user_ids"`
 	BalanceResults []BalanceGameResult `bson:"balance_results" json:"balance_results"` // 최종 선택 완료 후 업데이트
-	FinalMatch     []string            `bson:"final_match" json:"final_match"`         // 최종 선택 완료 후 업데이트
+	FinalChoices   []string            `bson:"final_choices" json:"final_choices"`     // 최종 선택 완료 후 업데이트
+	FinalMatchs    []FinalMatch        `bson:"final_matchs" json:"final_matchs"`       // 최종 선택 완료 후 업데이트
 	CreatedAt      time.Time           `bson:"created_at" json:"created_at"`
 }
 

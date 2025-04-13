@@ -22,6 +22,7 @@ func NewRouter(chatHandler *handler.ChatHandler, chatService *service.ChatServic
 	// 채팅방 관련 라우팅 (roomID 파라미터 사용)
 	e.GET("/room/:id", chatHandler.GetChatRoomByID)
 	e.GET("/room/finalchoice/:id", chatHandler.GetFinalChoiceResult)
+	e.GET("/room/finalmatch/:id", chatHandler.GetFinalMatch)
 	e.DELETE("/room/leave/:id", chatHandler.LeaveChatRoom)
 	e.DELETE("/room/delete/:id", chatHandler.DeleteChatRoom)
 	e.GET("/list/:id", chatHandler.GetChatMsgListByRoomID)

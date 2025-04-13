@@ -76,7 +76,7 @@ func (e *EventHandler) HandleRoomCreateEvent(body json.RawMessage) {
 		RoomSeq:        int(chatRoom.Seq),
 		UserIDs:        chatRoom.UserIDs,
 		BalanceResults: []models.BalanceGameResult{},
-		FinalMatch:     []string{},
+		FinalMatchs:    []models.FinalMatch{},
 		CreatedAt:      chatRoom.CreatedAt,
 	}
 

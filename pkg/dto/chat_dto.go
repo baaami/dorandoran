@@ -43,3 +43,8 @@ type LastMessage struct {
 	GameInfo  commontype.GameInfo `json:"game_info"`
 	CreatedAt time.Time           `json:"created_at"`
 }
+
+type FinalMatchResultResponse struct {
+	Result bool   `json:"result"`
+	RoomID string `json:"room_id"`
+}

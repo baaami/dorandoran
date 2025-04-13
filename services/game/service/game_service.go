@@ -319,17 +319,17 @@ func (s *GameService) BroadcastFinalChoices(roomID string) error {
 		return fmt.Errorf("❌ GetRoomByID 실패: %w", err)
 	}
 
-	matchStrings := helper.ConvertUserChoicesToMatchStrings(finalChoiceResults.Choices)
+	finalChoiceArrary := helper.ConvertUserChoicesToFinalChoiceArrary(finalChoiceResults.Choices)
 
-	err = s.sendCoupleMatchEvent(matchStrings)
+	err = s.sendCoupleMatchEvent(finalChoiceArrary)
 	if err != nil {
 		return fmt.Errorf("❌ sendCoupleMatchEvent 실패: %w", err)
 	}
 
-	// 최종 선택 결과 저장
-	err = s.chatRepo.UpdateMatchHistoryFinalMatch(int(chatRoom.Seq), matchStrings)
+	// 최종 선택 결과 업데이트
+	err = s.chatRepo.UpdateMatchHistoryFinalChoice(int(chatRoom.Seq), finalChoiceArrary)
 	if err != nil {
-		return fmt.Errorf("❌ UpdateFinalMatch 실패: %w", err)
+		return fmt.Errorf("❌ UpdateFinalChoice 실패: %w", err)
 	}
 
 	// Redis에서 최종 선택 정보 삭제
@@ -678,16 +678,16 @@ func (s *GameService) MonitorBalanceGameFinishTimer() {
 	}
 }
 
-func (s *GameService) sendCoupleMatchEvent(matchStrings []string) error {
+func (s *GameService) sendCoupleMatchEvent(finalChoiceArrary []string) error {
 
-	log.Printf("🔍 matchStrings: %v", matchStrings)
+	log.Printf("🔍 finalChoiceArrary: %v", finalChoiceArrary)
 
-	// matchStrings 분석하여 매칭된 사용자 정보 추출
-	for _, matchStr := range matchStrings {
+	// finalChoiceArrary 분석하여 매칭된 사용자 정보 추출
+	for _, finalChoiceStr := range finalChoiceArrary {
 		var matchedUsers []commontype.MatchedUser
 
 		// 매칭 문자열 파싱 (예: "1:2")
-		users := strings.Split(matchStr, ":")
+		users := strings.Split(finalChoiceStr, ":")
 		if len(users) != 2 {
 			continue
 		}

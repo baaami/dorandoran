@@ -776,6 +776,7 @@ func (r *ChatRepository) GetUserVote(formID primitive.ObjectID, userID int) (*mo
 	return &vote, nil
 }
 
+// 밸런스 게임 폼 ID로 채팅방 ID 조회
 func (r *ChatRepository) GetRoomIdByBalanceFormID(formID primitive.ObjectID) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -941,8 +942,8 @@ func (r *ChatRepository) UpdateMatchHistoryBalanceResult(roomSeq int, balanceRes
 	return nil
 }
 
-// 매칭 기록 최종 매칭 조회
-func (r *ChatRepository) GetMatchHistoryFinalMatch(roomSeq int) ([]string, error) {
+// 매칭 기록 최종 선택 조회
+func (r *ChatRepository) GetMatchHistoryFinalChoices(roomSeq int) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -957,11 +958,57 @@ func (r *ChatRepository) GetMatchHistoryFinalMatch(roomSeq int) ([]string, error
 		return nil, err
 	}
 
-	return matchHistory.FinalMatch, nil
+	return matchHistory.FinalChoices, nil
+}
+
+// 매칭 기록 최종 매칭 조회
+func (r *ChatRepository) GetMatchHistoryFinalMatch(roomSeq int) ([]models.FinalMatch, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	filter := bson.M{"room_seq": roomSeq}
+
+	var matchHistory models.MatchHistory
+	err := collection.FindOne(ctx, filter).Decode(&matchHistory)
+	if err != nil {
+		log.Printf("Error finding match history for room seq %d: %v", roomSeq, err)
+		return nil, err
+	}
+
+	return matchHistory.FinalMatchs, nil
+}
+
+// 매칭 기록 최종 선택 업데이트
+func (r *ChatRepository) UpdateMatchHistoryFinalChoice(roomSeq int, finalChoices []string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	filter := bson.M{"room_seq": roomSeq}
+	update := bson.M{
+		"$set": bson.M{
+			"final_choices": finalChoices,
+		},
+	}
+
+	result, err := collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error updating final choices for room seq %d: %v", roomSeq, err)
+		return err
+	}
+
+	if result.MatchedCount == 0 {
+		return errors.New("match history not found")
+	}
+
+	return nil
 }
 
 // 매칭 기록 최종 매칭 업데이트
-func (r *ChatRepository) UpdateMatchHistoryFinalMatch(roomSeq int, finalMatch []string) error {
+func (r *ChatRepository) UpdateMatchHistoryFinalMatch(roomSeq int, finalMatch []models.FinalMatch) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -985,6 +1032,25 @@ func (r *ChatRepository) UpdateMatchHistoryFinalMatch(roomSeq int, finalMatch []
 	}
 
 	return nil
+}
+
+// 커플 매칭 결과 및 커플방 조회
+func (r *ChatRepository) GetCoupleMatchResultAndRoom(roomSeq int) ([]models.FinalMatch, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := r.client.Database("chat_db").Collection("match_histories")
+
+	filter := bson.M{"room_seq": roomSeq}
+
+	var matchHistory models.MatchHistory
+	err := collection.FindOne(ctx, filter).Decode(&matchHistory)
+	if err != nil {
+		log.Printf("Error finding match history for room seq %d: %v", roomSeq, err)
+		return nil, err
+	}
+
+	return matchHistory.FinalMatchs, nil
 }
 
 // GetRandomBalanceGameForm은 balance_games 컬렉션에서 랜덤한 밸런스 게임을 하나 가져옵니다

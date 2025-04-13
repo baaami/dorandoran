@@ -56,27 +56,27 @@ func StringToIntArrary(strSlice []string) ([]int, error) {
 }
 
 // ["1:2", "3:4"] 형식으로 변환
-func ConvertUserChoicesToMatchStrings(choices []stype.UserChoice) []string {
-	matchStrings := make([]string, len(choices))
+func ConvertUserChoicesToFinalChoiceArrary(choices []stype.UserChoice) []string {
+	finalChoiceArrary := make([]string, len(choices))
 
 	for i, choice := range choices {
 		// UserID:SelectedUserID 형식으로 문자열 생성
-		matchStrings[i] = fmt.Sprintf("%d:%d",
+		finalChoiceArrary[i] = fmt.Sprintf("%d:%d",
 			choice.UserID,
 			choice.SelectedUserID,
 		)
 	}
 
-	return matchStrings
+	return finalChoiceArrary
 }
 
 // UserChoice 형식으로 변환
-func ConvertMatchStringsToUserChoices(matchStrings []string) []stype.UserChoice {
-	choices := make([]stype.UserChoice, len(matchStrings))
-	for i, matchString := range matchStrings {
-		parts := strings.Split(matchString, ":")
+func ConvertFinalChoiceArraryToUserChoices(finalChoiceArrary []string) []stype.UserChoice {
+	choices := make([]stype.UserChoice, len(finalChoiceArrary))
+	for i, finalChoice := range finalChoiceArrary {
+		parts := strings.Split(finalChoice, ":")
 		if len(parts) != 2 {
-			log.Printf("Invalid match string format: %s", matchString)
+			log.Printf("Invalid final choice string format: %s", finalChoice)
 			continue
 		}
 		userID, err := strconv.Atoi(parts[0])

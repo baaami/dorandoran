@@ -159,7 +159,35 @@ func (s *ChatService) CreateRoom(matchEvent eventtypes.MatchEvent) error {
 			return err
 		}
 	} else {
-		err := s.emitter.PublishCoupleRoomCreateEvent(room)
+		var maleID int
+		var femaleID int
+
+		if len(matchEvent.MatchedUsers) != 2 {
+			log.Printf("Failed to publish couple room event: %v", err)
+			return err
+		}
+
+		if matchEvent.MatchedUsers[0].Gender == commontype.MALE {
+			maleID = matchEvent.MatchedUsers[0].ID
+			femaleID = matchEvent.MatchedUsers[1].ID
+		} else {
+			maleID = matchEvent.MatchedUsers[1].ID
+			femaleID = matchEvent.MatchedUsers[0].ID
+		}
+
+		err := s.chatRepo.UpdateMatchHistoryFinalMatch(int(room.Seq), []models.FinalMatch{
+			{
+				RoomID:   room.ID,
+				MaleID:   maleID,
+				FemaleID: femaleID,
+			},
+		})
+		if err != nil {
+			log.Printf("Failed to update match history final match: %v", err)
+			return err
+		}
+
+		err = s.emitter.PublishCoupleRoomCreateEvent(room)
 		if err != nil {
 			log.Printf("Failed to publish couple room event: %v", err)
 			return err
@@ -485,8 +513,19 @@ func (s *ChatService) AddBalanceGameResult(roomSeq int, gameID primitive.ObjectI
 	return nil
 }
 
+// 매칭 기록 최종 선택 업데이트
+func (s *ChatService) UpdateFinalChoice(roomSeq int, finalChoices []string) error {
+	err := s.chatRepo.UpdateMatchHistoryFinalChoice(roomSeq, finalChoices)
+	if err != nil {
+		log.Printf("Failed to update final choices for room seq %d: %v", roomSeq, err)
+		return err
+	}
+
+	return nil
+}
+
 // 매칭 기록 최종 매칭 업데이트
-func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []string) error {
+func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []models.FinalMatch) error {
 	err := s.chatRepo.UpdateMatchHistoryFinalMatch(roomSeq, finalMatch)
 	if err != nil {
 		log.Printf("Failed to update final match for room seq %d: %v", roomSeq, err)
@@ -496,8 +535,13 @@ func (s *ChatService) UpdateFinalMatch(roomSeq int, finalMatch []string) error {
 	return nil
 }
 
-// 매칭 기록 최종 매칭 조회
+// 매칭 기록 최종 선택 조회
 func (s *ChatService) GetFinalChoiceResult(roomSeq int) ([]string, error) {
+	return s.chatRepo.GetMatchHistoryFinalChoices(roomSeq)
+}
+
+// 매칭 기록 최종 매칭 조회
+func (s *ChatService) GetFinalMatch(roomSeq int) ([]models.FinalMatch, error) {
 	return s.chatRepo.GetMatchHistoryFinalMatch(roomSeq)
 }
 

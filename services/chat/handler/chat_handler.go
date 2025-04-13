@@ -343,7 +343,7 @@ func (h *ChatHandler) GetBalanceFormComments(c echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// 매칭 기록 최종 매칭 조회
+// 매칭 기록 최종 선택 조회
 func (h *ChatHandler) GetFinalChoiceResult(c echo.Context) error {
 	roomID := c.Param("id")
 
@@ -357,7 +357,7 @@ func (h *ChatHandler) GetFinalChoiceResult(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve final match"})
 	}
 
-	match := helper.ConvertMatchStringsToUserChoices(matchArray)
+	match := helper.ConvertFinalChoiceArraryToUserChoices(matchArray)
 
 	finalChoiceResult := stype.FinalChoiceResultMessage{
 		RoomID:  roomID,
@@ -365,4 +365,41 @@ func (h *ChatHandler) GetFinalChoiceResult(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, finalChoiceResult)
+}
+
+// 매칭 기록 최종 매칭 조회
+func (h *ChatHandler) GetFinalMatch(c echo.Context) error {
+	roomID := c.Param("id")
+
+	userID, err := getUserID(c)
+	if err != nil {
+		return err
+	}
+
+	room, err := h.chatService.GetChatRoomByID(roomID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve chat room"})
+	}
+
+	matchArray, err := h.chatService.GetFinalMatch(int(room.Seq))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve final match"})
+	}
+
+	matchResult := dto.FinalMatchResultResponse{
+		Result: false,
+		RoomID: "",
+	}
+
+	for _, match := range matchArray {
+		if match.MaleID == userID || match.FemaleID == userID {
+			matchResult = dto.FinalMatchResultResponse{
+				Result: true,
+				RoomID: match.RoomID,
+			}
+			break
+		}
+	}
+
+	return c.JSON(http.StatusOK, matchResult)
 }
