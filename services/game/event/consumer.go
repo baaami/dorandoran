@@ -40,6 +40,7 @@ func (c *Consumer) StartListening() {
 			mq.RoutingKeyRoomLeave,
 			mq.RoutingKeyRoomTimeout,
 			mq.RoutingKeyVoteCommentChat,
+			mq.RoutingKeyFinalChoiceTimeout,
 		})
 	if err != nil {
 		log.Fatalf("❌ Failed to declare queue %s for %s: %v", mq.QueueGame, mq.ExchangeAppTopic, err)
