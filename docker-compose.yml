@@ -127,8 +127,8 @@ services:
     deploy:
       mode: replicated
       replicas: 1
-    # volumes:
-    #   - ./db-data/mysql/:/var/lib/mysql/
+    volumes:
+      - ./db-data/mysql/:/var/lib/mysql/
 
   doran-mongo:
     image: 'mongo:4.2.16-bionic'
@@ -139,6 +139,8 @@ services:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: sample
+    volumes:
+      - ./db-data/mongo/:/data/db
 
   doran-rabbitmq:
     image: 'rabbitmq:3.9-management-alpine'
@@ -173,5 +175,5 @@ services:
         '--appendonly',
         'no'
       ] # AOF 영속성 비활성화
-    # volumes:
-    #   - ./db-data/redis:/data # Redis 데이터 저장소 마운트
+    volumes:
+      - ./db-data/redis:/data # Redis 데이터 저장소 마운트

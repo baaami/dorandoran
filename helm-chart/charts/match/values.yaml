@@ -17,11 +17,12 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
   hosts:
     - host: api.solo.com
       paths:
-        - path: /ws/match
-          pathType: Prefix
+        - path: /ws/match(/|$)(.*)
+          pathType: ImplementationSpecific
           serviceName: match
           servicePort: 2720
   tls:

@@ -45,11 +45,12 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
   hosts:
     - host: api.solo.com
       paths:
-        - path: /ws/game
-          pathType: Prefix
+        - path: /ws/game(/|$)(.*)
+          pathType: ImplementationSpecific
           serviceName: game
           servicePort: 2721
   tls:
