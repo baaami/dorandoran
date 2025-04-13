@@ -36,6 +36,7 @@ func (s *UserService) GetUserList() ([]dto.UserDTO, error) {
 			GameStatus: user.GameStatus,
 			GameRoomID: user.GameRoomID,
 			GamePoint:  user.GamePoint,
+			Alert:      user.Alert,
 		})
 	}
 
@@ -60,6 +61,7 @@ func (s *UserService) GetUserByID(id int) (*dto.UserDTO, error) {
 		GameStatus: user.GameStatus,
 		GameRoomID: user.GameRoomID,
 		GamePoint:  user.GamePoint,
+		Alert:      user.Alert,
 	}, nil
 }
 
@@ -84,6 +86,7 @@ func (s *UserService) GetUserBySNS(snsType int, snsID string) (*dto.UserDTO, err
 		GameStatus: user.GameStatus,
 		GameRoomID: user.GameRoomID,
 		GamePoint:  user.GamePoint,
+		Alert:      user.Alert,
 	}, nil
 }
 
@@ -110,6 +113,7 @@ func (s *UserService) RegisterUser(user dto.UserDTO) (*dto.UserDTO, error) {
 		GameStatus: user.GameStatus,
 		GameRoomID: user.GameRoomID,
 		GamePoint:  user.GamePoint,
+		Alert:      user.Alert,
 	}
 	id, err := s.repo.InsertUser(userModel)
 	if err != nil {
@@ -132,17 +136,12 @@ func (s *UserService) RegisterUser(user dto.UserDTO) (*dto.UserDTO, error) {
 // 유저 업데이트
 func (s *UserService) UpdateUser(user dto.UserDTO) error {
 	userModel := models.User{
-		ID:         user.ID,
-		SnsType:    user.SnsType,
-		SnsID:      user.SnsID,
-		Name:       user.Name,
-		Gender:     user.Gender,
-		Birth:      user.Birth,
-		Address:    models.Address(user.Address),
-		GameStatus: user.GameStatus,
-		GameRoomID: user.GameRoomID,
-		GamePoint:  user.GamePoint,
-		Alert:      user.Alert,
+		ID:      user.ID,
+		Name:    user.Name,
+		Gender:  user.Gender,
+		Birth:   user.Birth,
+		Address: models.Address(user.Address),
+		Alert:   user.Alert,
 	}
 	return s.repo.UpdateUser(userModel)
 }
