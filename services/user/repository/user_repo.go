@@ -100,6 +100,11 @@ func (r *UserRepository) UpdateUser(user models.User) error {
 	return nil
 }
 
+// 유저 알람 업데이트
+func (r *UserRepository) UpdateUserAlert(userID int, alert bool) error {
+	return r.db.Model(&models.User{ID: userID}).Update("alert", alert).Error
+}
+
 // 유저 상태 업데이트
 func (r *UserRepository) UpdateUserGameInfo(userID int, newStatus int, gameRoomID string) error {
 	// 한 번의 쿼리로 game_status와 game_room_id를 함께 업데이트

@@ -29,6 +29,7 @@ func NewRouter(userHandler *handler.UserHandler, filterHandler *handler.FilterHa
 	mux.Post("/register", userHandler.RegisterUser)
 
 	mux.Patch("/update", userHandler.UpdateUser)
+	mux.Patch("/update/alert", userHandler.UpdateUserAlert)
 
 	mux.Delete("/delete", userHandler.DeleteUser)
 

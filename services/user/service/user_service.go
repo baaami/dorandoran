@@ -141,9 +141,13 @@ func (s *UserService) UpdateUser(user dto.UserDTO) error {
 		Gender:  user.Gender,
 		Birth:   user.Birth,
 		Address: models.Address(user.Address),
-		Alert:   user.Alert,
 	}
 	return s.repo.UpdateUser(userModel)
+}
+
+// 유저 알람 업데이트
+func (s *UserService) UpdateUserAlert(userID int, alert bool) error {
+	return s.repo.UpdateUserAlert(userID, alert)
 }
 
 // 유저 업데이트

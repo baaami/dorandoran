@@ -150,6 +150,35 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(updatedUser)
 }
 
+// 유저 알람 업데이트
+func (h *UserHandler) UpdateUserAlert(w http.ResponseWriter, r *http.Request) {
+	xUserID := r.Header.Get("X-User-ID")
+	if xUserID == "" {
+		http.Error(w, "User ID is required", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := strconv.Atoi(xUserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("User ID is not number, xUserID: %s", xUserID), http.StatusUnauthorized)
+		return
+	}
+
+	var updatedUser dto.UserDTO
+	if err := json.NewDecoder(r.Body).Decode(&updatedUser); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	err = h.userService.UpdateUserAlert(userID, updatedUser.Alert)
+	if err != nil {
+		http.Error(w, "Failed to update user alert", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // 유저 삭제
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	xUserID := r.Header.Get("X-User-ID")
